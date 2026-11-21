@@ -304,13 +304,14 @@ export function demoState() {
   const t = todayKey();
   const r = (n) => addDays(t, n);
   const locA = { id: 'locA', name: 'Mây Homestay – Đà Lạt', address: '12 Hoa Hồng, Phường 4, Đà Lạt', emoji: '🌿', rooms: [
-    { id: 'rA1', name: 'Phòng Đồi Thông' }, { id: 'rA2', name: 'Phòng Sương Mai' }, { id: 'rA3', name: 'Phòng Hoa Dã Quỳ' } ] };
+    { id: 'rA1', name: 'Phòng Đồi Thông' }, { id: 'rA2', name: 'Phòng Sương Mai' }, { id: 'rA3', name: 'Phòng Hoa Dã Quỳ' }, { id: 'rA4', name: 'Phòng Gác Mái' } ] };
   const locB = { id: 'locB', name: 'Mây House – Hội An', address: '45 Nguyễn Phúc Chu, Minh An, Hội An', emoji: '🏝️', rooms: [
-    { id: 'rB1', name: 'Phòng 101' }, { id: 'rB2', name: 'Phòng 102' } ] };
+    { id: 'rB1', name: 'Phòng 101' }, { id: 'rB2', name: 'Phòng 102' }, { id: 'rB3', name: 'Phòng 103' } ] };
   const cal = (id, roomId, platform) => ({ id, roomId, platform, url: '', checkIn: '14:00', checkOut: '12:00', demo: true });
   const calendars = [
     cal('c1', 'rA1', 'Airbnb'), cal('c2', 'rA1', 'Booking.com'), cal('c3', 'rA2', 'Airbnb'),
     cal('c4', 'rA3', 'Agoda'), cal('c5', 'rB1', 'Booking.com'), cal('c6', 'rB2', 'Airbnb'),
+    cal('c7', 'rB3', 'Agoda'),
   ];
   const ev = (s, e, summary, description = '') => ({ uid: uid(), start: r(s), end: r(e), summary, description });
   const events = {
@@ -320,6 +321,7 @@ export function demoState() {
     c4: [ev(-1, 1, 'Agoda Booking'), ev(3, 6, 'Agoda Booking'), ev(11, 13, 'Agoda Booking')],
     c5: [ev(-4, 1, 'CLOSED - Not available'), ev(1, 5, 'CLOSED - Not available'), ev(8, 10, 'CLOSED - Not available'), ev(18, 21, 'CLOSED - Not available')],
     c6: [ev(0, 2, 'Reserved'), ev(4, 9, 'Reserved'), ev(13, 17, 'Reserved')],
+    c7: [ev(-2, 0, 'Agoda Booking'), ev(3, 5, 'Agoda Booking'), ev(12, 14, 'Agoda Booking')],
   };
   const syncInfo = Object.fromEntries(calendars.map((c) => [c.id, { at: Date.now(), ok: true, count: events[c.id].length }]));
   return {
@@ -331,7 +333,8 @@ export function demoState() {
     events,
     syncInfo,
     lastSync: Date.now(),
-    manual: [{ id: 'm1', roomId: 'rB2', platform: 'Trực tiếp', guest: 'Chị Lan (0903 xxx 218)', start: r(-3), end: r(0), checkIn: '14:00', checkOut: '11:00', note: 'Khách quen, cần thêm 1 nệm phụ' }],
+    manual: [{ id: 'm1', roomId: 'rB2', platform: 'Trực tiếp', guest: 'Chị Lan (0903 xxx 218)', start: r(-3), end: r(0), checkIn: '14:00', checkOut: '11:00', note: 'Khách quen, cần thêm 1 nệm phụ' },
+      { id: 'm2', roomId: 'rA4', platform: 'Trực tiếp', guest: 'Anh Minh (0909 xxx 456)', start: r(2), end: r(4), checkIn: '14:00', checkOut: '12:00', note: '' }],
     notes: { [t]: 'Giặt toàn bộ ga gối phòng Đồi Thông. Nhắc khách phòng 102 trả chìa khoá trước 11h.' },
     tasks: [
       { id: uid(), title: 'Thay bóng đèn phòng tắm', desc: 'Phòng Sương Mai – bóng đèn gương bị chập chờn', date: t, roomId: 'rA2', priority: 'urgent', done: false },
