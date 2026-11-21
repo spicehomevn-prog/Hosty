@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, MapPin } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, allRooms, roomIndex } from '../lib/derive.js';
 import {
@@ -123,7 +123,7 @@ function WeekTimeline({ start, rooms, bookings, selected, onSelect, onBooking, c
           lastLoc = room.location.id;
           return (
             <div key={room.id}>
-              {showLoc && <div className="week-loc">{room.location.emoji} {room.location.name}</div>}
+              {showLoc && <div className="week-loc"><MapPin size={14} /> {room.location.name}</div>}
               <div className="week-row">
                 <div className="week-room" title={room.name}>{room.name}</div>
                 <div className="week-track" style={{ height: Math.max(1, lanes) * 30 + 10 }}>
@@ -192,7 +192,7 @@ export default function CalendarView({ api, focus }) {
           <div className="chips scroll-x">
             <button className={`chip ${!locId ? 'on' : ''}`} onClick={() => setLocId('')}>Tất cả</button>
             {state.locations.map((l) => (
-              <button key={l.id} className={`chip ${locId === l.id ? 'on' : ''}`} onClick={() => setLocId(l.id)}>{l.emoji} {l.name}</button>
+              <button key={l.id} className={`chip ${locId === l.id ? 'on' : ''}`} onClick={() => setLocId(l.id)}><MapPin size={14} />{l.name}</button>
             ))}
           </div>
         )}

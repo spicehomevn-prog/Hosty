@@ -1,4 +1,4 @@
-// Lưu trữ JSON cho Hosty.
+// Lưu trữ JSON cho Hostexa.
 // - Trên Vercel: Vercel Blob (biến BLOB_READ_WRITE_TOKEN tự có khi kết nối Blob store vào project).
 // - Chạy local (npm run dev) chưa có token: file trong thư mục .hosty-sync/ của máy.
 // Mọi lần ghi có thể kèm ifMatch (ETag) để không ghi đè dữ liệu mới hơn.

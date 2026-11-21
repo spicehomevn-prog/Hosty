@@ -1,4 +1,4 @@
-// Tài khoản & phiên đăng nhập của Hosty
+// Tài khoản & phiên đăng nhập của Hostexa
 // - Chủ hệ thống (owner): khai báo bằng biến môi trường HOSTY_OWNER_USERNAME / HOSTY_OWNER_PASSWORD.
 // - Tài khoản cơ sở (admin / member): lưu trong hosty/accounts.json, do owner tạo.
 import { scrypt as _scrypt, randomBytes, createHmac, createHash, timingSafeEqual, randomInt } from 'node:crypto';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarPlus, Sparkles, CheckCircle2, LogIn, Eye, EyeOff, Loader2, User, Lock } from 'lucide-react';
+import { CalendarPlus, Sparkles, CheckCircle2, LogIn, Eye, EyeOff, Loader2, User, Lock } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { Logo } from './Logo.jsx';
 
@@ -26,7 +26,7 @@ export default function Login() {
         <div className="wa-card yellow" style={{ '--d': '.58s' }}><Sparkles size={24} /><span>Thẻ dọn phòng</span></div>
         <div className="wa-card pink" style={{ '--d': '.71s' }}><CheckCircle2 size={24} /><span>Task mỗi ngày</span></div>
       </div>
-      <h1 className="rise" style={{ '--i': 9 }}>Đăng nhập Hosty</h1>
+      <h1 className="rise" style={{ '--i': 9 }}>Đăng nhập Hostexa</h1>
       <p className="muted rise" style={{ '--i': 10 }}>Dữ liệu tự đồng bộ giữa các máy mỗi 15 phút.</p>
 
       <form className="login-form rise" style={{ '--i': 11 }} onSubmit={submit}>

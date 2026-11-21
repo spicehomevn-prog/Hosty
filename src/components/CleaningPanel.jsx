@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Copy, X, Check, LogIn, LogOut, BedDouble, NotebookPen, Sparkles, ArrowRight, MapPin } from 'lucide-react';
+import { Copy, X, Check, LogIn, LogOut, BedDouble, NotebookPen, Sparkles, ArrowRight, MapPin } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { getCleanings, cleaningStatus, cleaningText, copyText, arrivalsOn, departuresOn, occupiedOn, roomIndex } from '../lib/derive.js';
 import { dm, longDate, monthTitle, wdLong } from '../lib/dates.js';

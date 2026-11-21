@@ -1,4 +1,4 @@
-# Hosty – theo dõi đặt phòng, dọn phòng & task cho khách sạn / homestay
+# Hostexa – theo dõi đặt phòng, dọn phòng & task cho khách sạn / homestay
 
 Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua link iCal. Dữ liệu từng cơ sở lưu trên Vercel Blob, đăng nhập trên máy nào cũng thấy cùng dữ liệu.
 
@@ -13,7 +13,7 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
 - Chọn font: Be Vietnam Pro (mặc định), Plus Jakarta Sans, Lexend, Manrope.
 
 ## Cài đặt trên Vercel (một lần)
-1. **Bật Vercel Blob**: project trên vercel.com → **Storage** → **Create Database** → **Blob** → đặt tên (vd. `hosty-data`) → **Create** → chọn project Hosty (tick Production/Preview/Development) → **Connect**. Vercel tự thêm biến `BLOB_READ_WRITE_TOKEN`.
+1. **Bật Vercel Blob**: project trên vercel.com → **Storage** → **Create Database** → **Blob** → đặt tên (vd. `hosty-data`) → **Create** → chọn project (tick Production/Preview/Development) → **Connect**. Vercel tự thêm biến `BLOB_READ_WRITE_TOKEN`.
 2. **Thêm biến môi trường**: **Settings → Environment Variables**:
 
    | Tên biến | Giá trị |
@@ -26,7 +26,7 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
 3. **Deployments → Redeploy** để áp dụng.
 
 ## Quy trình sử dụng
-1. Chủ hệ thống đăng nhập → **Tạo cơ sở mới** → Hosty tự tạo tài khoản `<cơ sở>-admin` và hiện mật khẩu → bấm **Copy để gửi** qua Zalo.
+1. Chủ hệ thống đăng nhập → **Tạo cơ sở mới** → Hostexa tự tạo tài khoản `<cơ sở>-admin` và hiện mật khẩu → bấm **Copy để gửi** qua Zalo.
 2. Admin cơ sở đăng nhập → trả lời 4 câu hỏi thiết lập phòng & lịch iCal.
 3. Chủ hệ thống vào **Quản lý tài khoản** → **Thêm member** cho từng nhân viên dọn phòng (tên đăng nhập tự sinh, sửa được).
 4. Admin tạo task và chọn **Giao cho** nhân viên. Nhân viên tick dọn phòng / task trên điện thoại; mọi máy tự cập nhật.
@@ -55,3 +55,8 @@ npx vercel --prod
 - `api/auth.js` – đăng nhập, đổi mật khẩu, thông tin tài khoản.
 - `api/data.js` – đọc/ghi dữ liệu cơ sở (ghi có điều kiện theo phiên bản, kiểm tra quyền member phía server).
 - `api/admin.js` – quản lý cơ sở & tài khoản (chỉ chủ hệ thống).
+
+## Nhận diện
+Logo, bảng màu và bộ icon theo "Hostexa — Relay identity": biểu tượng đường relay Midnight Plum `#241A3B` với điểm đầu Violet `#7C5CE6` và điểm cuối Coral `#F0845A`; chữ Manrope 700. Icon nằm trong `src/lib/icons.jsx` (lưới 24, nét 2px, đầu tròn, một nét nhấn violet/coral, một màu khi nhỏ hơn 20px).
+
+> Tên biến môi trường (`HOSTY_OWNER_USERNAME`, `HOSTY_OWNER_PASSWORD`) và nơi lưu dữ liệu giữ nguyên tên cũ để không phải cấu hình lại.

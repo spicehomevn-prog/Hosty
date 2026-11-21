@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { RefreshCw, Settings2, LogIn, Sparkles, BedDouble, ClipboardPlus, NotebookPen, CalendarRange, AlertTriangle, Check } from 'lucide-react';
+import { RefreshCw, Settings2, LogIn, Sparkles, BedDouble, ClipboardPlus, NotebookPen, CalendarRange, AlertTriangle, Check } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, arrivalsOn, occupiedOn, allRooms, roomIndex } from '../lib/derive.js';
 import { todayKey, longDate, addDays, dm, timeAgo, wdShort } from '../lib/dates.js';
@@ -9,7 +9,7 @@ import { useCountUp } from '../lib/motion.js';
 import { SyncStatus } from './Account.jsx';
 import { useSession } from '../lib/session.jsx';
 import { can, visibleTasks, canTickTask } from '../lib/perm.js';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight } from '../lib/icons.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
 
 export default function Home({ api }) {
@@ -35,7 +35,7 @@ export default function Home({ api }) {
       <header className="home-top rise" style={{ '--i': 0 }}>
         <div className="hello">
           <LogoMark size={48} />
-          <span>Xin chào{user?.name ? `, ${user.name}` : ''} 👋</span>
+          <span>Xin chào{user?.name ? `, ${user.name}` : ''}</span>
         </div>
         <div className="row gap8">
           <button className="icon-btn" onClick={() => { sync(); cloud.syncNow(); }} disabled={syncing || cloud.status === 'syncing'} aria-label="Đồng bộ"><RefreshCw size={19} className={syncing || cloud.status === 'syncing' ? 'spin' : ''} /></button>

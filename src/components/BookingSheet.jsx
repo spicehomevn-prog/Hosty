@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, LogIn, LogOut, Moon, Ban } from 'lucide-react';
+import { Trash2, LogIn, LogOut, Moon, Ban } from '../lib/icons.jsx';
 import { useStore, uid, PLATFORMS, platformColor } from '../lib/store.jsx';
 import { roomIndex } from '../lib/derive.js';
 import { todayKey, addDays, diffDays, longDate } from '../lib/dates.js';

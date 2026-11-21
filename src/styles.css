@@ -484,9 +484,23 @@ textarea.input { height: auto; padding: 12px 16px; resize: vertical; }
 }
 
 /* Brand */
-.logo { display: inline-flex; align-items: center; gap: .32em; }
-.logo-mark { flex: none; display: block; }
-.logo-word { font-family: 'Plus Jakarta Sans', var(--font); font-weight: 800; letter-spacing: -0.035em; line-height: 1; color: #121A33; }
+.logo { display: inline-flex; align-items: center; gap: .18em; }
+.logo-mark, .logo-symbol { flex: none; display: block; }
+.logo-word { font-family: 'Manrope', var(--font); font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: #241A3B; }
+.logo.dark .logo-word { color: #F8F6FD; }
+
+/* Icon Hostexa: nét chính = currentColor, nét nhấn = --icon-accent (violet) / --icon-coral */
+.hx-icon { flex: none; display: inline-block; vertical-align: middle; }
+/* nền tối: violet nhạt hơn (#A48BFF) theo quy cách bộ icon */
+.btn.primary, .nav-plus, .nav-item:not(.active) .nav-ico, .toast, .seg button.on, .role-badge.r-admin {
+  --icon-accent: #A48BFF; --icon-coral: #F6A07E;
+}
+.nav-item.active .nav-ico { --icon-accent: #5B3FD1; --icon-coral: #C9542B; }
+/* nền màu hoặc chữ màu trạng thái: icon một màu theo chữ */
+.hero, .wa-card.violet, .wa-card.yellow, .tpill, .tag, .check, .bar, .sync-pill, .alert, .sync-line, .cal-status,
+.clean-done-by, .status, .form-error, .pack-warn, .legacy-box > svg, .note-box label, .stat, .bk-grid, .create-tile .tile-ico, .aico {
+  --icon-accent: currentColor; --icon-coral: currentColor;
+}
 .welcome-logo { margin-bottom: 28px; }
 .brand-foot { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 36px; color: var(--muted); font-size: 12.5px; text-align: center; }
 
@@ -662,12 +676,12 @@ button:not(:disabled):active { --press: .95; transition-duration: .12s, .2s, .2s
 /* Logo vẽ dần */
 .logo.animated .logo-word { animation: rise .6s var(--ease-out) .35s backwards; display: inline-block; }
 .logo-mark.animated .lm-bg { transform-box: fill-box; transform-origin: center; animation: mark-in .7s var(--spring) backwards; }
-.logo-mark.animated .lm-roof, .logo-mark.animated .lm-h { stroke-dasharray: 1; stroke-dashoffset: 0; animation: draw .45s var(--ease-out) backwards; }
-.logo-mark.animated .lm-roof { animation-delay: .35s; }
-.logo-mark.animated .lm-h1 { animation-delay: .6s; }
-.logo-mark.animated .lm-h2 { animation-delay: .7s; }
-.logo-mark.animated .lm-h3 { animation-delay: .8s; }
-.logo-mark.animated .lm-dot { transform-box: fill-box; transform-origin: center; animation: dot-drop .6s var(--spring) .95s backwards; }
+/* đường relay vẽ dần, rồi điểm đầu (violet) và điểm cuối (coral) bật ra */
+.animated .lm-line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: draw .7s var(--flow) .3s backwards; }
+.animated .lm-start, .animated .lm-end { transform-box: fill-box; transform-origin: center; animation: dot-pop .5s var(--spring) backwards; }
+.animated .lm-start { animation-delay: .2s; }
+.animated .lm-end { animation-delay: .95s; }
+@keyframes dot-pop { from { opacity: 0; transform: scale(0); } }
 @keyframes mark-in { from { opacity: 0; transform: scale(.4) rotate(-14deg); } }
 @keyframes draw { from { stroke-dashoffset: 1; } }
 @keyframes dot-drop { 0% { opacity: 0; transform: translateY(-34px) scale(.6); } 60% { opacity: 1; } }
@@ -711,3 +725,8 @@ button:not(:disabled):active { --press: .95; transition-duration: .12s, .2s, .2s
   }
 }
 .login .center-btn { display: flex; width: 100%; margin-top: 18px; flex-wrap: wrap; }
+/* icon trong chip / nhãn địa điểm */
+.emoji-box { color: var(--ink); }
+.loc-pill, .week-loc, .cal-loc h4 { display: inline-flex; align-items: center; gap: 6px; }
+.week-loc { display: flex; }
+.loc-pill .hx-icon, .week-loc .hx-icon, .chip .hx-icon { color: var(--violet-ink); }

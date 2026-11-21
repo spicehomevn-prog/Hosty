@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '../lib/icons.jsx';
 import { useStore, uid } from '../lib/store.jsx';
 import { todayKey } from '../lib/dates.js';
 import { Sheet, Field } from './ui.jsx';

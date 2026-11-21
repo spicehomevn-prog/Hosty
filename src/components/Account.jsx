@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cloud, CloudOff, RefreshCw, AlertTriangle, LogOut, KeyRound, ArrowLeftRight, Users, Loader2, CheckCircle2 } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, AlertTriangle, LogOut, KeyRound, ArrowLeftRight, Users, Loader2, CheckCircle2 } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { useStore } from '../lib/store.jsx';
 import { ROLE_LABEL } from '../lib/perm.js';

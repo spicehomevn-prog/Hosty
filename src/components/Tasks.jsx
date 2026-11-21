@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks, UserRound } from 'lucide-react';
+import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks, UserRound } from '../lib/icons.jsx';
 import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { useMembers } from '../lib/members.js';
 import { useStore } from '../lib/store.jsx';

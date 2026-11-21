@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, Type, UserRound } from 'lucide-react';
+import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, Type, UserRound } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { FONTS, ensureFont } from '../lib/fonts.js';
 import { timeAgo } from '../lib/dates.js';
@@ -56,7 +56,7 @@ export default function Places({ api }) {
           return (
             <details key={loc.id} className={`loc-card tone-${TONES[i % 4]}`}>
               <summary>
-                <span className="emoji-box lg">{loc.emoji}</span>
+                <span className="emoji-box lg"><Building2 size={26} /></span>
                 <span className="loc-info">
                   <b>{loc.name}</b>
                   <small>{loc.rooms.length} phòng · {cals.length} lịch</small>

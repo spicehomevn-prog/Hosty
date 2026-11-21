@@ -15,7 +15,7 @@ function clearCaches() {
   } catch { /* noop */ }
 }
 
-/** Gọi API Hosty; ném Error có .status và .info (body) khi lỗi */
+/** Gọi API Hostexa; ném Error có .status và .info (body) khi lỗi */
 export async function api(path, { token, method = 'GET', body } = {}) {
   let r;
   try {

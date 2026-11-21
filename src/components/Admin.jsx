@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, KeyRound, Lock, Unlock, Trash2, Pencil, Loader2, Check, X, ShieldCheck, Sparkles } from 'lucide-react';
+import { Plus, KeyRound, Lock, Unlock, Trash2, Pencil, Loader2, Check, X, ShieldCheck, Sparkles } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { ROLE_LABEL } from '../lib/perm.js';
 import { Sheet, toast } from './ui.jsx';

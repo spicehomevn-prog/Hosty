@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Plus, Trash2, Link2, Clock, MapPin, CheckCircle2, AlertCircle, Loader2, CalendarPlus, History } from 'lucide-react';
+import { Building2, ArrowLeft, ArrowRight, Plus, Trash2, Link2, Clock, MapPin, CheckCircle2, AlertCircle, Loader2, CalendarPlus, History } from '../lib/icons.jsx';
 import { useStore, uid, PLATFORMS, LOCATION_EMOJI, platformColor, loadLegacy } from '../lib/store.jsx';
 import { Stepper, Field } from './ui.jsx';
 import { LogoMark } from './Logo.jsx';
@@ -108,7 +108,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
             <div className="legacy-box">
               <History size={18} />
               <div>
-                <b>Máy này có dữ liệu Hosty cũ: {legacy.property?.name}</b>
+                <b>Máy này có dữ liệu Hostexa cũ: {legacy.property?.name}</b>
                 <span>{legacy.locations.length} địa điểm · {legacy.locations.reduce((n, l) => n + l.rooms.length, 0)} phòng · {(legacy.tasks || []).length} task. Dùng dữ liệu này cho cơ sở và đưa lên máy chủ?</span>
                 <button className="btn tiny" onClick={() => {
                   dispatch({ type: 'REPLACE', state: legacy });
@@ -129,7 +129,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
           <p className="muted">Mỗi địa điểm là một toà nhà / chi nhánh có địa chỉ riêng.</p>
           <div className="big-stepper"><Stepper value={locations.length} onChange={setCount} min={1} max={20} /></div>
           <div className="loc-preview">
-            {locations.map((l, i) => <span key={l.id} className="loc-pill">{l.emoji} {l.name || `Địa điểm ${i + 1}`}</span>)}
+            {locations.map((l, i) => <span key={l.id} className="loc-pill"><MapPin size={14} />{l.name || `Địa điểm ${i + 1}`}</span>)}
           </div>
         </section>
       )}
@@ -142,7 +142,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
           {locations.map((loc, i) => (
             <div key={loc.id} className={`setup-card tone-${['violet', 'yellow', 'pink', 'blue'][i % 4]}`}>
               <div className="setup-card-head">
-                <span className="emoji-box">{loc.emoji}</span>
+                <span className="emoji-box"><Building2 size={22} /></span>
                 <b>Địa điểm {i + 1}</b>
               </div>
               <Field label="Tên địa điểm">
@@ -178,7 +178,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
           </div>
           {locations.map((loc) => (
             <div key={loc.id} className="cal-loc">
-              <h4>{loc.emoji} {loc.name}</h4>
+              <h4><MapPin size={16} /> {loc.name}</h4>
               {loc.rooms.map((room) => {
                 const cals = calendars.filter((c) => c.roomId === room.id);
                 return (

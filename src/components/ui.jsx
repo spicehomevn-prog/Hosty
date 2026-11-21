@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { X, Minus, Plus } from 'lucide-react';
+import { X, Minus, Plus } from '../lib/icons.jsx';
 
 export function Sheet({ open, onClose, title, children, footer }) {
   const [closing, setClosing] = useState(false);

@@ -1,4 +1,4 @@
-import { Copy, KeyRound } from 'lucide-react';
+import { Copy, KeyRound } from '../lib/icons.jsx';
 import { copyText } from '../lib/derive.js';
 import { ROLE_LABEL } from '../lib/perm.js';
 import { Sheet, toast } from './ui.jsx';
@@ -8,7 +8,7 @@ export function CredentialsSheet({ data, onClose }) {
   if (!data) return null;
   const { account, password, workspaceName } = data;
   const text = [
-    `Hosty – ${workspaceName || ''}`.trim(),
+    `Hostexa – ${workspaceName || ''}`.trim(),
     `Link: ${location.origin}`,
     `Tài khoản: ${account.username}`,
     `Mật khẩu: ${password}`,
