@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useFlipNav } from './lib/motion.js';
 import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen } from 'lucide-react';
 import { useStore } from './lib/store.jsx';
 import { applyFont } from './lib/fonts.js';
@@ -28,6 +29,9 @@ export default function App() {
   const [task, setTask] = useState(null);
   const [editing, setEditing] = useState(false);
   const [inSetup, setInSetup] = useState(!state.setupDone);
+  const navRef = useRef(null);
+  const showMain = state.setupDone && !inSetup && !editing;
+  const blob = useFlipNav(navRef, tab, showMain);
 
   useEffect(() => { if (!state.setupDone) setInSetup(true); }, [state.setupDone]);
 
@@ -56,17 +60,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <main className={`page page-${tab}`}>
+      <main key={tab} className={`page page-${tab}`}>
         {tab === 'home' && <Home api={api} />}
         {tab === 'calendar' && <CalendarView api={api} focus={calFocus} />}
         {tab === 'tasks' && <Tasks api={api} />}
         {tab === 'places' && <Places api={api} />}
       </main>
 
-      <nav className="bottom-nav" aria-label="Điều hướng">
-        <button className="nav-plus" onClick={() => setCreateOpen(true)} aria-label="Tạo mới"><Plus size={22} /></button>
+      <nav className="bottom-nav" aria-label="Điều hướng" ref={navRef}>
+        {blob && (
+          <span
+            className={`nav-blob ${blob.animate ? (blob.dir > 0 ? 'to-right' : 'to-left') : ''}`}
+            style={{ left: blob.left, right: blob.right }}
+            aria-hidden="true"
+          />
+        )}
+        <button className="nav-plus" data-flip="plus" onClick={() => setCreateOpen(true)} aria-label="Tạo mới"><Plus size={22} /></button>
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={`nav-item ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)} aria-label={label} aria-current={tab === id ? 'page' : undefined}>
+          <button key={id} data-flip={id} className={`nav-item ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)} aria-label={label} aria-current={tab === id ? 'page' : undefined}>
             <span className="nav-ico"><Icon size={19} /></span>
             {tab === id && <span className="nav-label">{label}</span>}
           </button>

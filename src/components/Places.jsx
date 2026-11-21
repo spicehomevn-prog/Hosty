@@ -35,12 +35,12 @@ export default function Places({ api }) {
 
   return (
     <div className="places">
-      <header className="page-head">
+      <header className="page-head rise">
         <div><h1>Cơ sở</h1><p className="sub">Địa điểm, phòng & lịch đồng bộ</p></div>
         <button className="icon-btn" onClick={api.editSetup} aria-label="Chỉnh sửa thiết lập"><Pencil size={18} /></button>
       </header>
 
-      <div className="loc-list">
+      <div className="loc-list stagger">
         {state.locations.map((loc, i) => {
           const cals = state.calendars.filter((c) => loc.rooms.some((r) => r.id === c.roomId));
           return (
@@ -90,7 +90,7 @@ export default function Places({ api }) {
 
       <h2 className="section-title"><Type size={18} /> Font chữ</h2>
       <p className="tiny muted">Các font không chân từ Google Fonts, hỗ trợ đầy đủ tiếng Việt.</p>
-      <div className="font-grid">
+      <div className="font-grid stagger" style={{ '--i': 3 }}>
         {FONTS.map((f) => (
           <button key={f.id} className={`font-card ${state.settings.font === f.id ? 'on' : ''}`} style={{ fontFamily: `'${f.id}', sans-serif` }} onClick={() => dispatch({ type: 'SETTINGS', patch: { font: f.id } })}>
             <span className="font-tag">{f.tag}</span>

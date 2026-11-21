@@ -37,10 +37,11 @@ const pct = (v, days = 7) => `${(v / days) * 100}%`;
 
 function Bar({ sg, label, top, onClick }) {
   const { b } = sg;
+  const delay = `${Math.round(sg.cs * 45 + (sg.lane || 0) * 30)}ms`;
   return (
     <button
       className={`bar ${b.blocked ? 'blocked' : ''} ${sg.openL ? 'open-l' : ''} ${sg.openR ? 'open-r' : ''}`}
-      style={{ left: `calc(${pct(sg.cs)} + 2px)`, width: `calc(${pct(sg.ce - sg.cs)} - 4px)`, top, '--bc': b.color }}
+      style={{ left: `calc(${pct(sg.cs)} + 2px)`, width: `calc(${pct(sg.ce - sg.cs)} - 4px)`, top, '--bc': b.color, animationDelay: delay }}
       onClick={(e) => { e.stopPropagation(); onClick(b); }}
       title={`${label} · ${b.platform} · ${dm(b.start)} → ${dm(b.end)}`}
     >
@@ -211,9 +212,9 @@ export default function CalendarView({ api, focus }) {
 
         <div className="cal-card">
           {view === 'month' ? (
-            <MonthGrid anchor={anchor} bookings={visible} selected={selected} onSelect={onSelect} onBooking={api.openBooking} cleanDays={cleanDays} noteDays={noteDays} labelFor={labelFor} />
+            <MonthGrid key={`m${anchor.slice(0, 7)}${locId}`} anchor={anchor} bookings={visible} selected={selected} onSelect={onSelect} onBooking={api.openBooking} cleanDays={cleanDays} noteDays={noteDays} labelFor={labelFor} />
           ) : (
-            <WeekTimeline start={from} rooms={rooms} bookings={visible} selected={selected} onSelect={onSelect} onBooking={api.openBooking} cleanDays={cleanDays} noteDays={noteDays} />
+            <WeekTimeline key={`w${from}${locId}`} start={from} rooms={rooms} bookings={visible} selected={selected} onSelect={onSelect} onBooking={api.openBooking} cleanDays={cleanDays} noteDays={noteDays} />
           )}
           <Legend bookings={visible} />
         </div>

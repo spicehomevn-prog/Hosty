@@ -39,13 +39,13 @@ export default function Tasks({ api }) {
 
   return (
     <div className="tasks">
-      <header className="page-head">
+      <header className="page-head rise">
         <div><h1>Công việc</h1><p className="sub">{state.tasks.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
         <button className="icon-btn" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={20} /></button>
       </header>
 
       <h2 className="section-title">Tiến độ</h2>
-      <div className="active-cards scroll-x">
+      <div className="active-cards scroll-x stagger">
         {summary.map((s) => (
           <div key={s.title} className={`active-card tone-${s.tone}`}>
             <s.icon size={18} />
@@ -60,7 +60,7 @@ export default function Tasks({ api }) {
         {FILTERS.map((f) => <button key={f.id} className={`chip ${filter === f.id ? 'on' : ''}`} onClick={() => setFilter(f.id)}>{f.label}</button>)}
       </div>
 
-      <div className="task-list">
+      <div className="task-list stagger" style={{ '--i': 2 }}>
         {list.length === 0 && <div className="empty-card"><ListChecks size={22} /><p>Không có task nào.</p></div>}
         {list.map((t) => {
           const room = idx[t.roomId]?.room;

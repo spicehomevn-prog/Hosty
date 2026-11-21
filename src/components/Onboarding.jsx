@@ -87,15 +87,15 @@ export default function Onboarding({ editing, onDone, onCancel }) {
   if (key === 'welcome') {
     return (
       <div className="onb onb-welcome">
-        <div className="welcome-logo"><Logo size={52} /></div>
+        <div className="welcome-logo"><Logo size={52} animated /></div>
         <div className="welcome-art" aria-hidden="true">
-          <div className="wa-card violet"><CalendarPlus size={26} /><span>Lịch đặt phòng</span></div>
-          <div className="wa-card yellow"><Sparkles size={26} /><span>Thẻ dọn phòng</span></div>
-          <div className="wa-card pink"><CheckCircle2 size={26} /><span>Task mỗi ngày</span></div>
+          <div className="wa-card violet" style={{ '--d': '.45s' }}><CalendarPlus size={26} /><span>Lịch đặt phòng</span></div>
+          <div className="wa-card yellow" style={{ '--d': '.58s' }}><Sparkles size={26} /><span>Thẻ dọn phòng</span></div>
+          <div className="wa-card pink" style={{ '--d': '.71s' }}><CheckCircle2 size={26} /><span>Task mỗi ngày</span></div>
         </div>
-        <h1>Quản lý phòng,<br />gọn trong một lịch.</h1>
-        <p className="muted">Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua iCal, tự tạo thẻ dọn phòng mỗi ngày và theo dõi công việc của khách sạn / homestay.</p>
-        <div className="onb-actions col">
+        <h1 className="rise" style={{ '--i': 9 }}>Quản lý phòng,<br />gọn trong một lịch.</h1>
+        <p className="muted rise" style={{ '--i': 10 }}>Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua iCal, tự tạo thẻ dọn phòng mỗi ngày và theo dõi công việc của khách sạn / homestay.</p>
+        <div className="onb-actions col rise" style={{ '--i': 11 }}>
           <button className="btn primary lg" onClick={() => setStep(1)}>Bắt đầu thiết lập <ArrowRight size={18} /></button>
           <button className="btn ghost" onClick={() => { dispatch({ type: 'REPLACE', state: demoState() }); onDone(); }}>Xem thử với dữ liệu mẫu</button>
         </div>
@@ -105,7 +105,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
 
   return (
     <div className="onb">
-      <div className="onb-top">
+      <div className="onb-top rise" style={{ '--i': 0 }}>
         {key !== 'finish' && (
           <button className="icon-btn" onClick={() => (step <= 1 ? (onCancel ? onCancel() : setStep(0)) : setStep(step - 1))} aria-label="Quay lại"><ArrowLeft size={20} /></button>
         )}
@@ -115,7 +115,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
       </div>
 
       {key === 'name' && (
-        <section className="onb-step">
+        <section className="onb-step step-in">
           <span className="eyebrow">Câu hỏi 1</span>
           <h2>Cơ sở lưu trú của bạn tên là gì?</h2>
           <p className="muted">Tên thương hiệu khách sạn / homestay — sẽ hiển thị trên trang tổng quan và thẻ dọn phòng.</p>
@@ -124,7 +124,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
       )}
 
       {key === 'count' && (
-        <section className="onb-step">
+        <section className="onb-step step-in">
           <span className="eyebrow">Câu hỏi 2</span>
           <h2>Bạn có bao nhiêu địa điểm?</h2>
           <p className="muted">Mỗi địa điểm là một toà nhà / chi nhánh có địa chỉ riêng.</p>
@@ -136,7 +136,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
       )}
 
       {key === 'locations' && (
-        <section className="onb-step">
+        <section className="onb-step step-in">
           <span className="eyebrow">Câu hỏi 3</span>
           <h2>Địa chỉ & phòng của từng địa điểm</h2>
           <p className="muted">Nhập địa chỉ, số phòng và đặt tên cho từng phòng.</p>
@@ -167,7 +167,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
       )}
 
       {key === 'calendars' && (
-        <section className="onb-step">
+        <section className="onb-step step-in">
           <span className="eyebrow">Câu hỏi 4</span>
           <h2>Đồng bộ lịch phòng</h2>
           <p className="muted">Với mỗi phòng, nhập tên sàn và link iCal (.ics) xuất từ sàn đó. Bấm <b>+</b> để thêm lịch của sàn khác cho cùng phòng. Phòng không có link có thể để trống.</p>
@@ -225,7 +225,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
       )}
 
       {key === 'finish' && (
-        <section className="onb-step center">
+        <section className="onb-step center step-in">
           {busy || !results ? (
             <>
               <div className="sync-orb"><Loader2 className="spin" size={34} /></div>

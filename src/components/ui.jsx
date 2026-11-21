@@ -1,22 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 
 export function Sheet({ open, onClose, title, children, footer }) {
+  const [closing, setClosing] = useState(false);
+  const close = useCallback(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return onClose();
+    setClosing(true);
+    setTimeout(() => { setClosing(false); onClose(); }, 200);
+  }, [onClose]);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && close();
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
-  }, [open, onClose]);
+  }, [open, close]);
   if (!open) return null;
   return (
-    <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`sheet-backdrop ${closing ? 'closing' : ''}`} onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-grab" />
         <div className="sheet-head">
           <h3>{title}</h3>
-          <button className="icon-btn sm" onClick={onClose} aria-label="Đóng"><X size={18} /></button>
+          <button className="icon-btn sm" onClick={close} aria-label="Đóng"><X size={18} /></button>
         </div>
         <div className="sheet-body">{children}</div>
         {footer && <div className="sheet-foot">{footer}</div>}
@@ -60,7 +66,12 @@ export function Toaster() {
 }
 
 export function Progress({ value }) {
-  return <div className="progress"><div style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>;
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(value));
+    return () => cancelAnimationFrame(id);
+  }, [value]);
+  return <div className="progress"><div style={{ width: `${Math.max(0, Math.min(100, shown))}%` }} /></div>;
 }
 
 export function Avatar({ name }) {

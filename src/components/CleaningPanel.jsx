@@ -107,7 +107,7 @@ export default function CleaningPanel({ api, bookings, locId, from, to, view, an
         </>
       )}
 
-      <div className="clean-list">
+      <div className="clean-list stagger" key={`${a}|${b}|${locId}`}>
         {cards.length === 0 && (
           <div className="empty-card"><Sparkles size={22} /><p>Không có phòng cần dọn {selected ? 'trong ngày này' : view === 'week' ? 'trong tuần này' : 'trong tháng này'}.</p></div>
         )}
