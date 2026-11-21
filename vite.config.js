@@ -6,7 +6,7 @@ const devApi = () => ({
   name: 'dev-api',
   configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
-      const m = req.url.match(/^\/api\/(ical|auth|data|admin|health)(\?|$)/);
+      const m = req.url.match(/^\/api\/(ical-out|ical|auth|data|admin|health)(\?|$)/) || (req.url.startsWith('/cal/') && [null, 'ical-out']);
       if (!m) return next();
       const { default: handler } = await server.ssrLoadModule(`/api/${m[1]}.js`);
       handler(req, res);

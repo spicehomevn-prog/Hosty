@@ -735,3 +735,20 @@ button:not(:disabled):active { --press: .95; transition-duration: .12s, .2s, .2s
 .loc-pill, .week-loc, .cal-loc h4 { display: inline-flex; align-items: center; gap: 6px; }
 .week-loc { display: flex; }
 .loc-pill .hx-icon, .week-loc .hx-icon, .chip .hx-icon { color: var(--violet-ink); }
+
+/* Đồng bộ ngược lên sàn */
+.xl-card { display: flex; gap: 14px; padding: 16px; border-radius: var(--r-lg); background: var(--violet-soft); }
+.xl-card > div { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.xl-card small { color: var(--ink-2); font-size: 14px; }
+.xl-ico { width: 44px; height: 44px; border-radius: 14px; background: #fff; display: grid; place-items: center; flex: none; color: var(--ink); }
+.xl-note { color: var(--muted) !important; }
+.xl-warn { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-sm); background: var(--yellow-soft); color: var(--yellow-ink); font-size: 13.5px; margin: 12px 0 6px; --icon-accent: currentColor; --icon-coral: currentColor; }
+.xl-loc { display: flex; align-items: center; gap: 6px; margin: 16px 0 8px; font-size: 16px; }
+.xl-room { border: 1.5px solid var(--line); border-radius: var(--r); padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.xl-room h5 { margin: 0; font-family: var(--font-head); font-weight: 400; font-size: 16px; }
+.xl-row { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: var(--r-sm); background: var(--soft); border-left: 4px solid var(--pc); }
+.xl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.xl-main b { display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; }
+.xl-main small { color: var(--muted); font-size: 12.5px; }
+.xl-url { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.xl-row .btn.tiny { background: #fff; flex: none; }

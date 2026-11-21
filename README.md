@@ -9,6 +9,7 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
   - **`<cơ sở>-member`, `-member2`…** – nhân viên dọn phòng: xem lịch & thẻ dọn phòng, tick đã dọn, tick task được giao, đọc ghi chú, copy thẻ.
 - **Tự đồng bộ**: khi mở app, mỗi 15 phút, 20 giây sau lần sửa cuối, khi chuyển app xuống nền, khi có mạng trở lại, hoặc bấm *Đồng bộ ngay*. Hai máy sửa cùng lúc được gộp theo từng mục (task, ghi chú, phòng…), không mất dữ liệu. Mất mạng vẫn dùng được, có mạng sẽ tự đồng bộ.
 - **Thiết lập cơ sở** (admin): tên cơ sở → số địa điểm → địa chỉ + số phòng + tên phòng → link iCal của từng sàn cho từng phòng, giờ nhận/trả phòng riêng cho từng lịch.
+- **Đồng bộ ngược lên sàn**: Cơ sở → *Lấy link xuất lịch*. Mỗi phòng có link iCal riêng cho từng sàn (vd. "Dán vào Airbnb") gồm khách đặt trực tiếp + khách từ các sàn khác, đã loại khách của chính sàn đó để không chặn vòng. Dán vào mục *Nhập lịch* của sàn để sàn tự chặn ngày. Link có chữ ký bảo mật, không chứa tên/SĐT khách; đổi `AUTH_SECRET` sẽ vô hiệu mọi link cũ.
 - **Lịch đặt phòng** theo Tuần / Tháng, **thẻ dọn phòng** theo tuần/tháng hoặc từng ngày, ghi rõ ai đã dọn lúc mấy giờ, **copy thẻ** gửi Zalo, **ghi chú ngày**, **task** (giao cho từng nhân viên), đặt phòng thủ công.
 - Font: **Cal Sans** cho tiêu đề & heading, **Afacad Flux** cho chữ nội dung (Google Fonts, hỗ trợ tiếng Việt).
 
@@ -55,6 +56,8 @@ npx vercel --prod
 - `api/auth.js` – đăng nhập, đổi mật khẩu, thông tin tài khoản.
 - `api/data.js` – đọc/ghi dữ liệu cơ sở (ghi có điều kiện theo phiên bản, kiểm tra quyền member phía server).
 - `api/admin.js` – quản lý cơ sở & tài khoản (chỉ chủ hệ thống).
+- `api/ical-out.js` – lịch iCal xuất cho các sàn, truy cập qua `/cal/<mã>.ics`.
+- `api/health.js` – kiểm tra cấu hình máy chủ (chỉ báo có/thiếu).
 
 ## Nhận diện
 Logo, bảng màu và bộ icon theo "Hostexa — Relay identity": biểu tượng đường relay Midnight Plum `#241A3B` với điểm đầu Violet `#7C5CE6` và điểm cuối Coral `#F0845A`; chữ Manrope 700. Icon nằm trong `src/lib/icons.jsx` (lưới 24, nét 2px, đầu tròn, một nét nhấn violet/coral, một màu khi nhỏ hơn 20px).

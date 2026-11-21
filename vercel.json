@@ -1,5 +1,8 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/cal/:token", "destination": "/api/ical-out?k=:token" }
+  ]
 }

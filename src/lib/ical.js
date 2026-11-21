@@ -1,6 +1,6 @@
 import { toKey } from './dates.js';
 
-const unescape = (v) => v.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\;/g, ';').replace(/\\\\/g, '\\');
+const unescape = (v) => v.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
 
 function parseDate(value, params) {
   const v = value.trim();

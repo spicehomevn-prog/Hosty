@@ -3,7 +3,7 @@
 // PUT /api/data { ws, baseVersion, data }   -> { version, updatedAt }   (409 nếu bản trên máy chủ đã đổi)
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, loadWorkspaces, wsFile } from './_auth.js';
+import { requireUser, canAccess, loadWorkspaces, wsFile, signFeed } from './_auth.js';
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'setupDone'];
 const TASK_TICK_FIELDS = new Set(['done', 'doneAt', 'doneBy', 'doneByName']);
@@ -46,6 +46,27 @@ function checkMemberChange(prev, next, user) {
   }
 }
 
+/** Link xuất lịch iCal cho từng phòng (chỉ admin cơ sở / chủ hệ thống) */
+function exportLinks(req, user, ws, data) {
+  if (user.role === 'member') throw new HttpError(403, 'Chỉ admin cơ sở xem được link xuất lịch');
+  if (!data) return [];
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = String(req.headers['x-forwarded-proto'] || (/^(localhost|127\.|192\.168\.)/.test(host) ? 'http' : 'https')).split(',')[0];
+  const url = (payload) => `${proto}://${host}/cal/${signFeed(payload)}.ics`;
+  const out = [];
+  for (const loc of data.locations || []) {
+    for (const room of loc.rooms || []) {
+      const cals = (data.calendars || []).filter((c) => c.roomId === room.id && c.url);
+      out.push({
+        roomId: room.id, roomName: room.name, locationName: loc.name,
+        all: url({ w: ws, r: room.id }),
+        calendars: cals.map((c) => ({ id: c.id, platform: c.platform, url: url({ w: ws, r: room.id, x: c.id }) })),
+      });
+    }
+  }
+  return out;
+}
+
 export default route(async (req, res) => {
   const user = await requireUser(req);
 
@@ -53,6 +74,7 @@ export default route(async (req, res) => {
     const ws = query(req).get('ws');
     if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
     const cur = await getJSON(wsFile(ws));
+    if (query(req).get('links')) return send(res, 200, { links: exportLinks(req, user, ws, cur?.data?.data) });
     if (!cur) return send(res, 200, { version: 0, updatedAt: 0, updatedBy: '', data: null });
     const { version, updatedAt, updatedBy, data } = cur.data;
     return send(res, 200, { version, updatedAt, updatedBy, data });

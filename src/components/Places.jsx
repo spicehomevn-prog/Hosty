@@ -1,16 +1,18 @@
-import { useEffect, useRef } from 'react';
-import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, UserRound } from '../lib/icons.jsx';
+import { useRef, useState } from 'react';
+import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, UserRound, Link2 } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
 import { AccountCard } from './Account.jsx';
+import { ExportLinksSheet } from './ExportLinks.jsx';
 import { can } from '../lib/perm.js';
 
 const TONES = ['blue', 'violet', 'yellow', 'pink'];
 
 export default function Places({ api }) {
   const { state, dispatch, sync, syncing, role, cloud } = useStore();
+  const [exportOpen, setExportOpen] = useState(false);
   const canSetup = can(role, 'setup');
   const fileRef = useRef(null);
 
@@ -95,6 +97,19 @@ export default function Places({ api }) {
         <button className="btn ghost" onClick={api.editSetup}><Pencil size={16} /> Sửa phòng & lịch</button>
       </div>
       <p className="tiny muted">Lịch iCal từ các sàn tự tải lại mỗi 30 phút khi app đang mở. Lần cuối: {timeAgo(state.lastSync)}.</p>
+
+      <h2 className="section-title">Đồng bộ ngược lên sàn</h2>
+      <div className="xl-card">
+        <span className="xl-ico"><Upload size={22} /></span>
+        <div>
+          <b>Chặn ngày trên Airbnb, Booking… khi có khách đặt trực tiếp</b>
+          <small>Lấy link lịch xuất của từng phòng và dán vào mục "Nhập lịch" của sàn. Link gồm khách đặt trực tiếp và khách từ các sàn khác.</small>
+          {cloud.enabled
+            ? <button className="btn primary" onClick={() => setExportOpen(true)}><Link2 size={16} /> Lấy link xuất lịch</button>
+            : <small className="xl-note">Cần đăng nhập tài khoản (chế độ xem thử không có máy chủ).</small>}
+        </div>
+      </div>
+      {exportOpen && <ExportLinksSheet onClose={() => setExportOpen(false)} />}
       </>}
 
       {can(role, 'backup') && <>

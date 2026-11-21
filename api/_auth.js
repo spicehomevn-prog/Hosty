@@ -160,3 +160,19 @@ export function configStatus() {
     ownerUsernameLength: o ? o.username.length : 0,
   };
 }
+
+/* ---------- Link xuất lịch iCal (cho sàn đọc) ---------- */
+// Link có chữ ký HMAC: không đoán được, không cần đăng nhập. Đổi AUTH_SECRET sẽ vô hiệu mọi link cũ.
+// payload: { w: cơ sở, r: phòng, x: id lịch sàn nhận link (bỏ qua lịch của chính sàn đó) }
+export function signFeed(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = createHmac('sha256', secret()).update(`feed:${body}`).digest('base64url').slice(0, 22);
+  return `${body}.${sig}`;
+}
+export function verifyFeed(token) {
+  const [body, sig] = String(token || '').split('.');
+  if (!body || !sig) return null;
+  const want = createHmac('sha256', secret()).update(`feed:${body}`).digest('base64url').slice(0, 22);
+  if (!safeEqual(sig, want)) return null;
+  try { return JSON.parse(Buffer.from(body, 'base64url').toString('utf8')); } catch { return null; }
+}
