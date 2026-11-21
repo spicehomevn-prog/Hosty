@@ -18,5 +18,8 @@ export default route(async (req, res) => {
     HOSTY_OWNER_USERNAME: c.ownerUsername,
     HOSTY_OWNER_PASSWORD: c.ownerPassword,
     'Số ký tự tên đăng nhập chủ hệ thống': c.ownerUsernameLength,
+    // chỉ TÊN biến (không có giá trị) để phát hiện gõ sai tên, ví dụ thiếu chữ hay dư khoảng trắng
+    'Tên biến máy chủ thấy': Object.keys(process.env).filter((k) => /hosty|owner|auth_secret/i.test(k)).map((k) => JSON.stringify(k)),
+    'Môi trường Vercel': process.env.VERCEL_ENV || 'local',
   });
 }, { needStore: false });
