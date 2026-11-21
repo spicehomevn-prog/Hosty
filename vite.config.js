@@ -14,6 +14,17 @@ const devApi = () => ({
   },
 });
 
+// Địa chỉ đầy đủ của trang cho thẻ xem trước khi chia sẻ link (og:image bắt buộc là URL tuyệt đối).
+// Trên Vercel lấy tên miền production tự động; có thể đặt SITE_URL để ghi đè.
+const siteUrl = () => {
+  const raw = process.env.SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || 'hosty-rose.vercel.app';
+  return (raw.startsWith('http') ? raw : `https://${raw}`).replace(/\/$/, '');
+};
+const siteMeta = () => ({
+  name: 'site-url',
+  transformIndexHtml: (html) => html.replaceAll('%SITE_URL%', siteUrl()),
+});
+
 export default defineConfig(({ mode, command }) => {
   if (command === 'serve') {
     // Nạp biến từ file .env (nếu có). Thiếu thì dùng giá trị mặc định CHỈ DÀNH CHO CHẠY LOCAL.
@@ -26,5 +37,5 @@ export default defineConfig(({ mode, command }) => {
     process.env.HOSTY_OWNER_USERNAME ||= 'owner';
     process.env.HOSTY_OWNER_PASSWORD ||= 'hosty-owner';
   }
-  return { plugins: [react(), devApi()] };
+  return { plugins: [react(), devApi(), siteMeta()] };
 });
