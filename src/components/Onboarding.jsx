@@ -8,7 +8,7 @@ const STEPS = ['welcome', 'name', 'count', 'locations', 'calendars', 'finish'];
 
 const newLocation = (i) => ({ id: uid(), name: '', address: '', emoji: LOCATION_EMOJI[i % LOCATION_EMOJI.length], rooms: [{ id: uid(), name: 'Phòng 1' }] });
 
-export default function Onboarding({ editing, onDone, onCancel }) {
+export default function Onboarding({ editing, onDone, onCancel, onImport }) {
   const { state, dispatch, sync } = useStore();
   const [step, setStep] = useState(editing ? 1 : 0);
   const [name, setName] = useState(state.property.name || '');
@@ -98,6 +98,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
         <div className="onb-actions col rise" style={{ '--i': 11 }}>
           <button className="btn primary lg" onClick={() => setStep(1)}>Bắt đầu thiết lập <ArrowRight size={18} /></button>
           <button className="btn ghost" onClick={() => { dispatch({ type: 'REPLACE', state: demoState() }); onDone(); }}>Xem thử với dữ liệu mẫu</button>
+          <button className="link-btn center-btn" onClick={() => onImport('')}>Đã dùng Hosty trên máy khác? <b>Nhập mã đồng bộ</b></button>
         </div>
       </div>
     );

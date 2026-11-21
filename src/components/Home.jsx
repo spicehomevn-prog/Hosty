@@ -6,6 +6,7 @@ import { todayKey, longDate, addDays, dm, timeAgo, wdShort } from '../lib/dates.
 import { Progress } from './ui.jsx';
 import { LogoMark } from './Logo.jsx';
 import { useCountUp } from '../lib/motion.js';
+import { SyncBanner } from './Sync.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
 
 export default function Home({ api }) {
@@ -66,6 +67,8 @@ export default function Home({ api }) {
           <b>{nOcc}%</b>
         </div>
       </div>
+
+      <SyncBanner />
 
       {failed.length > 0 && (
         <button className="alert" onClick={() => api.goto('places')}>

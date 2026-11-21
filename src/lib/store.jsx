@@ -39,6 +39,7 @@ export const emptyState = () => ({
   tasks: [],
   cleanDone: {},
   settings: { font: 'Be Vietnam Pro', calView: 'month' },
+  syncMeta: { code: '', version: 0, at: 0 },
 });
 
 function load() {
@@ -49,7 +50,7 @@ function load() {
   return emptyState();
 }
 
-function reducer(state, a) {
+function baseReducer(state, a) {
   switch (a.type) {
     case 'REPLACE': return { ...emptyState(), ...a.state };
     case 'SETUP': {
@@ -101,9 +102,20 @@ function reducer(state, a) {
       return { ...state, overrides };
     }
     case 'SETTINGS': return { ...state, settings: { ...state.settings, ...a.patch } };
+    case 'SYNC_META': return { ...state, syncMeta: { ...state.syncMeta, ...a.patch } };
+    case 'IMPORT_PACK':
+      return { ...emptyState(), ...a.data, syncMeta: { code: a.code, version: a.version, at: Date.now() } };
     case 'RESET': return emptyState();
     default: return state;
   }
+}
+
+// Những thao tác không tính là "sửa dữ liệu" (để biết máy này có thay đổi chưa đóng gói)
+const NOT_EDITS = new Set(['SYNC_RESULT', 'SYNC_META', 'SETTINGS', 'IMPORT_PACK', 'REPLACE', 'RESET']);
+function reducer(state, a) {
+  const next = baseReducer(state, a);
+  if (next !== state && !NOT_EDITS.has(a.type)) return { ...next, editedAt: Date.now() };
+  return next;
 }
 
 const Ctx = createContext(null);

@@ -12,6 +12,16 @@ import Places from './components/Places.jsx';
 import { BookingSheet } from './components/BookingSheet.jsx';
 import { TaskSheet } from './components/TaskSheet.jsx';
 import { Sheet, Toaster } from './components/ui.jsx';
+import { ImportSheet } from './components/Sync.jsx';
+
+// Mã đồng bộ trong link / mã QR (?sync=CODE) — đọc một lần khi mở app rồi xoá khỏi URL
+const SYNC_FROM_URL = (() => {
+  try {
+    const c = new URLSearchParams(window.location.search).get('sync');
+    if (c) window.history.replaceState(null, '', window.location.pathname);
+    return c;
+  } catch { return null; }
+})();
 
 const TABS = [
   { id: 'home', label: 'Tổng quan', icon: LayoutGrid },
@@ -29,6 +39,15 @@ export default function App() {
   const [task, setTask] = useState(null);
   const [editing, setEditing] = useState(false);
   const [inSetup, setInSetup] = useState(!state.setupDone);
+  // ?sync=CODE trong link / mã QR -> mở bảng nhận dữ liệu
+  const [importCode, setImportCode] = useState(SYNC_FROM_URL);
+  const importSheet = importCode !== null && (
+    <ImportSheet
+      initialCode={importCode}
+      onClose={() => setImportCode(null)}
+      onImported={() => { setEditing(false); setInSetup(false); setTab('home'); }}
+    />
+  );
   const navRef = useRef(null);
   const showMain = state.setupDone && !inSetup && !editing;
   const blob = useFlipNav(navRef, tab, showMain);
@@ -41,7 +60,8 @@ export default function App() {
   if (!state.setupDone || inSetup || editing) {
     return (
       <>
-        <Onboarding editing={editing} onDone={() => { setEditing(false); setInSetup(false); setTab('home'); }} onCancel={editing ? () => setEditing(false) : null} />
+        <Onboarding editing={editing} onDone={() => { setEditing(false); setInSetup(false); setTab('home'); }} onCancel={editing ? () => setEditing(false) : null} onImport={(c) => setImportCode(c || '')} />
+        {importSheet}
         <Toaster />
       </>
     );
@@ -55,6 +75,7 @@ export default function App() {
     newTask: (preset) => setTask(preset || {}),
     editTask: (t) => setTask(t),
     editSetup: () => setEditing(true),
+    importData: (c) => setImportCode(c || ''),
     goto: setTab,
   };
 
@@ -100,6 +121,7 @@ export default function App() {
 
       {booking && <BookingSheet {...booking} onClose={() => setBooking(null)} />}
       {task && <TaskSheet task={task} onClose={() => setTask(null)} />}
+      {importSheet}
       <Toaster />
     </div>
   );

@@ -5,6 +5,7 @@ import { FONTS, ensureFont } from '../lib/fonts.js';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
+import { SyncCard } from './Sync.jsx';
 
 const TONES = ['blue', 'violet', 'yellow', 'pink'];
 
@@ -88,6 +89,9 @@ export default function Places({ api }) {
       </div>
       <p className="tiny muted">Tự động đồng bộ mỗi 30 phút khi app đang mở. Lần cuối: {timeAgo(state.lastSync)}.</p>
 
+      <h2 className="section-title">Đồng bộ</h2>
+      <SyncCard onImport={api.importData} />
+
       <h2 className="section-title"><Type size={18} /> Font chữ</h2>
       <p className="tiny muted">Các font không chân từ Google Fonts, hỗ trợ đầy đủ tiếng Việt.</p>
       <div className="font-grid stagger" style={{ '--i': 3 }}>
@@ -101,8 +105,8 @@ export default function Places({ api }) {
         ))}
       </div>
 
-      <h2 className="section-title">Dữ liệu</h2>
-      <p className="tiny muted">Dữ liệu được lưu trên trình duyệt của thiết bị này. Xuất file để sao lưu hoặc chuyển sang máy khác.</p>
+      <h2 className="section-title">Sao lưu</h2>
+      <p className="tiny muted">Dữ liệu được lưu trên trình duyệt của thiết bị này. Có thể xuất ra file để sao lưu.</p>
       <div className="data-actions">
         <button className="btn ghost" onClick={exportData}><Download size={16} /> Xuất dữ liệu</button>
         <button className="btn ghost" onClick={() => fileRef.current?.click()}><Upload size={16} /> Nhập dữ liệu</button>
