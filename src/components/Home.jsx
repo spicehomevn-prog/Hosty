@@ -1,0 +1,124 @@
+import { useMemo } from 'react';
+import { RefreshCw, Settings2, LogIn, Sparkles, BedDouble, ClipboardPlus, NotebookPen, CalendarRange, AlertTriangle, Check } from 'lucide-react';
+import { useStore } from '../lib/store.jsx';
+import { getBookings, getCleanings, arrivalsOn, occupiedOn, allRooms, roomIndex } from '../lib/derive.js';
+import { todayKey, longDate, addDays, dm, timeAgo, wdShort } from '../lib/dates.js';
+import { Avatar, Progress } from './ui.jsx';
+import { CleaningCard } from './CleaningPanel.jsx';
+
+export default function Home({ api }) {
+  const { state, dispatch, sync, syncing } = useStore();
+  const today = todayKey();
+  const bookings = useMemo(() => getBookings(state), [state]);
+  const idx = useMemo(() => roomIndex(state), [state]);
+  const rooms = allRooms(state);
+  const arrivals = arrivalsOn(bookings, today);
+  const cleanings = getCleanings(state, bookings, today, today);
+  const occupied = new Set(occupiedOn(bookings, today).map((b) => b.roomId)).size;
+  const occPct = rooms.length ? Math.round((occupied / rooms.length) * 100) : 0;
+  const failed = state.calendars.filter((c) => state.syncInfo[c.id] && !state.syncInfo[c.id].ok);
+  const todayTasks = state.tasks.filter((t) => t.date === today || (!t.done && t.date && t.date < today));
+  const upcoming = bookings.filter((b) => !b.blocked && b.start > today && b.start <= addDays(today, 7)).slice(0, 6);
+
+  return (
+    <div className="home">
+      <header className="home-top">
+        <div className="hello">
+          <Avatar name={state.property.name} />
+          <span>Xin chào 👋</span>
+        </div>
+        <div className="row gap8">
+          <button className="icon-btn" onClick={() => sync()} disabled={syncing} aria-label="Đồng bộ lịch"><RefreshCw size={19} className={syncing ? 'spin' : ''} /></button>
+          <button className="icon-btn" onClick={() => api.goto('places')} aria-label="Cài đặt"><Settings2 size={19} /></button>
+        </div>
+      </header>
+
+      <h1 className="home-title">{state.property.name}</h1>
+      <p className="sub">Hôm nay {longDate(today)}</p>
+
+      <div className="hero-cards">
+        <button className="hero violet" onClick={() => api.openDay(today)}>
+          <span className="hero-ico"><LogIn size={18} /></span>
+          <span className="hero-label">Nhận phòng hôm nay</span>
+          <b className="hero-num">{arrivals.length} <small>lượt</small></b>
+          <span className="hero-deco" aria-hidden="true" />
+        </button>
+        <button className="hero yellow" onClick={() => api.openDay(today)}>
+          <span className="hero-ico"><Sparkles size={18} /></span>
+          <span className="hero-label">Dọn phòng hôm nay</span>
+          <b className="hero-num">{cleanings.length} <small>phòng</small></b>
+          <span className="hero-deco" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="occ-card">
+        <div>
+          <b>Công suất hôm nay</b>
+          <span className="muted">{occupied}/{rooms.length} phòng có khách</span>
+        </div>
+        <div className="occ-right">
+          <Progress value={occPct} />
+          <b>{occPct}%</b>
+        </div>
+      </div>
+
+      {failed.length > 0 && (
+        <button className="alert" onClick={() => api.goto('places')}>
+          <AlertTriangle size={18} />
+          <span>{failed.length} lịch đồng bộ lỗi · {state.syncInfo[failed[0].id].error}</span>
+        </button>
+      )}
+
+      <h2 className="section-title">Thao tác nhanh</h2>
+      <div className="actions scroll-x">
+        <button className="action" onClick={() => api.newBooking()}><span className="aico pink"><BedDouble size={22} /></span>Đặt phòng</button>
+        <button className="action" onClick={() => api.newTask()}><span className="aico violet"><ClipboardPlus size={22} /></span>Thêm task</button>
+        <button className="action" onClick={() => api.openDay(today)}><span className="aico blue"><NotebookPen size={22} /></span>Ghi chú</button>
+        <button className="action" onClick={() => { dispatch({ type: 'SETTINGS', patch: { calView: 'week' } }); api.goto('calendar'); }}><span className="aico yellow"><CalendarRange size={22} /></span>Lịch tuần</button>
+      </div>
+
+      <div className="section-row">
+        <h2 className="section-title">Dọn phòng hôm nay</h2>
+        <button className="link" onClick={() => api.openDay(today)}>Xem lịch</button>
+      </div>
+      <div className="clean-list">
+        {cleanings.length === 0
+          ? <div className="empty-card"><Sparkles size={20} /><p>Hôm nay không có phòng nào cần dọn.</p></div>
+          : cleanings.map((c) => <CleaningCard key={c.id} c={c} />)}
+      </div>
+
+      {todayTasks.length > 0 && (
+        <>
+          <div className="section-row">
+            <h2 className="section-title">Task hôm nay</h2>
+            <button className="link" onClick={() => api.goto('tasks')}>Xem tất cả</button>
+          </div>
+          <div className="mini-tasks">
+            {todayTasks.slice(0, 4).map((t) => (
+              <div key={t.id} className={`mini-task ${t.done ? 'done' : ''}`}>
+                <button className={`check ${t.done ? 'on' : ''} p-${t.priority}`} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id })} aria-label="Hoàn thành">{t.done && <Check size={14} strokeWidth={3} />}</button>
+                <button className="mini-task-body" onClick={() => api.editTask(t)}>
+                  <b>{t.title}</b>
+                  {t.date < today && !t.done && <small className="overdue">Quá hạn {dm(t.date)}</small>}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h2 className="section-title">Khách sắp đến (7 ngày)</h2>
+      <div className="upcoming">
+        {upcoming.length === 0 && <p className="muted tiny">Chưa có khách nào trong 7 ngày tới.</p>}
+        {upcoming.map((b) => (
+          <button key={b.id} className="up-item" onClick={() => api.openBooking(b)}>
+            <span className="up-date"><small>{wdShort(b.start)}</small><b>{b.start.slice(8)}</b></span>
+            <span className="arr-main"><b>{idx[b.roomId]?.room.name}</b><small>{b.platform} · {dm(b.start)} → {dm(b.end)}</small></span>
+            <span className="pdot lg" style={{ background: b.color }} />
+          </button>
+        ))}
+      </div>
+      <p className="tiny muted center">Đồng bộ lần cuối: {timeAgo(state.lastSync)}</p>
+    </div>
+  );
+}
