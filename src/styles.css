@@ -305,7 +305,8 @@ button.occ-card:hover .occ-chev { transform: translateX(3px); color: var(--viole
 .occ-room { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px 10px 10px; border-radius: var(--r-sm); border: 1.5px solid var(--line); background: #fff; text-align: left; color: inherit; font: inherit; }
 button.occ-room { cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
 button.occ-room:hover { border-color: #DCD2F7; box-shadow: var(--shadow); }
-.occ-room .arr-main small { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.occ-room .arr-main small { display: block; }
+.occ-room .arr-main small > svg, .occ-room .arr-main small > .pdot { vertical-align: -1px; margin-right: 4px; }
 .occ-room.blocked { background: var(--soft); }
 .occ-room .arr-main small.occ-loc { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .occ-loc svg { vertical-align: -2px; margin-right: 4px; }
