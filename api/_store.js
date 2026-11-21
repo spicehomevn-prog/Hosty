@@ -59,10 +59,14 @@ async function blobGetPrivate(p) {
   if (!res || res.statusCode !== 200) return null;
   return { data: JSON.parse(await new Response(res.stream).text()), etag: res.blob.etag };
 }
+// Blob chưa tồn tại (khác với lỗi "store does not exist")
+const isMissing = (e, mod) => (mod.BlobNotFoundError && e instanceof mod.BlobNotFoundError)
+  || /requested blob does not exist|not.?found/i.test(`${e?.name} ${e?.message}`);
+
 async function blobGetPublic(p) {
-  const { head } = await import('@vercel/blob');
+  const mod = await import('@vercel/blob');
   let meta;
-  try { meta = await head(p, auth()); } catch (e) { if (/not.?found|404/i.test(`${e?.name} ${e?.message}`)) return null; throw e; }
+  try { meta = await mod.head(p, auth()); } catch (e) { if (isMissing(e, mod)) return null; throw e; }
   if (!meta) return null;
   const r = await fetch(`${meta.url}?t=${Date.now()}`, { cache: 'no-store' });
   if (!r.ok) return null;
