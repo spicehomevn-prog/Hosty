@@ -4,6 +4,7 @@ import { useStore } from '../lib/store.jsx';
 import { FONTS, ensureFont } from '../lib/fonts.js';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
+import { Logo } from './Logo.jsx';
 
 const TONES = ['blue', 'violet', 'yellow', 'pink'];
 
@@ -16,7 +17,7 @@ export default function Places({ api }) {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `lich-phong-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `hosty-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -108,6 +109,7 @@ export default function Places({ api }) {
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
         <button className="btn ghost danger" onClick={() => { if (confirm('Xoá toàn bộ dữ liệu và thiết lập lại từ đầu?')) dispatch({ type: 'RESET' }); }}><RotateCcw size={16} /> Thiết lập lại</button>
       </div>
+      <footer className="brand-foot"><Logo size={28} /><span>Lịch đặt phòng & dọn phòng cho khách sạn, homestay</span></footer>
     </div>
   );
 }

@@ -479,3 +479,10 @@ textarea.input { height: auto; padding: 12px 16px; resize: vertical; }
   h1 { font-size: 32px; }
   .hero { min-height: 170px; padding: 20px; }
 }
+
+/* Brand */
+.logo { display: inline-flex; align-items: center; gap: .32em; }
+.logo-mark { flex: none; display: block; }
+.logo-word { font-family: 'Plus Jakarta Sans', var(--font); font-weight: 800; letter-spacing: -0.035em; line-height: 1; color: #121A33; }
+.welcome-logo { margin-bottom: 28px; }
+.brand-foot { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 36px; color: var(--muted); font-size: 12.5px; text-align: center; }

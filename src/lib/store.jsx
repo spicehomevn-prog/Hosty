@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useReducer, useCallback, useRef, 
 import { fetchCalendar } from './ical.js';
 import { addDays, todayKey } from './dates.js';
 
-const KEY = 'lichphong:v1';
+const KEY = 'hosty:v1';
+const OLD_KEY = 'lichphong:v1';
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 export const PLATFORMS = [
@@ -42,7 +43,7 @@ export const emptyState = () => ({
 
 function load() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
     if (raw) return { ...emptyState(), ...JSON.parse(raw) };
   } catch { /* noop */ }
   return emptyState();

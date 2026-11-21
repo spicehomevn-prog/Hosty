@@ -1,4 +1,4 @@
-# Lịch Phòng – theo dõi đặt phòng, dọn phòng & task cho khách sạn / homestay
+# Hosty – theo dõi đặt phòng, dọn phòng & task cho khách sạn / homestay
 
 Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua link iCal.
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Plus, Trash2, Link2, Clock, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, CalendarPlus } from 'lucide-react';
 import { useStore, uid, PLATFORMS, LOCATION_EMOJI, demoState, platformColor } from '../lib/store.jsx';
 import { Stepper, Field } from './ui.jsx';
+import { Logo, LogoMark } from './Logo.jsx';
 
 const STEPS = ['welcome', 'name', 'count', 'locations', 'calendars', 'finish'];
 
@@ -81,11 +82,12 @@ export default function Onboarding({ editing, onDone, onCancel }) {
     setBusy(false);
   }
 
-  const progress = key === 'finish' ? 1 : Math.max(0, step - 1) / 4;
+  const progress = key === 'finish' ? 1 : step / 5;
 
   if (key === 'welcome') {
     return (
       <div className="onb onb-welcome">
+        <div className="welcome-logo"><Logo size={52} /></div>
         <div className="welcome-art" aria-hidden="true">
           <div className="wa-card violet"><CalendarPlus size={26} /><span>Lịch đặt phòng</span></div>
           <div className="wa-card yellow"><Sparkles size={26} /><span>Thẻ dọn phòng</span></div>
@@ -109,6 +111,7 @@ export default function Onboarding({ editing, onDone, onCancel }) {
         )}
         <div className="onb-progress"><div style={{ width: `${progress * 100}%` }} /></div>
         <span className="onb-count">{Math.min(step, 4)}/4</span>
+        <LogoMark size={34} radius={27} />
       </div>
 
       {key === 'name' && (

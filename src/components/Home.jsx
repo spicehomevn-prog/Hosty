@@ -3,7 +3,8 @@ import { RefreshCw, Settings2, LogIn, Sparkles, BedDouble, ClipboardPlus, Notebo
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, arrivalsOn, occupiedOn, allRooms, roomIndex } from '../lib/derive.js';
 import { todayKey, longDate, addDays, dm, timeAgo, wdShort } from '../lib/dates.js';
-import { Avatar, Progress } from './ui.jsx';
+import { Progress } from './ui.jsx';
+import { LogoMark } from './Logo.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
 
 export default function Home({ api }) {
@@ -24,7 +25,7 @@ export default function Home({ api }) {
     <div className="home">
       <header className="home-top">
         <div className="hello">
-          <Avatar name={state.property.name} />
+          <LogoMark size={48} />
           <span>Xin chào 👋</span>
         </div>
         <div className="row gap8">
