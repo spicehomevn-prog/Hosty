@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { RefreshCw, Settings2, LogIn, Sparkles, BedDouble, ClipboardPlus, NotebookPen, CalendarRange, AlertTriangle, Check } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, arrivalsOn, occupiedOn, allRooms, roomIndex } from '../lib/derive.js';
@@ -11,11 +11,14 @@ import { useSession } from '../lib/session.jsx';
 import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { ArrowLeftRight } from '../lib/icons.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
+import OccupancySheet from './OccupancySheet.jsx';
+import { ChevronRight } from '../lib/icons.jsx';
 
 export default function Home({ api }) {
   const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
   const { workspaces, selectWs } = useSession();
   const today = todayKey();
+  const [occOpen, setOccOpen] = useState(false);
   const bookings = useMemo(() => getBookings(state), [state]);
   const idx = useMemo(() => roomIndex(state), [state]);
   const rooms = allRooms(state);
@@ -65,16 +68,18 @@ export default function Home({ api }) {
         </button>
       </div>
 
-      <div className="occ-card rise" style={{ '--i': 4 }}>
+      <button className="occ-card rise" style={{ '--i': 4 }} onClick={() => setOccOpen(true)} aria-haspopup="dialog">
         <div>
           <b>Công suất hôm nay</b>
-          <span className="muted">{occupied}/{rooms.length} phòng có khách</span>
+          <span className="muted">{occupied}/{rooms.length} phòng có khách · {rooms.length - occupied} trống</span>
         </div>
         <div className="occ-right">
           <Progress value={occPct} />
           <b>{nOcc}%</b>
+          <ChevronRight size={18} className="occ-chev" />
         </div>
-      </div>
+      </button>
+      <OccupancySheet open={occOpen} onClose={() => setOccOpen(false)} day={today} bookings={bookings} api={api} />
 
       {failed.length > 0 && (
         <button className="alert" onClick={() => api.goto('places')}>
