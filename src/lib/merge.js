@@ -3,7 +3,11 @@
 // Mảng phần tử có id gộp theo từng phần tử, object gộp theo từng khoá.
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'setupDone'];
-export const pickSync = (s) => Object.fromEntries(SYNC_KEYS.map((k) => [k, s?.[k]]));
+const DEFAULTS = {
+  property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, setupDone: false,
+};
+/** Lấy phần dữ liệu được đồng bộ; khoá thiếu / null lấy giá trị mặc định để so sánh nhất quán */
+export const pickSync = (s) => Object.fromEntries(SYNC_KEYS.map((k) => [k, s?.[k] ?? DEFAULTS[k]]));
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isIdArray = (v) => Array.isArray(v) && v.every((x) => isObj(x) && x.id != null);

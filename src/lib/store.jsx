@@ -187,6 +187,7 @@ export function StoreProvider({ scope, role, user, children }) {
     setCloudState((c) => ({ ...c, status: 'syncing', error: '' }));
     try {
       let remote = await api(`/api/data?ws=${cloud.ws}`, { token: cloud.token });
+      let done = false;
       for (let attempt = 0; attempt < 4; attempt++) {
         const snapshot = pickSync(stateRef.current);
         let merged;
@@ -218,8 +219,10 @@ export function StoreProvider({ scope, role, user, children }) {
           baseRef.current = final;
         }
         versionRef.current = remote.version;
+        done = true;
         break;
       }
+      if (!done) throw new Error('Máy chủ đang bận, chưa lưu được thay đổi. Bấm để thử lại.');
       lastAtRef.current = Date.now();
       persist();
       setCloudState({ status: 'ok', at: lastAtRef.current, error: '', loaded: true });

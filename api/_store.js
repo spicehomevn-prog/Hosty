@@ -53,16 +53,22 @@ let access = process.env.HOSTY_BLOB_ACCESS || null;
 const auth = () => (process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {});
 const isConflict = (e) => /precondition|already exists|etag/i.test(`${e?.name} ${e?.message}`);
 
-async function blobGetPrivate(p) {
-  const { get } = await import('@vercel/blob');
-  const res = await get(p, { access: 'private', useCache: false, ...auth() });
-  if (!res || res.statusCode !== 200) return null;
-  return { data: JSON.parse(await new Response(res.stream).text()), etag: res.blob.etag };
-}
 // Blob chưa tồn tại (khác với lỗi "store does not exist")
 const isMissing = (e, mod) => (mod.BlobNotFoundError && e instanceof mod.BlobNotFoundError)
   || /requested blob does not exist|not.?found/i.test(`${e?.name} ${e?.message}`);
 
+async function blobGetPrivate(p) {
+  const mod = await import('@vercel/blob');
+  // ETag phải lấy từ API (head) — đúng loại mà put({ ifMatch }) so sánh.
+  // ETag trong header HTTP khi tải file (get) là của CDN, khác định dạng -> ghi có điều kiện luôn bị từ chối.
+  let meta;
+  try { meta = await mod.head(p, auth()); } catch (e) { if (isMissing(e, mod)) return null; throw e; }
+  if (!meta) return null;
+  const res = await mod.get(p, { access: 'private', useCache: false, ...auth() });
+  if (!res || res.statusCode !== 200) return null;
+  // đọc head TRƯỚC get: nếu file vừa đổi, nội dung mới hơn ETag -> lần ghi sau bị từ chối và thử lại (an toàn)
+  return { data: JSON.parse(await new Response(res.stream).text()), etag: meta.etag };
+}
 async function blobGetPublic(p) {
   const mod = await import('@vercel/blob');
   let meta;
