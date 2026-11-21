@@ -13,14 +13,17 @@ export const ACCOUNTS = 'accounts.json';
 export const WORKSPACES = 'workspaces.json';
 export const wsFile = (id) => `ws/${id}.json`;
 
+// Bỏ khoảng trắng / dấu ngoặc kép thừa khi dán giá trị vào Vercel
+export const envClean = (v) => String(v ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
+
 function secret() {
-  const s = process.env.AUTH_SECRET;
+  const s = envClean(process.env.AUTH_SECRET);
   if (!s || s.length < 16) throw new HttpError(503, 'Máy chủ thiếu biến AUTH_SECRET (ít nhất 16 ký tự). Xem README.');
   return s;
 }
 function owner() {
-  const username = (process.env.HOSTY_OWNER_USERNAME || '').trim().toLowerCase();
-  const password = process.env.HOSTY_OWNER_PASSWORD || '';
+  const username = envClean(process.env.HOSTY_OWNER_USERNAME).toLowerCase();
+  const password = envClean(process.env.HOSTY_OWNER_PASSWORD);
   if (!username || !password) return null;
   return { username, password, tv: createHash('sha256').update(password).digest('hex').slice(0, 10) };
 }
@@ -100,6 +103,9 @@ export async function login(username, password) {
     return { token: sign({ uid: 'owner', tv: o.tv, exp: Date.now() + TOKEN_DAYS * 864e5 }), user: OWNER_USER(o) };
   }
   const { accounts } = await loadAccounts();
+  if (!o && accounts.length === 0) {
+    throw new HttpError(503, 'Máy chủ chưa có tài khoản chủ hệ thống: thêm HOSTY_OWNER_USERNAME và HOSTY_OWNER_PASSWORD trên Vercel rồi Redeploy.');
+  }
   const acc = accounts.find((a) => a.username === u);
   if (!acc || !(await checkPassword(String(password || ''), acc.salt, acc.passHash))) throw await fail();
   if (acc.disabled) throw new HttpError(403, 'Tài khoản đã bị khoá. Liên hệ quản trị viên.');
@@ -142,3 +148,15 @@ export async function workspacesFor(user) {
 }
 
 export { checkPassword };
+
+/** Tình trạng cấu hình (không lộ giá trị) cho /api/health */
+export function configStatus() {
+  const o = owner();
+  const s = envClean(process.env.AUTH_SECRET);
+  return {
+    authSecret: s.length >= 16 ? 'ok' : (s ? 'quá ngắn (cần ≥ 16 ký tự)' : 'thiếu'),
+    ownerUsername: envClean(process.env.HOSTY_OWNER_USERNAME) ? 'ok' : 'thiếu',
+    ownerPassword: envClean(process.env.HOSTY_OWNER_PASSWORD) ? 'ok' : 'thiếu',
+    ownerUsernameLength: o ? o.username.length : 0,
+  };
+}

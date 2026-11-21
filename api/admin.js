@@ -6,11 +6,11 @@ import { route, send, readBody, HttpError } from './_http.js';
 import { updateJSON, delJSON } from './_store.js';
 import {
   requireUser, requireOwner, loadAccounts, loadWorkspaces, publicAccount, hashPassword, randomPassword,
-  slugify, validUsername, ACCOUNTS, WORKSPACES, wsFile,
+  slugify, validUsername, ACCOUNTS, WORKSPACES, wsFile, envClean,
 } from './_auth.js';
 
 const newId = () => randomBytes(6).toString('hex');
-const RESERVED = () => (process.env.HOSTY_OWNER_USERNAME || '').trim().toLowerCase();
+const RESERVED = () => envClean(process.env.HOSTY_OWNER_USERNAME).toLowerCase();
 
 function nextUsername(accounts, base) {
   const taken = new Set(accounts.map((a) => a.username));
