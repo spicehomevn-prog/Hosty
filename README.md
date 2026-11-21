@@ -1,5 +1,7 @@
 # Hostexa – theo dõi đặt phòng, dọn phòng & task cho khách sạn / homestay
 
+**Địa chỉ chính: https://hostexa.vercel.app** (khai báo trong `site.config.js`).
+
 Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua link iCal. Dữ liệu từng cơ sở lưu trên Vercel Blob, đăng nhập trên máy nào cũng thấy cùng dữ liệu.
 
 ## Tính năng
@@ -12,6 +14,11 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
 - **Đồng bộ ngược lên sàn**: Cơ sở → *Lấy link xuất lịch*. Mỗi phòng có link iCal riêng cho từng sàn (vd. "Dán vào Airbnb") gồm khách đặt trực tiếp + khách từ các sàn khác, đã loại khách của chính sàn đó để không chặn vòng. Dán vào mục *Nhập lịch* của sàn để sàn tự chặn ngày. Link có chữ ký bảo mật, không chứa tên/SĐT khách; đổi `AUTH_SECRET` sẽ vô hiệu mọi link cũ.
 - **Lịch đặt phòng** theo Tuần / Tháng, **thẻ dọn phòng** theo tuần/tháng hoặc từng ngày, ghi rõ ai đã dọn lúc mấy giờ, **copy thẻ** gửi Zalo, **ghi chú ngày**, **task** (giao cho từng nhân viên), đặt phòng thủ công.
 - Font: **Cal Sans** cho tiêu đề & heading, **Afacad Flux** cho chữ nội dung (Google Fonts, hỗ trợ tiếng Việt).
+
+## Tên miền
+- Tên miền chính là `hostexa.vercel.app`, dùng cho thẻ xem trước khi chia sẻ link và cho mọi link xuất lịch iCal mới.
+- Tên miền cũ `hosty-rose.vercel.app` vẫn được giữ trên Vercel (**No Redirect**) để các link lịch đã dán lên sàn tiếp tục chạy. Chỉ xoá khi đã dán lại link mới vào mọi sàn.
+- Đổi sang tên miền khác: sửa `PRIMARY_DOMAIN` trong `site.config.js`, hoặc đặt biến môi trường `SITE_URL` (vd. `https://hostexa.vn`), rồi Redeploy.
 
 ## Cài đặt trên Vercel (một lần)
 1. **Bật Vercel Blob**: project trên vercel.com → **Storage** → **Create Database** → **Blob** → đặt tên (vd. `hosty-data`) → **Create** → chọn project (tick Production/Preview/Development) → **Connect**. Vercel tự thêm biến `BLOB_READ_WRITE_TOKEN`.

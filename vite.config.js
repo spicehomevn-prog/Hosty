@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import { siteUrl } from './site.config.js';
 
 // Khi chạy local (npm run dev), giả lập các Vercel function trong thư mục api/
 const devApi = () => ({
@@ -15,11 +16,7 @@ const devApi = () => ({
 });
 
 // Địa chỉ đầy đủ của trang cho thẻ xem trước khi chia sẻ link (og:image bắt buộc là URL tuyệt đối).
-// Trên Vercel lấy tên miền production tự động; có thể đặt SITE_URL để ghi đè.
-const siteUrl = () => {
-  const raw = process.env.SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || 'hosty-rose.vercel.app';
-  return (raw.startsWith('http') ? raw : `https://${raw}`).replace(/\/$/, '');
-};
+// Dùng tên miền chính trong site.config.js; có thể đặt SITE_URL để ghi đè.
 const siteMeta = () => ({
   name: 'site-url',
   transformIndexHtml: (html) => html.replaceAll('%SITE_URL%', siteUrl()),

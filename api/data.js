@@ -4,6 +4,7 @@
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, ConflictError } from './_store.js';
 import { requireUser, canAccess, loadWorkspaces, wsFile, signFeed } from './_auth.js';
+import { siteUrl } from '../site.config.js';
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'setupDone'];
 const TASK_TICK_FIELDS = new Set(['done', 'doneAt', 'doneBy', 'doneByName']);
@@ -50,9 +51,11 @@ function checkMemberChange(prev, next, user) {
 function exportLinks(req, user, ws, data) {
   if (user.role === 'member') throw new HttpError(403, 'Chỉ admin cơ sở xem được link xuất lịch');
   if (!data) return [];
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const proto = String(req.headers['x-forwarded-proto'] || (/^(localhost|127\.|192\.168\.)/.test(host) ? 'http' : 'https')).split(',')[0];
-  const url = (payload) => `${proto}://${host}/cal/${signFeed(payload)}.ics`;
+  // Link mới luôn dùng tên miền chính (link cũ trên tên miền khác vẫn hợp lệ). Chạy local thì dùng địa chỉ đang mở.
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+  const local = /^(localhost|127\.|192\.168\.|10\.)/.test(host);
+  const base = local ? `http://${host}` : siteUrl();
+  const url = (payload) => `${base}/cal/${signFeed(payload)}.ics`;
   const out = [];
   for (const loc of data.locations || []) {
     for (const room of loc.rooms || []) {
