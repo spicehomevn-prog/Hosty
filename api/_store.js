@@ -13,7 +13,7 @@ export class ConflictError extends Error {
 }
 
 export function storeMode() {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return 'blob';
+  if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) return 'blob';
   if (process.env.HOSTY_LOCAL_STORE) return 'local';
   return null;
 }
@@ -48,18 +48,21 @@ async function localDel(p) { try { await fs.unlink(localFile(p)); } catch { /* n
 /* ---------- Vercel Blob ---------- */
 // Ưu tiên blob "private"; store không hỗ trợ thì dùng "public" (đường dẫn chỉ server biết).
 let access = process.env.HOSTY_BLOB_ACCESS || null;
+// Luôn dùng token read-write: nếu project có BLOB_STORE_ID, thư viện sẽ tự chọn OIDC thay vì token,
+// dễ lỗi quyền theo môi trường (Production/Preview). Truyền token trực tiếp để tránh việc đó.
+const auth = () => (process.env.BLOB_READ_WRITE_TOKEN ? { token: process.env.BLOB_READ_WRITE_TOKEN } : {});
 const isConflict = (e) => /precondition|already exists|etag/i.test(`${e?.name} ${e?.message}`);
 
 async function blobGetPrivate(p) {
   const { get } = await import('@vercel/blob');
-  const res = await get(p, { access: 'private', useCache: false });
+  const res = await get(p, { access: 'private', useCache: false, ...auth() });
   if (!res || res.statusCode !== 200) return null;
   return { data: JSON.parse(await new Response(res.stream).text()), etag: res.blob.etag };
 }
 async function blobGetPublic(p) {
   const { head } = await import('@vercel/blob');
   let meta;
-  try { meta = await head(p); } catch (e) { if (/not.?found|404/i.test(`${e?.name} ${e?.message}`)) return null; throw e; }
+  try { meta = await head(p, auth()); } catch (e) { if (/not.?found|404/i.test(`${e?.name} ${e?.message}`)) return null; throw e; }
   if (!meta) return null;
   const r = await fetch(`${meta.url}?t=${Date.now()}`, { cache: 'no-store' });
   if (!r.ok) return null;
@@ -70,7 +73,7 @@ async function blobPut(p, obj, acc, { ifMatch, create } = {}) {
   try {
     const res = await put(p, JSON.stringify(obj), {
       access: acc, addRandomSuffix: false, allowOverwrite: !create, contentType: 'application/json',
-      cacheControlMaxAge: 60, ...(ifMatch ? { ifMatch } : {}),
+      cacheControlMaxAge: 60, ...(ifMatch ? { ifMatch } : {}), ...auth(),
     });
     return { etag: res.etag };
   } catch (e) {
@@ -106,7 +109,7 @@ async function blobSet(p, obj, opts) {
 }
 async function blobDel(p) {
   const { del } = await import('@vercel/blob');
-  try { await del(p); } catch { /* noop */ }
+  try { await del(p, auth()); } catch { /* noop */ }
 }
 
 /* ---------- API chung ---------- */

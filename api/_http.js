@@ -41,7 +41,10 @@ export function route(fn, { needStore = true } = {}) {
       if (e instanceof HttpError) return send(res, e.status, { error: e.message, ...(e.extra || {}) });
       if (e instanceof SyntaxError) return send(res, 400, { error: 'Dữ liệu gửi lên không đúng định dạng' });
       console.error('api error', e);
-      return send(res, 500, { error: e.message && /Máy chủ bận/.test(e.message) ? e.message : 'Lỗi máy chủ, vui lòng thử lại' });
+      if (e.message && /Máy chủ bận/.test(e.message)) return send(res, 500, { error: e.message });
+      // kèm chi tiết ngắn để dễ tìm nguyên nhân (không chứa token / mật khẩu)
+      const detail = String(e.message || e.name || '').replace(/vercel_blob_rw_[A-Za-z0-9_]+/g, '***').slice(0, 180);
+      return send(res, 500, { error: `Lỗi máy chủ: ${detail || 'không rõ'}` });
     }
   };
 }
