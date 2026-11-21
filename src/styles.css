@@ -1,5 +1,6 @@
 :root {
-  --font: 'Be Vietnam Pro', system-ui, sans-serif;
+  --font: 'Afacad Flux', system-ui, sans-serif;     /* chữ nội dung */
+  --font-head: 'Cal Sans', 'Afacad Flux', system-ui, sans-serif; /* tiêu đề & heading */
   --ink: #1D1530;
   --ink-2: #4E4663;
   --muted: #8F88A3;
@@ -30,18 +31,22 @@ body {
   color: var(--ink);
   background: var(--surface);
   -webkit-font-smoothing: antialiased;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.45;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
 button:disabled { cursor: not-allowed; opacity: .5; }
 :focus-visible { outline: 2px solid var(--violet-ink); outline-offset: 2px; }
-h1, h2, h3, h4 { margin: 0; letter-spacing: -0.02em; }
-h1 { font-size: 28px; font-weight: 800; line-height: 1.15; }
+h1, h2, h3, h4 { margin: 0; letter-spacing: 0; }
+h1 { font-size: 28px; line-height: 1.15; }
+/* Cal Sans chỉ có một độ đậm: giữ font-weight 400 để không bị đậm giả */
+h1, h2, h3, h4, .section-title, .hero-num, .sync-code, .eyebrow + h2 {
+  font-family: var(--font-head); font-weight: 400 !important;
+}
 p { margin: 0; }
 .muted { color: var(--muted); }
-.tiny { font-size: 12.5px; }
+.tiny { font-size: 13.5px; }
 .center { text-align: center; }
 .row { display: flex; align-items: center; }
 .gap8 { gap: 8px; }

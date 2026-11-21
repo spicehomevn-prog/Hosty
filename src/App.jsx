@@ -4,7 +4,6 @@ import { useFlipNav } from './lib/motion.js';
 import { StoreProvider, useStore, demoState } from './lib/store.jsx';
 import { useSession } from './lib/session.jsx';
 import { can } from './lib/perm.js';
-import { applyFont } from './lib/fonts.js';
 import { todayKey } from './lib/dates.js';
 import Login from './components/Login.jsx';
 import WorkspacePicker from './components/WorkspacePicker.jsx';
@@ -102,7 +101,6 @@ function Workspace() {
   const blob = useFlipNav(navRef, tab, showMain);
 
   useEffect(() => { if (cloud.loaded && !state.setupDone && can(role, 'setup')) setInSetup(true); }, [cloud.loaded, state.setupDone, role]);
-  useEffect(() => { applyFont(state.settings.font || 'Be Vietnam Pro'); }, [state.settings.font]);
   useEffect(() => { window.scrollTo(0, 0); }, [tab]);
 
   if (!cloud.loaded) return <Splash cloud={cloud} onLogout={s.logout} />;

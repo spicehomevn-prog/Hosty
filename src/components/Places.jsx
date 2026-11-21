@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, Type, UserRound } from '../lib/icons.jsx';
+import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, UserRound } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
-import { FONTS, ensureFont } from '../lib/fonts.js';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
@@ -14,7 +13,6 @@ export default function Places({ api }) {
   const { state, dispatch, sync, syncing, role, cloud } = useStore();
   const canSetup = can(role, 'setup');
   const fileRef = useRef(null);
-  useEffect(() => { FONTS.forEach((f) => ensureFont(f.id)); }, []);
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -98,19 +96,6 @@ export default function Places({ api }) {
       </div>
       <p className="tiny muted">Lịch iCal từ các sàn tự tải lại mỗi 30 phút khi app đang mở. Lần cuối: {timeAgo(state.lastSync)}.</p>
       </>}
-
-      <h2 className="section-title"><Type size={18} /> Font chữ</h2>
-      <p className="tiny muted">Các font không chân từ Google Fonts, hỗ trợ đầy đủ tiếng Việt.</p>
-      <div className="font-grid stagger" style={{ '--i': 3 }}>
-        {FONTS.map((f) => (
-          <button key={f.id} className={`font-card ${state.settings.font === f.id ? 'on' : ''}`} style={{ fontFamily: `'${f.id}', sans-serif` }} onClick={() => dispatch({ type: 'SETTINGS', patch: { font: f.id } })}>
-            <span className="font-tag">{f.tag}</span>
-            <b className="font-sample">Phòng đẹp, khách vui</b>
-            <span className="font-name">{f.id}</span>
-            <small>{f.note}</small>
-          </button>
-        ))}
-      </div>
 
       {can(role, 'backup') && <>
         <h2 className="section-title">Sao lưu</h2>
