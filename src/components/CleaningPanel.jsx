@@ -4,9 +4,12 @@ import { useStore } from '../lib/store.jsx';
 import { getCleanings, cleaningStatus, cleaningText, copyText, arrivalsOn, departuresOn, occupiedOn, roomIndex } from '../lib/derive.js';
 import { dm, longDate, monthTitle, wdLong } from '../lib/dates.js';
 import { toast, Progress } from './ui.jsx';
+import { can } from '../lib/perm.js';
+
+const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 export function CleaningCard({ c, compact }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, user } = useStore();
   const st = cleaningStatus(c);
   const copyOne = async () => {
     const ok = await copyText(cleaningText(state, [c], { title: `DỌN PHÒNG – ${c.room.name}`, notes: {} }));
@@ -14,7 +17,7 @@ export function CleaningCard({ c, compact }) {
   };
   return (
     <div className={`clean-card tone-${st.tone} ${c.done ? 'done' : ''}`}>
-      <button className={`check ${c.done ? 'on' : ''}`} onClick={() => dispatch({ type: 'TOGGLE_CLEAN', id: c.id })} aria-label={c.done ? 'Bỏ đánh dấu đã dọn' : 'Đánh dấu đã dọn'}>
+      <button className={`check ${c.done ? 'on' : ''}`} onClick={() => dispatch({ type: 'TOGGLE_CLEAN', id: c.id, by: user?.id, byName: user?.name })} aria-label={c.done ? 'Bỏ đánh dấu đã dọn' : 'Đánh dấu đã dọn'}>
         {c.done && <Check size={14} strokeWidth={3} />}
       </button>
       <div className="clean-body">
@@ -36,6 +39,9 @@ export function CleaningCard({ c, compact }) {
           <span className="sep">·</span>
           <span className={`status s-${st.tone}`}>{st.label}</span>
         </div>
+        {c.done && c.doneInfo?.at && (
+          <div className="clean-done-by"><Check size={12} strokeWidth={3} /> Đã dọn{c.doneInfo.byName ? ` · ${c.doneInfo.byName}` : ''} lúc {hhmm(c.doneInfo.at)}</div>
+        )}
       </div>
       <button className="icon-btn sm ghost-btn" onClick={copyOne} aria-label={`Copy thẻ dọn ${c.room.name}`}><Copy size={16} /></button>
     </div>
@@ -43,7 +49,8 @@ export function CleaningCard({ c, compact }) {
 }
 
 export default function CleaningPanel({ api, bookings, locId, from, to, view, anchor, selected, clearSelected, selectDay }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, role } = useStore();
+  const canNote = can(role, 'note.edit');
   const idx = useMemo(() => roomIndex(state), [state]);
   const a = selected || from;
   const b = selected || to;
@@ -93,17 +100,18 @@ export default function CleaningPanel({ api, bookings, locId, from, to, view, an
             <div className="stat yellow"><LogOut size={16} /><b>{departuresOn(bookings, selected).filter(inLoc).length}</b><span>Trả phòng</span></div>
             <div className="stat blue"><BedDouble size={16} /><b>{occupiedOn(bookings, selected).filter(inLoc).length}</b><span>Đang ở</span></div>
           </div>
-          <div className="note-box">
+          {(canNote || state.notes[selected]) && <div className="note-box">
             <label htmlFor="day-note"><NotebookPen size={16} /> Ghi chú ngày {dm(selected)}</label>
             <textarea
               id="day-note"
               rows={3}
               placeholder="VD: Thay ga gối, khách cần thêm khăn, bảo trì máy lạnh…"
               value={state.notes[selected] || ''}
-              onChange={(e) => dispatch({ type: 'SET_NOTE', date: selected, text: e.target.value })}
+              readOnly={!canNote}
+              onChange={(e) => canNote && dispatch({ type: 'SET_NOTE', date: selected, text: e.target.value })}
             />
-            <span className="tiny muted">Ghi chú được lưu tự động và kèm theo khi copy thẻ dọn phòng.</span>
-          </div>
+            <span className="tiny muted">{canNote ? 'Ghi chú được lưu tự động và kèm theo khi copy thẻ dọn phòng.' : 'Ghi chú của admin cơ sở.'}</span>
+          </div>}
         </>
       )}
 

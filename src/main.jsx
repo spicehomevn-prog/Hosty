@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { StoreProvider } from './lib/store.jsx';
+import { SessionProvider } from './lib/session.jsx';
 import App from './App.jsx';
 import './styles.css';
 import { initPressEffects } from './lib/motion.js';
@@ -9,6 +9,6 @@ initPressEffects();
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <StoreProvider><App /></StoreProvider>
+    <SessionProvider><App /></SessionProvider>
   </React.StrictMode>,
 );

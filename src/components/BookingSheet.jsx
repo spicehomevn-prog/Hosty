@@ -4,6 +4,7 @@ import { useStore, uid, PLATFORMS, platformColor } from '../lib/store.jsx';
 import { roomIndex } from '../lib/derive.js';
 import { todayKey, addDays, diffDays, longDate } from '../lib/dates.js';
 import { Sheet, Field, toast } from './ui.jsx';
+import { can } from '../lib/perm.js';
 
 export function BookingSheet({ mode, data, onClose }) {
   if (mode === 'new' || (mode === 'edit')) return <ManualForm data={data} onClose={onClose} />;
@@ -11,14 +12,15 @@ export function BookingSheet({ mode, data, onClose }) {
 }
 
 function BookingDetail({ b, onClose }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, role } = useStore();
   const [edit, setEdit] = useState(false);
+  const canEdit = can(role, 'booking');
   const info = roomIndex(state)[b.roomId];
   if (edit) return <ManualForm data={state.manual.find((m) => m.id === b.id) || b} onClose={onClose} />;
   const nights = diffDays(b.start, b.end);
   return (
     <Sheet open onClose={onClose} title="Chi tiết đặt phòng"
-      footer={b.source === 'manual' ? (
+      footer={!canEdit ? null : b.source === 'manual' ? (
         <>
           <button className="icon-btn danger" onClick={() => { dispatch({ type: 'DELETE_MANUAL', id: b.id }); toast('Đã xoá đặt phòng'); onClose(); }} aria-label="Xoá"><Trash2 size={18} /></button>
           <button className="btn primary block" onClick={() => setEdit(true)}>Sửa đặt phòng</button>

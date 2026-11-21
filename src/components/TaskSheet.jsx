@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useStore, uid } from '../lib/store.jsx';
 import { todayKey } from '../lib/dates.js';
 import { Sheet, Field } from './ui.jsx';
+import { useMembers } from '../lib/members.js';
 
 export const PRIORITIES = [
   { id: 'normal', label: 'Bình thường' },
@@ -12,8 +13,9 @@ export const PRIORITIES = [
 
 export function TaskSheet({ task, onClose }) {
   const { state, dispatch } = useStore();
+  const members = useMembers().filter((m) => m.role === 'member');
   const isNew = !task.id;
-  const [f, setF] = useState({ title: '', desc: '', date: todayKey(), roomId: '', priority: 'normal', done: false, ...task });
+  const [f, setF] = useState({ title: '', desc: '', date: todayKey(), roomId: '', priority: 'normal', done: false, assignee: '', ...task });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = () => {
     if (!f.title.trim()) return;
@@ -41,6 +43,14 @@ export function TaskSheet({ task, onClose }) {
           </select>
         </Field>
       </div>
+      {members.length > 0 && (
+        <Field label="Giao cho" hint="Nhân viên dọn phòng chỉ thấy task chung và task được giao cho mình">
+          <select className="input" value={f.assignee || ''} onChange={set('assignee')}>
+            <option value="">Chung (mọi người)</option>
+            {members.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.username})</option>)}
+          </select>
+        </Field>
+      )}
       <Field label="Mức độ">
         <div className="seg wide">
           {PRIORITIES.map((p) => <button key={p.id} type="button" className={f.priority === p.id ? 'on' : ''} onClick={() => setF({ ...f, priority: p.id })}>{p.label}</button>)}

@@ -1,16 +1,18 @@
 import { useEffect, useRef } from 'react';
-import { Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, RotateCcw, MapPin, Type } from 'lucide-react';
+import { Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, Type, UserRound } from 'lucide-react';
 import { useStore } from '../lib/store.jsx';
 import { FONTS, ensureFont } from '../lib/fonts.js';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
-import { SyncCard } from './Sync.jsx';
+import { AccountCard } from './Account.jsx';
+import { can } from '../lib/perm.js';
 
 const TONES = ['blue', 'violet', 'yellow', 'pink'];
 
 export default function Places({ api }) {
-  const { state, dispatch, sync, syncing } = useStore();
+  const { state, dispatch, sync, syncing, role, cloud } = useStore();
+  const canSetup = can(role, 'setup');
   const fileRef = useRef(null);
   useEffect(() => { FONTS.forEach((f) => ensureFont(f.id)); }, []);
 
@@ -28,6 +30,7 @@ export default function Places({ api }) {
     try {
       const data = JSON.parse(await file.text());
       if (!Array.isArray(data.locations)) throw new Error();
+      if (!confirm(cloud.enabled ? 'Thay toàn bộ dữ liệu của cơ sở bằng file này? Dữ liệu mới sẽ được đồng bộ cho mọi tài khoản của cơ sở.' : 'Thay toàn bộ dữ liệu bằng file này?')) return;
       dispatch({ type: 'REPLACE', state: data });
       toast('Đã nhập dữ liệu');
     } catch { toast('File không hợp lệ'); }
@@ -37,9 +40,15 @@ export default function Places({ api }) {
   return (
     <div className="places">
       <header className="page-head rise">
-        <div><h1>Cơ sở</h1><p className="sub">Địa điểm, phòng & lịch đồng bộ</p></div>
-        <button className="icon-btn" onClick={api.editSetup} aria-label="Chỉnh sửa thiết lập"><Pencil size={18} /></button>
+        <div><h1>Cơ sở</h1><p className="sub">{canSetup ? 'Tài khoản, địa điểm, phòng & lịch đồng bộ' : 'Tài khoản & cài đặt'}</p></div>
+        {canSetup && <button className="icon-btn" onClick={api.editSetup} aria-label="Chỉnh sửa thiết lập"><Pencil size={18} /></button>}
       </header>
+
+      <h2 className="section-title"><UserRound size={18} /> Tài khoản</h2>
+      <AccountCard />
+
+      {canSetup && <>
+      <h2 className="section-title">Địa điểm & phòng</h2>
 
       <div className="loc-list stagger">
         {state.locations.map((loc, i) => {
@@ -83,14 +92,12 @@ export default function Places({ api }) {
 
       <div className="row gap8 wrap">
         <button className="btn primary" onClick={async () => { const r = await sync(); toast(r.length ? `Đã đồng bộ ${r.filter((x) => x.ok).length}/${r.length} lịch` : 'Chưa có link iCal nào'); }} disabled={syncing}>
-          <RefreshCw size={16} className={syncing ? 'spin' : ''} /> Đồng bộ ngay
+          <RefreshCw size={16} className={syncing ? 'spin' : ''} /> Tải lại lịch iCal
         </button>
         <button className="btn ghost" onClick={api.editSetup}><Pencil size={16} /> Sửa phòng & lịch</button>
       </div>
-      <p className="tiny muted">Tự động đồng bộ mỗi 30 phút khi app đang mở. Lần cuối: {timeAgo(state.lastSync)}.</p>
-
-      <h2 className="section-title">Đồng bộ</h2>
-      <SyncCard onImport={api.importData} />
+      <p className="tiny muted">Lịch iCal từ các sàn tự tải lại mỗi 30 phút khi app đang mở. Lần cuối: {timeAgo(state.lastSync)}.</p>
+      </>}
 
       <h2 className="section-title"><Type size={18} /> Font chữ</h2>
       <p className="tiny muted">Các font không chân từ Google Fonts, hỗ trợ đầy đủ tiếng Việt.</p>
@@ -105,14 +112,15 @@ export default function Places({ api }) {
         ))}
       </div>
 
-      <h2 className="section-title">Sao lưu</h2>
-      <p className="tiny muted">Dữ liệu được lưu trên trình duyệt của thiết bị này. Có thể xuất ra file để sao lưu.</p>
-      <div className="data-actions">
-        <button className="btn ghost" onClick={exportData}><Download size={16} /> Xuất dữ liệu</button>
-        <button className="btn ghost" onClick={() => fileRef.current?.click()}><Upload size={16} /> Nhập dữ liệu</button>
-        <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
-        <button className="btn ghost danger" onClick={() => { if (confirm('Xoá toàn bộ dữ liệu và thiết lập lại từ đầu?')) dispatch({ type: 'RESET' }); }}><RotateCcw size={16} /> Thiết lập lại</button>
-      </div>
+      {can(role, 'backup') && <>
+        <h2 className="section-title">Sao lưu</h2>
+        <p className="tiny muted">Xuất dữ liệu cơ sở ra file để lưu trữ riêng, hoặc khôi phục từ file đã xuất.</p>
+        <div className="data-actions">
+          <button className="btn ghost" onClick={exportData}><Download size={16} /> Xuất dữ liệu</button>
+          <button className="btn ghost" onClick={() => fileRef.current?.click()}><Upload size={16} /> Nhập dữ liệu</button>
+          <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
+        </div>
+      </>}
       <footer className="brand-foot"><Logo size={28} /><span>Lịch đặt phòng & dọn phòng cho khách sạn, homestay</span></footer>
     </div>
   );

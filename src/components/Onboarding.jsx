@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Plus, Trash2, Link2, Clock, MapPin, Sparkles, CheckCircle2, AlertCircle, Loader2, CalendarPlus } from 'lucide-react';
-import { useStore, uid, PLATFORMS, LOCATION_EMOJI, demoState, platformColor } from '../lib/store.jsx';
+import { ArrowLeft, ArrowRight, Plus, Trash2, Link2, Clock, MapPin, CheckCircle2, AlertCircle, Loader2, CalendarPlus, History } from 'lucide-react';
+import { useStore, uid, PLATFORMS, LOCATION_EMOJI, platformColor, loadLegacy } from '../lib/store.jsx';
 import { Stepper, Field } from './ui.jsx';
-import { Logo, LogoMark } from './Logo.jsx';
+import { LogoMark } from './Logo.jsx';
 
-const STEPS = ['welcome', 'name', 'count', 'locations', 'calendars', 'finish'];
+const STEPS = ['welcome', 'name', 'count', 'locations', 'calendars', 'finish']; // bước 0 (màn chào) đã chuyển sang trang Đăng nhập
 
 const newLocation = (i) => ({ id: uid(), name: '', address: '', emoji: LOCATION_EMOJI[i % LOCATION_EMOJI.length], rooms: [{ id: uid(), name: 'Phòng 1' }] });
 
-export default function Onboarding({ editing, onDone, onCancel, onImport }) {
-  const { state, dispatch, sync } = useStore();
-  const [step, setStep] = useState(editing ? 1 : 0);
-  const [name, setName] = useState(state.property.name || '');
+export default function Onboarding({ editing, onDone, onCancel, initialName = '' }) {
+  const { state, dispatch, sync, cloud } = useStore();
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState(state.property.name || initialName);
+  // Dữ liệu cũ trên máy này (trước khi có tài khoản) -> dùng cho cơ sở mới
+  const [legacy] = useState(() => (!editing && cloud.enabled ? loadLegacy() : null));
   const [locations, setLocations] = useState(() => (state.locations.length ? structuredClone(state.locations) : [newLocation(0)]));
   const [calendars, setCalendars] = useState(() => structuredClone(state.calendars.filter((c) => !c.demo || editing)));
   const [defIn, setDefIn] = useState('14:00');
@@ -77,6 +79,7 @@ export default function Onboarding({ editing, onDone, onCancel, onImport }) {
     setStep(STEPS.indexOf('finish'));
     setBusy(true);
     dispatch({ type: 'SETUP', property: { name: name.trim() }, locations: cleanLocs, calendars: cals });
+    if (cloud.enabled) setTimeout(() => cloud.syncNow(), 50); // đưa thiết lập lên máy chủ ngay
     const res = await sync(cals);
     setResults({ res, cals, locs: cleanLocs });
     setBusy(false);
@@ -84,31 +87,11 @@ export default function Onboarding({ editing, onDone, onCancel, onImport }) {
 
   const progress = key === 'finish' ? 1 : step / 5;
 
-  if (key === 'welcome') {
-    return (
-      <div className="onb onb-welcome">
-        <div className="welcome-logo"><Logo size={52} animated /></div>
-        <div className="welcome-art" aria-hidden="true">
-          <div className="wa-card violet" style={{ '--d': '.45s' }}><CalendarPlus size={26} /><span>Lịch đặt phòng</span></div>
-          <div className="wa-card yellow" style={{ '--d': '.58s' }}><Sparkles size={26} /><span>Thẻ dọn phòng</span></div>
-          <div className="wa-card pink" style={{ '--d': '.71s' }}><CheckCircle2 size={26} /><span>Task mỗi ngày</span></div>
-        </div>
-        <h1 className="rise" style={{ '--i': 9 }}>Quản lý phòng,<br />gọn trong một lịch.</h1>
-        <p className="muted rise" style={{ '--i': 10 }}>Đồng bộ lịch từ Airbnb, Booking.com, Agoda… qua iCal, tự tạo thẻ dọn phòng mỗi ngày và theo dõi công việc của khách sạn / homestay.</p>
-        <div className="onb-actions col rise" style={{ '--i': 11 }}>
-          <button className="btn primary lg" onClick={() => setStep(1)}>Bắt đầu thiết lập <ArrowRight size={18} /></button>
-          <button className="btn ghost" onClick={() => { dispatch({ type: 'REPLACE', state: demoState() }); onDone(); }}>Xem thử với dữ liệu mẫu</button>
-          <button className="link-btn center-btn" onClick={() => onImport('')}>Đã dùng Hosty trên máy khác? <b>Nhập mã đồng bộ</b></button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="onb">
       <div className="onb-top rise" style={{ '--i': 0 }}>
-        {key !== 'finish' && (
-          <button className="icon-btn" onClick={() => (step <= 1 ? (onCancel ? onCancel() : setStep(0)) : setStep(step - 1))} aria-label="Quay lại"><ArrowLeft size={20} /></button>
+        {key !== 'finish' && (step > 1 || onCancel) && (
+          <button className="icon-btn" onClick={() => (step <= 1 ? onCancel() : setStep(step - 1))} aria-label="Quay lại"><ArrowLeft size={20} /></button>
         )}
         <div className="onb-progress"><div style={{ width: `${progress * 100}%` }} /></div>
         <span className="onb-count">{Math.min(step, 4)}/4</span>
@@ -121,6 +104,21 @@ export default function Onboarding({ editing, onDone, onCancel, onImport }) {
           <h2>Cơ sở lưu trú của bạn tên là gì?</h2>
           <p className="muted">Tên thương hiệu khách sạn / homestay — sẽ hiển thị trên trang tổng quan và thẻ dọn phòng.</p>
           <input className="input xl" autoFocus placeholder="VD: Mây Homestay" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && next()} />
+          {legacy && (
+            <div className="legacy-box">
+              <History size={18} />
+              <div>
+                <b>Máy này có dữ liệu Hosty cũ: {legacy.property?.name}</b>
+                <span>{legacy.locations.length} địa điểm · {legacy.locations.reduce((n, l) => n + l.rooms.length, 0)} phòng · {(legacy.tasks || []).length} task. Dùng dữ liệu này cho cơ sở và đưa lên máy chủ?</span>
+                <button className="btn tiny" onClick={() => {
+                  dispatch({ type: 'REPLACE', state: legacy });
+                  try { localStorage.removeItem('hosty:v1'); localStorage.removeItem('lichphong:v1'); } catch { /* noop */ }
+                  setTimeout(() => cloud.syncNow(), 50);
+                  onDone();
+                }}>Dùng dữ liệu cũ</button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

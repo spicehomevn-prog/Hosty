@@ -62,6 +62,7 @@ export function getCleanings(state, bookings, from, to, locationId) {
       outTime: b.checkOut, outPlatform: b.platform, outBooking: b,
       next: next || null, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null,
       done: !!state.cleanDone[id],
+      doneInfo: typeof state.cleanDone[id] === 'object' ? state.cleanDone[id] : null,
     };
   }
   return Object.values(map).sort((a, b) =>

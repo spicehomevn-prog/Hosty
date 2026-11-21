@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useReducer, useCallback, useRef, useState } from 'react';
 import { fetchCalendar } from './ical.js';
 import { addDays, todayKey } from './dates.js';
+import { pickSync, merge3, deepEqual } from './merge.js';
+import { api } from './session.jsx';
 
-const KEY = 'hosty:v1';
-const OLD_KEY = 'lichphong:v1';
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const CLOUD_EVERY = 15 * 60 * 1000; // tự đồng bộ mỗi 15 phút
+const EDIT_DEBOUNCE = 20 * 1000; // và 20 giây sau lần sửa cuối
 
 export const PLATFORMS = [
   { name: 'Airbnb', color: '#EF4F7A' },
@@ -39,20 +41,30 @@ export const emptyState = () => ({
   tasks: [],
   cleanDone: {},
   settings: { font: 'Be Vietnam Pro', calView: 'month' },
-  syncMeta: { code: '', version: 0, at: 0 },
 });
 
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
-    if (raw) return { ...emptyState(), ...JSON.parse(raw) };
-  } catch { /* noop */ }
-  return emptyState();
+/** Điền giá trị mặc định cho các khoá đồng bộ bị thiếu */
+function withDefaults(synced) {
+  const e = emptyState();
+  const out = {};
+  for (const [k, v] of Object.entries(synced)) out[k] = v === undefined || v === null ? e[k] : v;
+  return out;
 }
 
-function baseReducer(state, a) {
+/** Dữ liệu cũ trên máy (trước khi có tài khoản) — để đưa lên cơ sở mới */
+export function loadLegacy() {
+  for (const k of ['hosty:v1', 'lichphong:v1']) {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw) { const s = JSON.parse(raw); if (s?.setupDone && Array.isArray(s.locations)) return { ...emptyState(), ...s }; }
+    } catch { /* noop */ }
+  }
+  return null;
+}
+
+function reducer(state, a) {
   switch (a.type) {
-    case 'REPLACE': return { ...emptyState(), ...a.state };
+    case 'REPLACE': return { ...emptyState(), ...a.state, settings: state.settings };
     case 'SETUP': {
       // giữ lại dữ liệu đồng bộ của các lịch vẫn còn
       const ids = new Set(a.calendars.map((c) => c.id));
@@ -83,14 +95,23 @@ function baseReducer(state, a) {
     }
     case 'TOGGLE_CLEAN': {
       const cleanDone = { ...state.cleanDone };
-      if (cleanDone[a.id]) delete cleanDone[a.id]; else cleanDone[a.id] = Date.now();
+      if (cleanDone[a.id]) delete cleanDone[a.id];
+      else cleanDone[a.id] = { at: Date.now(), by: a.by || '', byName: a.byName || '' };
       return { ...state, cleanDone };
     }
     case 'SAVE_TASK': {
       const exists = state.tasks.some((t) => t.id === a.task.id);
       return { ...state, tasks: exists ? state.tasks.map((t) => (t.id === a.task.id ? a.task : t)) : [a.task, ...state.tasks] };
     }
-    case 'TOGGLE_TASK': return { ...state, tasks: state.tasks.map((t) => (t.id === a.id ? { ...t, done: !t.done } : t)) };
+    case 'TOGGLE_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map((t) => {
+          if (t.id !== a.id) return t;
+          if (t.done) { const { doneAt, doneBy, doneByName, ...rest } = t; return { ...rest, done: false }; } // eslint-disable-line no-unused-vars
+          return { ...t, done: true, doneAt: Date.now(), doneBy: a.by || '', doneByName: a.byName || '' };
+        }),
+      };
     case 'DELETE_TASK': return { ...state, tasks: state.tasks.filter((t) => t.id !== a.id) };
     case 'SAVE_MANUAL': {
       const exists = state.manual.some((m) => m.id === a.booking.id);
@@ -102,34 +123,147 @@ function baseReducer(state, a) {
       return { ...state, overrides };
     }
     case 'SETTINGS': return { ...state, settings: { ...state.settings, ...a.patch } };
-    case 'SYNC_META': return { ...state, syncMeta: { ...state.syncMeta, ...a.patch } };
-    case 'IMPORT_PACK':
-      return { ...emptyState(), ...a.data, syncMeta: { code: a.code, version: a.version, at: Date.now() } };
-    case 'RESET': return emptyState();
+    // Áp bản đã gộp từ máy chủ, giữ lại những gì máy này sửa trong lúc đang đồng bộ
+    case 'CLOUD_APPLY': {
+      const cur = pickSync(state);
+      return { ...state, ...withDefaults(merge3(a.snapshot, cur, a.merged)) };
+    }
+    case 'CLOUD_REPLACE': return { ...state, ...withDefaults(pickSync(a.data || {})) };
     default: return state;
   }
 }
 
-// Những thao tác không tính là "sửa dữ liệu" (để biết máy này có thay đổi chưa đóng gói)
-const NOT_EDITS = new Set(['SYNC_RESULT', 'SYNC_META', 'SETTINGS', 'IMPORT_PACK', 'REPLACE', 'RESET']);
-function reducer(state, a) {
-  const next = baseReducer(state, a);
-  if (next !== state && !NOT_EDITS.has(a.type)) return { ...next, editedAt: Date.now() };
-  return next;
+function readCache(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
 }
 
 const Ctx = createContext(null);
 
-export function StoreProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, load);
+/**
+ * scope = {
+ *   cacheKey,                       // nơi lưu tạm trên máy
+ *   cloud: { token, ws, user } | null,
+ *   initial: () => state,           // khi chưa có gì trong bộ nhớ tạm
+ *   onAuthError: () => void,        // phiên hết hạn
+ * }
+ */
+export function StoreProvider({ scope, role, user, children }) {
+  const { cacheKey, cloud } = scope;
+  const cache = useRef(readCache(cacheKey));
+  const [state, dispatch] = useReducer(reducer, undefined, () => ({
+    ...emptyState(), ...(cache.current?.state || scope.initial?.() || {}),
+  }));
   const [syncing, setSyncing] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* noop */ }
-  }, [state]);
+  // ---- trạng thái đồng bộ lên mây ----
+  const baseRef = useRef(cache.current?.base ?? null);
+  const versionRef = useRef(cache.current?.version ?? 0);
+  const [cloudState, setCloudState] = useState({
+    status: cloud ? 'idle' : 'local',
+    at: cache.current?.lastCloudSync || 0,
+    error: '',
+    loaded: !cloud || !!cache.current,
+  });
+  const lastAtRef = useRef(cache.current?.lastCloudSync || 0);
+  const busyRef = useRef(false);
+  const againRef = useRef(false);
 
+  const persist = useCallback(() => {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        state: stateRef.current, base: baseRef.current, version: versionRef.current, lastCloudSync: lastAtRef.current,
+      }));
+    } catch { /* noop */ }
+  }, [cacheKey]);
+
+  useEffect(() => { persist(); }, [state, persist]);
+
+  const cloudSync = useCallback(async () => {
+    if (!cloud) return false;
+    if (busyRef.current) { againRef.current = true; return false; }
+    busyRef.current = true;
+    setCloudState((c) => ({ ...c, status: 'syncing', error: '' }));
+    try {
+      let remote = await api(`/api/data?ws=${cloud.ws}`, { token: cloud.token });
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const snapshot = pickSync(stateRef.current);
+        let merged;
+        if (!remote.data) merged = snapshot.setupDone ? snapshot : null; // máy chủ chưa có dữ liệu
+        else if (baseRef.current == null) {
+          // máy mới: lấy bản máy chủ; nếu máy này đã kịp thiết lập (lúc mất mạng) thì gộp cả hai
+          merged = snapshot.setupDone ? merge3(pickSync(emptyState()), snapshot, pickSync(remote.data)) : pickSync(remote.data);
+        } else merged = merge3(baseRef.current, snapshot, pickSync(remote.data));
+
+        if (merged && (!remote.data || !deepEqual(merged, pickSync(remote.data)))) {
+          try {
+            const r = await api('/api/data', { token: cloud.token, method: 'PUT', body: { ws: cloud.ws, baseVersion: remote.version, data: merged } });
+            remote = { version: r.version, data: merged };
+          } catch (e) {
+            if (e.status === 409) { remote = e.info; continue; }
+            if (e.status === 403 && remote.data) {
+              // không có quyền sửa: quay về bản trên máy chủ
+              dispatch({ type: 'CLOUD_REPLACE', data: remote.data });
+              baseRef.current = pickSync(remote.data);
+              versionRef.current = remote.version;
+              throw e;
+            }
+            throw e;
+          }
+        }
+        if (merged || remote.data) {
+          const final = merged || pickSync(remote.data);
+          dispatch({ type: 'CLOUD_APPLY', snapshot, merged: final });
+          baseRef.current = final;
+        }
+        versionRef.current = remote.version;
+        break;
+      }
+      lastAtRef.current = Date.now();
+      persist();
+      setCloudState({ status: 'ok', at: lastAtRef.current, error: '', loaded: true });
+      return true;
+    } catch (e) {
+      if (e.status === 401) { scope.onAuthError?.(); return false; }
+      setCloudState((c) => ({ ...c, status: e.offline ? 'offline' : 'error', error: e.message }));
+      return false;
+    } finally {
+      busyRef.current = false;
+      if (againRef.current) { againRef.current = false; setTimeout(() => cloudSync(), 0); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud?.ws, cloud?.token, persist]);
+
+  // Đồng bộ khi mở, mỗi 15 phút, khi chuyển app xuống nền / mở lại, khi có mạng trở lại
+  useEffect(() => {
+    if (!cloud) return undefined;
+    cloudSync();
+    const t = setInterval(cloudSync, CLOUD_EVERY);
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        if (!deepEqual(pickSync(stateRef.current), baseRef.current)) cloudSync();
+      } else if (Date.now() - lastAtRef.current > 60 * 1000) cloudSync();
+    };
+    const onOnline = () => cloudSync();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('online', onOnline);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [cloudSync]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Có thay đổi chưa đồng bộ -> đồng bộ sau 20 giây không sửa gì thêm
+  const dirty = !!cloud && cloudState.loaded && !deepEqual(pickSync(state), baseRef.current);
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const t = setTimeout(cloudSync, EDIT_DEBOUNCE);
+    return () => clearTimeout(t);
+  }, [state, dirty, cloudSync]);
+
+  // ---- đồng bộ iCal ----
   const sync = useCallback(async (calendars) => {
     const list = (calendars || stateRef.current.calendars).filter((c) => c.url && !c.demo);
     if (!list.length) return [];
@@ -145,7 +279,7 @@ export function StoreProvider({ children }) {
     return results;
   }, []);
 
-  // Tự đồng bộ khi mở app nếu lần cuối > 30 phút
+  // Tự tải lại iCal khi mở app nếu lần cuối > 30 phút
   useEffect(() => {
     if (state.setupDone && Date.now() - (state.lastSync || 0) > 30 * 60 * 1000) sync();
     const t = setInterval(() => { if (stateRef.current.setupDone) sync(); }, 30 * 60 * 1000);
@@ -153,7 +287,11 @@ export function StoreProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.setupDone]);
 
-  return <Ctx.Provider value={{ state, dispatch, sync, syncing }}>{children}</Ctx.Provider>;
+  const value = {
+    state, dispatch, sync, syncing, role, user,
+    cloud: { ...cloudState, enabled: !!cloud, dirty, syncNow: cloudSync },
+  };
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export const useStore = () => useContext(Ctx);

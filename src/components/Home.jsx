@@ -6,11 +6,15 @@ import { todayKey, longDate, addDays, dm, timeAgo, wdShort } from '../lib/dates.
 import { Progress } from './ui.jsx';
 import { LogoMark } from './Logo.jsx';
 import { useCountUp } from '../lib/motion.js';
-import { SyncBanner } from './Sync.jsx';
+import { SyncStatus } from './Account.jsx';
+import { useSession } from '../lib/session.jsx';
+import { can, visibleTasks, canTickTask } from '../lib/perm.js';
+import { ArrowLeftRight } from 'lucide-react';
 import { CleaningCard } from './CleaningPanel.jsx';
 
 export default function Home({ api }) {
-  const { state, dispatch, sync, syncing } = useStore();
+  const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
+  const { workspaces, selectWs } = useSession();
   const today = todayKey();
   const bookings = useMemo(() => getBookings(state), [state]);
   const idx = useMemo(() => roomIndex(state), [state]);
@@ -20,7 +24,7 @@ export default function Home({ api }) {
   const occupied = new Set(occupiedOn(bookings, today).map((b) => b.roomId)).size;
   const occPct = rooms.length ? Math.round((occupied / rooms.length) * 100) : 0;
   const failed = state.calendars.filter((c) => state.syncInfo[c.id] && !state.syncInfo[c.id].ok);
-  const todayTasks = state.tasks.filter((t) => t.date === today || (!t.done && t.date && t.date < today));
+  const todayTasks = visibleTasks(state.tasks, role, user).filter((t) => t.date === today || (!t.done && t.date && t.date < today));
   const nArr = useCountUp(arrivals.length);
   const nClean = useCountUp(cleanings.length);
   const nOcc = useCountUp(occPct);
@@ -31,16 +35,20 @@ export default function Home({ api }) {
       <header className="home-top rise" style={{ '--i': 0 }}>
         <div className="hello">
           <LogoMark size={48} />
-          <span>Xin chào 👋</span>
+          <span>Xin chào{user?.name ? `, ${user.name}` : ''} 👋</span>
         </div>
         <div className="row gap8">
-          <button className="icon-btn" onClick={() => sync()} disabled={syncing} aria-label="Đồng bộ lịch"><RefreshCw size={19} className={syncing ? 'spin' : ''} /></button>
+          <button className="icon-btn" onClick={() => { sync(); cloud.syncNow(); }} disabled={syncing || cloud.status === 'syncing'} aria-label="Đồng bộ"><RefreshCw size={19} className={syncing || cloud.status === 'syncing' ? 'spin' : ''} /></button>
           <button className="icon-btn" onClick={() => api.goto('places')} aria-label="Cài đặt"><Settings2 size={19} /></button>
         </div>
       </header>
 
       <h1 className="home-title rise" style={{ '--i': 1 }}>{state.property.name}</h1>
       <p className="sub rise" style={{ '--i': 2 }}>Hôm nay {longDate(today)}</p>
+      <div className="home-sync rise" style={{ '--i': 2 }}>
+        <SyncStatus compact />
+        {workspaces.length > 1 && <button className="sync-pill" onClick={() => selectWs(null)}><ArrowLeftRight size={14} /><span>Đổi cơ sở</span></button>}
+      </div>
 
       <div className="hero-cards rise" style={{ '--i': 3 }}>
         <button className="hero violet" onClick={() => api.openDay(today)}>
@@ -68,8 +76,6 @@ export default function Home({ api }) {
         </div>
       </div>
 
-      <SyncBanner />
-
       {failed.length > 0 && (
         <button className="alert" onClick={() => api.goto('places')}>
           <AlertTriangle size={18} />
@@ -79,9 +85,10 @@ export default function Home({ api }) {
 
       <h2 className="section-title rise" style={{ '--i': 5 }}>Thao tác nhanh</h2>
       <div className="actions scroll-x stagger" style={{ '--i': 5 }}>
-        <button className="action" onClick={() => api.newBooking()}><span className="aico pink"><BedDouble size={22} /></span>Đặt phòng</button>
-        <button className="action" onClick={() => api.newTask()}><span className="aico violet"><ClipboardPlus size={22} /></span>Thêm task</button>
-        <button className="action" onClick={() => api.openDay(today)}><span className="aico blue"><NotebookPen size={22} /></span>Ghi chú</button>
+        {can(role, 'booking') && <button className="action" onClick={() => api.newBooking()}><span className="aico pink"><BedDouble size={22} /></span>Đặt phòng</button>}
+        {can(role, 'task.create') && <button className="action" onClick={() => api.newTask()}><span className="aico violet"><ClipboardPlus size={22} /></span>Thêm task</button>}
+        <button className="action" onClick={() => api.openDay(today)}><span className="aico blue"><NotebookPen size={22} /></span>{can(role, 'note.edit') ? 'Ghi chú' : 'Hôm nay'}</button>
+        {!can(role, 'task.create') && <button className="action" onClick={() => api.goto('tasks')}><span className="aico violet"><Check size={22} /></span>Task của tôi</button>}
         <button className="action" onClick={() => { dispatch({ type: 'SETTINGS', patch: { calView: 'week' } }); api.goto('calendar'); }}><span className="aico yellow"><CalendarRange size={22} /></span>Lịch tuần</button>
       </div>
 
@@ -104,8 +111,8 @@ export default function Home({ api }) {
           <div className="mini-tasks stagger" style={{ '--i': 7 }}>
             {todayTasks.slice(0, 4).map((t) => (
               <div key={t.id} className={`mini-task ${t.done ? 'done' : ''}`}>
-                <button className={`check ${t.done ? 'on' : ''} p-${t.priority}`} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id })} aria-label="Hoàn thành">{t.done && <Check size={14} strokeWidth={3} />}</button>
-                <button className="mini-task-body" onClick={() => api.editTask(t)}>
+                <button className={`check ${t.done ? 'on' : ''} p-${t.priority}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, by: user?.id, byName: user?.name })} aria-label="Hoàn thành">{t.done && <Check size={14} strokeWidth={3} />}</button>
+                <button className="mini-task-body" onClick={() => (can(role, 'task.create') ? api.editTask(t) : api.goto('tasks'))}>
                   <b>{t.title}</b>
                   {t.date < today && !t.done && <small className="overdue">Quá hạn {dm(t.date)}</small>}
                 </button>
@@ -126,7 +133,7 @@ export default function Home({ api }) {
           </button>
         ))}
       </div>
-      <p className="tiny muted center">Đồng bộ lần cuối: {timeAgo(state.lastSync)}</p>
+      <p className="tiny muted center">Lịch iCal tải lần cuối: {timeAgo(state.lastSync)}</p>
     </div>
   );
 }

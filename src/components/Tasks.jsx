@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks } from 'lucide-react';
+import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks, UserRound } from 'lucide-react';
+import { can, visibleTasks, canTickTask } from '../lib/perm.js';
+import { useMembers } from '../lib/members.js';
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, roomIndex } from '../lib/derive.js';
 import { todayKey, startOfWeek, addDays, dm } from '../lib/dates.js';
@@ -14,7 +16,10 @@ const FILTERS = [
 ];
 
 export default function Tasks({ api }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, role, user } = useStore();
+  const members = useMembers();
+  const canEdit = can(role, 'task.create');
+  const tasks = visibleTasks(state.tasks, role, user);
   const [filter, setFilter] = useState('open');
   const today = todayKey();
   const idx = useMemo(() => roomIndex(state), [state]);
@@ -22,11 +27,11 @@ export default function Tasks({ api }) {
   const ws = startOfWeek(today);
   const weekClean = getCleanings(state, bookings, ws, addDays(ws, 6));
   const todayClean = weekClean.filter((c) => c.date === today);
-  const todayTasks = state.tasks.filter((t) => t.date === today);
-  const weekTasks = state.tasks.filter((t) => t.date >= ws && t.date <= addDays(ws, 6));
+  const todayTasks = tasks.filter((t) => t.date === today);
+  const weekTasks = tasks.filter((t) => t.date >= ws && t.date <= addDays(ws, 6));
   const ratio = (list) => (list.length ? Math.round((list.filter((x) => x.done).length / list.length) * 100) : 0);
 
-  const list = state.tasks
+  const list = tasks
     .filter((t) => (filter === 'open' ? !t.done : filter === 'done' ? t.done : filter === 'today' ? t.date === today : true))
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.date || '9').localeCompare(b.date || '9'));
 
@@ -40,8 +45,8 @@ export default function Tasks({ api }) {
   return (
     <div className="tasks">
       <header className="page-head rise">
-        <div><h1>Công việc</h1><p className="sub">{state.tasks.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
-        <button className="icon-btn" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={20} /></button>
+        <div><h1>{canEdit ? 'Công việc' : 'Việc của tôi'}</h1><p className="sub">{tasks.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
+        {canEdit && <button className="icon-btn" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={20} /></button>}
       </header>
 
       <h2 className="section-title">Tiến độ</h2>
@@ -67,23 +72,25 @@ export default function Tasks({ api }) {
           const pr = PRIORITIES.find((p) => p.id === t.priority) || PRIORITIES[0];
           return (
             <div key={t.id} className={`task-card p-${t.priority} ${t.done ? 'done' : ''}`}>
-              <button className={`check ${t.done ? 'on' : ''}`} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id })} aria-label={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}>
+              <button className={`check ${t.done ? 'on' : ''}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, by: user?.id, byName: user?.name })} aria-label={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}>
                 {t.done && <Check size={14} strokeWidth={3} />}
               </button>
-              <button className="task-body" onClick={() => api.editTask(t)}>
+              <button className="task-body" onClick={() => canEdit && api.editTask(t)}>
                 <b>{t.title}</b>
                 {t.desc && <span>{t.desc}</span>}
                 <span className="task-tags">
                   {t.date && <em className={`tag ${!t.done && t.date < today ? 'late' : ''}`}><CalendarDays size={12} />{t.date === today ? 'Hôm nay' : dm(t.date)}</em>}
                   {room && <em className="tag"><DoorOpen size={12} />{room.name}</em>}
                   <em className={`tag pr-${t.priority}`}>{pr.label}</em>
+                  {t.assignee && <em className="tag"><UserRound size={12} />{t.assignee === user?.id ? 'Giao cho tôi' : members.find((m) => m.id === t.assignee)?.name || 'Đã giao'}</em>}
+                  {t.done && t.doneByName && <em className="tag"><Check size={12} />{t.doneByName}</em>}
                 </span>
               </button>
             </div>
           );
         })}
       </div>
-      <button className="fab" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={24} /></button>
+      {canEdit && <button className="fab" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={24} /></button>}
     </div>
   );
 }
