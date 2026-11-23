@@ -1237,3 +1237,13 @@ button.clean-note:hover { background: #fff; }
 .imp-tag { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 4px; vertical-align: 1px; }
 .imp-tag.update { background: #E6F7F0; color: #1E8A5A; }
 .imp-tag.add { background: #FFF1DC; color: #B26A00; }
+.rm-prefs { display: flex; flex-direction: column; gap: 2px; background: rgba(255,255,255,.75); border-radius: 12px; padding: 8px 12px; }
+.rm-prefs-h { font-size: 12px; color: var(--ink-2); padding: 2px 0 4px; }
+.rm-pref { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; cursor: pointer; }
+.rm-pref + .rm-pref { border-top: 1px solid rgba(36,26,59,.07); }
+.rm-pref b { display: block; font-size: 14px; font-weight: 600; }
+.rm-pref small { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.35; }
+input.switch { appearance: none; -webkit-appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: #D9D3E8; position: relative; cursor: pointer; transition: background .25s; margin: 0; }
+input.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(36,26,59,.25); transition: transform .3s var(--spring); }
+input.switch:checked { background: #6B4FD8; }
+input.switch:checked::after { transform: translateX(18px); }

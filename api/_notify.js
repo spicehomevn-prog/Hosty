@@ -1,8 +1,8 @@
-// Nhắc hẹn task bằng thông báo đẩy (Web Push) tới các máy đã bật.
+// Thông báo đẩy (Web Push) tới các máy đã bật: nhắc task, tổng quan 8:00, trả / nhận phòng trước 1 giờ.
 // Ai nhận: task giao cho ai -> người đó; task "Chung" -> mọi người của cơ sở đã bật thông báo.
 // File trên Blob (bí mật được mã hoá bằng khoá suy ra từ AUTH_SECRET):
 //   notify/index.json        { push: { [uid]: [ws] } }   – ai nhận nhắc của cơ sở nào
-//   notify/push/<uid>.json   { subs: [{ endpoint, keys, ws, ua, at }] }
+//   notify/push/<uid>.json   { subs: [{ endpoint, keys, ws, ua, at }], prefs: { daily, checkout, checkin, task } }
 //   notify/vapid.json        { publicKey, privateKey(enc) }   – tự tạo lần đầu nếu không có biến VAPID_*
 //   notify/sent.json         { [khoá lần nhắc]: thời điểm gửi }   – chống gửi trùng
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
@@ -11,6 +11,11 @@ import { envClean, loadAccounts, wsFile } from './_auth.js';
 import { HttpError } from './_http.js';
 import { taskInstances, REMINDS } from '../src/lib/tasks.js';
 import { addDays } from '../src/lib/dates.js';
+import { getBookings } from '../src/lib/derive.js';
+import { balanceDue } from '../src/lib/fin.js';
+import { fmtShort } from '../src/lib/money.js';
+import { eventsOf } from './_feeds.js';
+import { loadWorkspaces } from './_auth.js';
 
 const INDEX = 'notify/index.json';
 const pFile = (uid) => `notify/push/${uid}.json`;
@@ -48,7 +53,7 @@ async function setIndex(kind, uid, wsList) {
 /** Người dùng còn hợp lệ với cơ sở không (tài khoản bị xoá / khoá / chuyển cơ sở thì bỏ) */
 async function validUsers() {
   const { accounts } = await loadAccounts();
-  const m = new Map([['owner', { id: 'owner', role: 'owner' }]]);
+  const m = new Map([['owner', { id: 'owner', role: 'owner', name: 'Chủ hệ thống' }]]);
   for (const a of accounts) if (!a.disabled) m.set(a.id, a);
   return m;
 }
@@ -85,23 +90,34 @@ export async function pushSubscribe(uid, ws, sub, ua) {
   const rec = await updateJSON(pFile(uid), (d) => {
     const subs = (d?.subs || []).filter((s) => s.endpoint !== sub.endpoint);
     subs.push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, ws, ua: String(ua || '').slice(0, 120), at: Date.now() });
-    return { subs: subs.slice(-8) };
+    return { ...(d || {}), subs: subs.slice(-8) };
   }, null);
   await setIndex('push', uid, rec.subs.map((s) => s.ws));
   return rec.subs.length;
 }
 export async function pushUnsubscribe(uid, endpoint) {
-  const rec = await updateJSON(pFile(uid), (d) => ({ subs: (d?.subs || []).filter((s) => s.endpoint !== endpoint) }), null);
+  const rec = await updateJSON(pFile(uid), (d) => ({ ...(d || {}), subs: (d?.subs || []).filter((s) => s.endpoint !== endpoint) }), null);
   await setIndex('push', uid, rec.subs.map((s) => s.ws));
 }
+/** Loại thông báo người dùng bật / tắt (mặc định bật hết) */
+export const PREF_KEYS = ['daily', 'checkout', 'checkin', 'task'];
+const prefsOf = (rec) => Object.fromEntries(PREF_KEYS.map((k) => [k, rec?.prefs?.[k] !== false]));
+
 export async function pushInfo(uid, ws) {
-  const subs = (await getJSON(pFile(uid)))?.data?.subs || [];
-  return { devices: subs.filter((s) => s.ws === ws).length, cron: envClean(process.env.CRON_SECRET).length >= 16 };
+  const rec = (await getJSON(pFile(uid)))?.data;
+  const subs = rec?.subs || [];
+  return { devices: subs.filter((s) => s.ws === ws).length, cron: envClean(process.env.CRON_SECRET).length >= 16, prefs: prefsOf(rec) };
+}
+export async function pushSetPrefs(uid, prefs) {
+  const clean = Object.fromEntries(PREF_KEYS.filter((k) => typeof prefs?.[k] === 'boolean').map((k) => [k, prefs[k]]));
+  const rec = await updateJSON(pFile(uid), (d) => ({ ...(d || { subs: [] }), prefs: { ...(d?.prefs || {}), ...clean } }), null);
+  return prefsOf(rec);
 }
 
 /** Gửi 1 thông báo tới mọi máy của uid đang bật cho ws (ws = null: mọi máy). Máy đã huỷ đăng ký thì xoá. */
-export async function pushSend(uid, ws, payload) {
+export async function pushSend(uid, ws, payload, pref = null) {
   const rec = (await getJSON(pFile(uid)))?.data;
+  if (pref && rec?.prefs?.[pref] === false) return { sent: 0, off: true };
   const subs = (rec?.subs || []).filter((s) => !ws || s.ws === ws);
   if (!subs.length) return { sent: 0 };
   const { default: webpush } = await import('web-push');
@@ -117,7 +133,7 @@ export async function pushSend(uid, ws, payload) {
     }
   }));
   if (dead.length) {
-    const left = await updateJSON(pFile(uid), (d) => ({ subs: (d?.subs || []).filter((s) => !dead.includes(s.endpoint)) }), null);
+    const left = await updateJSON(pFile(uid), (d) => ({ ...(d || {}), subs: (d?.subs || []).filter((s) => !dead.includes(s.endpoint)) }), null);
     await setIndex('push', uid, left.subs.map((s) => s.ws));
   }
   return { sent };
@@ -158,7 +174,7 @@ export async function pushDue(now = Date.now()) {
       };
       for (const uid of uids) {
         if (!forUser(it, uid) || !userOk(users.get(uid), ws)) continue;
-        sent += (await pushSend(uid, ws, payload)).sent;
+        sent += (await pushSend(uid, ws, payload, 'task')).sent;
       }
     }
   }
@@ -167,4 +183,109 @@ export async function pushDue(now = Date.now()) {
     await updateJSON(SENT, (d) => Object.fromEntries(Object.entries({ ...(d || {}), ...fresh }).filter(([, t]) => t > cut)), {});
   }
   return { sent, reminders: Object.keys(fresh).length };
+}
+
+/* =================== TỔNG QUAN 8:00 + TRẢ / NHẬN PHÒNG TRƯỚC 1 GIỜ =================== */
+const FEED_AGE = 60 * 60e3; // lịch sàn tải lại tối đa 1 lần / giờ
+const BEFORE = 60; // phút báo trước giờ trả / nhận phòng
+const canMoney = (u) => u?.role === 'owner' || u?.role === 'admin';
+
+/** Đặt phòng hiện có của cơ sở (cùng cách tính với app: ẩn bản sao do đặt phòng trực tiếp, bỏ lịch khoá) */
+export async function wsBookings(data) {
+  const cals = (data.calendars || []).filter((c) => c.url);
+  const events = {};
+  await Promise.all(cals.map(async (c) => { events[c.id] = await eventsOf(c, { maxAge: FEED_AGE }); }));
+  return getBookings({ calendars: data.calendars || [], manual: data.manual || [], overrides: data.overrides || {}, events }).filter((b) => !b.blocked);
+}
+
+/** Chạy mỗi 5 phút cùng nhắc task: gửi tổng quan lúc 08:00 và báo trả / nhận phòng trước 1 giờ */
+export async function stayDue(now = Date.now(), { collect = false } = {}) {
+  const log = [];
+  const idx = await loadIndex();
+  const byWs = new Map();
+  for (const [uid, list] of Object.entries(idx.push || {})) for (const w of list) byWs.set(w, [...(byWs.get(w) || []), uid]);
+  if (!byWs.size) return { sent: 0 };
+  const users = await validUsers();
+  const { workspaces } = await loadWorkspaces();
+  const multi = new Map(); // uid -> số cơ sở đang nhận (để ghi tên cơ sở khi > 1)
+  for (const uids of byWs.values()) for (const u of uids) multi.set(u, (multi.get(u) || 0) + 1);
+  const sentLog = (await getJSON(SENT))?.data || {};
+  const fresh = {}; let sent = 0;
+  const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
+  const inWindow = (at) => at <= now && at > now - WINDOW;
+  const dailyNow = inWindow(fireAt(today, '08:00', 0));
+
+  for (const [ws, uidsAll] of byWs) {
+    const uids = uidsAll.filter((u) => userOk(users.get(u), ws));
+    if (!uids.length) continue;
+    const data = (await getJSON(wsFile(ws)))?.data?.data;
+    if (!data) continue;
+    // chỉ tải lịch sàn khi lượt này có thể có việc: 08:00, hoặc đang trong khung "trước 1 giờ" của một giờ nhận / trả phòng
+    const times = new Set();
+    for (const c of data.calendars || []) { times.add(c.checkIn || '14:00'); times.add(c.checkOut || '12:00'); }
+    for (const m of data.manual || []) if (m.start === today || m.end === today) { times.add(m.checkIn || '14:00'); times.add(m.checkOut || '12:00'); }
+    if (!dailyNow && ![...times].some((t) => /^\d{2}:\d{2}$/.test(t) && inWindow(fireAt(today, t, BEFORE)))) continue;
+    const pending = [];
+    const bookings = await wsBookings(data);
+    const rooms = roomNames(data);
+    const fin = (await getJSON(`fin/${ws}.json`))?.data?.data || {};
+    const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
+    const wsName = workspaces.find((w) => w.id === ws)?.name || data.property?.name || '';
+
+    if (dailyNow) {
+      const outs = bookings.filter((b) => b.end === today);
+      const ins = bookings.filter((b) => b.start === today);
+      const dues = bookings.filter((b) => b.source === 'manual' && b.start <= today && b.end >= today && dueOf(b) > 0);
+      const dueSum = dues.reduce((a, b) => a + dueOf(b), 0);
+      for (const uid of uids) {
+        const k = `${ws}:daily:${today}:${uid}`;
+        if (sentLog[k] || fresh[k]) continue;
+        const u = users.get(uid);
+        const money = canMoney(u) && dues.length;
+        let body;
+        if (!outs.length && !ins.length && !money) body = 'Hôm nay không có lượt nhận / trả phòng nào.';
+        else {
+          const parts = [`${outs.length} lượt trả phòng`, `${ins.length} lượt nhận phòng`];
+          if (canMoney(u)) parts.push(`${dues.length} khoản phải thu tiền phòng${dues.length ? ` (${fmtShort(dueSum)})` : ''}`);
+          body = `Hôm nay có ${parts.slice(0, -1).join(', ')} và ${parts[parts.length - 1]}.`;
+        }
+        pending.push({ k, uid, pref: 'daily', payload: { title: `☀️ Chào buổi sáng${u?.name ? `, ${u.name}` : ''}${multi.get(uid) > 1 && wsName ? ` · ${wsName}` : ''}`, body, tag: `daily-${ws}-${today}`, url: '/?tab=home' } });
+      }
+    }
+
+    for (const b of bookings) {
+      for (const kind of ['out', 'in']) {
+        if ((kind === 'out' ? b.end : b.start) !== today) continue;
+        const time = /^\d{2}:\d{2}$/.test(kind === 'out' ? b.checkOut : b.checkIn) ? (kind === 'out' ? b.checkOut : b.checkIn) : (kind === 'out' ? '12:00' : '14:00');
+        if (!inWindow(fireAt(today, time, BEFORE))) continue;
+        const room = rooms[b.roomId] || 'Phòng';
+        const guest = b.source === 'manual' ? (b.guest || '') : '';
+        const due = kind === 'in' ? dueOf(b) : 0;
+        for (const uid of uids) {
+          const k = `${ws}:${kind}:${b.id}:${today}:${uid}`;
+          if (sentLog[k] || fresh[k]) continue;
+          const extra = due > 0 && canMoney(users.get(uid)) ? `còn phải thu ${fmtShort(due)}` : '';
+          pending.push({
+            k, uid, pref: kind === 'out' ? 'checkout' : 'checkin',
+            payload: {
+              title: kind === 'out' ? `🧳 ${room} trả phòng lúc ${time}` : `🔑 ${room} nhận phòng lúc ${time}`,
+              body: ['Còn 1 giờ', b.platform, guest, extra, multi.get(uid) > 1 ? wsName : ''].filter(Boolean).join(' · ').slice(0, 180),
+              tag: `${kind}-${b.id}-${today}`, url: '/?tab=home',
+            },
+          });
+        }
+      }
+    }
+
+    for (const it of pending) {
+      fresh[it.k] = now;
+      if (collect) log.push({ uid: it.uid, ...it.payload });
+      sent += (await pushSend(it.uid, ws, it.payload, it.pref)).sent;
+    }
+  }
+  if (Object.keys(fresh).length) {
+    const cut = now - 3 * 864e5;
+    await updateJSON(SENT, (d) => Object.fromEntries(Object.entries({ ...(d || {}), ...fresh }).filter(([, t]) => t > cut)), {});
+  }
+  return { sent, notices: Object.keys(fresh).length, ...(collect ? { log } : {}) };
 }

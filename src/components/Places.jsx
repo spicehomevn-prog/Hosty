@@ -48,7 +48,7 @@ export default function Places({ api }) {
       <h2 className="section-title"><UserRound size={18} /> Tài khoản</h2>
       <AccountCard />
 
-      <h2 className="section-title"><Bell size={18} /> Nhắc hẹn task</h2>
+      <h2 className="section-title"><Bell size={18} /> Thông báo</h2>
       <RemindersCard />
 
       {canSetup && <>

@@ -41,8 +41,14 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
    Tạo `AUTH_SECRET` nhanh: chạy `openssl rand -base64 32` hoặc gõ bừa một chuỗi dài. Đổi `AUTH_SECRET` sẽ đăng xuất mọi người; đổi `HOSTY_OWNER_PASSWORD` sẽ đăng xuất chủ hệ thống trên mọi máy.
 3. **Deployments → Redeploy** để áp dụng.
 
-## Nhắc hẹn task
-Mỗi người tự bật ở **Cơ sở → Nhắc hẹn task** (hoặc nút **Cài đặt nhắc hẹn** trong form task). Task giao riêng chỉ nhắc người được giao; task "Chung" nhắc mọi người đã bật.
+## Thông báo (nhắc hẹn)
+Mỗi người tự bật ở **Cơ sở → Thông báo** (hoặc nút **Cài đặt nhắc hẹn** trong form task) và chọn loại muốn nhận:
+- **Tổng quan lúc 8:00** – "Chào buổi sáng, <tên>": số lượt trả phòng, nhận phòng hôm nay và số khoản phải thu tiền phòng (phần tiền chỉ gửi cho chủ hệ thống / admin).
+- **Trả phòng** – trước giờ trả phòng 1 tiếng, từng phòng (giờ theo cài đặt lịch của phòng, mặc định 12:00).
+- **Nhận phòng** – trước giờ nhận phòng 1 tiếng, từng phòng (mặc định 14:00; đặt phòng trực tiếp còn nợ thì kèm số còn phải thu cho admin).
+- **Nhắc task** – task giao riêng chỉ nhắc người được giao; task "Chung" nhắc mọi người đã bật.
+
+Máy chủ tự đọc lịch iCal của các sàn (tối đa 1 lần/giờ) để biết lượt nhận / trả phòng, dùng cùng cách tính với app (ẩn lịch khoá do đặt phòng trực tiếp).
 
 **Thông báo đẩy của Hostexa** – gửi thẳng tới điện thoại / máy tính đã bấm **Bật thông báo**. iPhone cần iOS 16.4+ và phải mở Hostexa từ biểu tượng ngoài Màn hình chính (Safari → Chia sẻ → Thêm vào MH chính). Khoá gửi thông báo (VAPID) máy chủ tự tạo lần đầu. Vì Vercel gói miễn phí chỉ chạy hẹn giờ 1 lần/ngày, cần một dịch vụ hẹn giờ miễn phí gọi máy chủ mỗi 5 phút:
 1. Đặt biến `CRON_SECRET` trên Vercel (nếu chưa có) → Redeploy.

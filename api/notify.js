@@ -1,12 +1,12 @@
 // Nhắc hẹn task bằng thông báo đẩy.
 // GET  /api/notify?ws=ID                         -> { push: { publicKey, devices, cron } }
-// POST /api/notify { action, ws, ... }           action: push-sub | push-unsub | push-test
+// POST /api/notify { action, ws, ... }           action: push-sub | push-unsub | push-test | push-prefs
 // GET  /api/notify?cron=push  (Authorization: Bearer CRON_SECRET) – gọi 5 phút/lần từ dịch vụ hẹn giờ ngoài (cron-job.org…)
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
 import { requireUser, canAccess, loadWorkspaces, envClean } from './_auth.js';
 import {
-  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue,
+  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue,
 } from './_notify.js';
 
 /** Kiểm tra cron ngoài (cron-job.org…): nhận "Bearer <CRON_SECRET>" hoặc chỉ "<CRON_SECRET>", bỏ khoảng trắng / dấu < > thừa.
@@ -37,7 +37,10 @@ export default route(async (req, res) => {
   if (req.method === 'GET' && q.get('cron') === 'push') {
     const why = cronProblem(req);
     if (why) throw new HttpError(401, why);
-    return send(res, 200, { ok: true, ...(await pushDue()) });
+    const tasks = await pushDue();
+    let stays = { sent: 0 };
+    try { stays = await stayDue(); } catch (e) { console.error('stayDue', e.message); stays = { sent: 0, error: String(e.message).slice(0, 120) }; }
+    return send(res, 200, { ok: true, sent: (tasks.sent || 0) + (stays.sent || 0), tasks, stays });
   }
 
   if (req.method === 'GET') {
@@ -53,6 +56,7 @@ export default route(async (req, res) => {
     const user = await requireWs(req, ws);
     switch (action) {
       case 'push-sub': return send(res, 200, { devices: await pushSubscribe(user.id, ws, body.sub, req.headers?.['user-agent']) });
+      case 'push-prefs': return send(res, 200, { prefs: await pushSetPrefs(user.id, body.prefs) });
       case 'push-unsub': await pushUnsubscribe(user.id, String(body.endpoint || '')); return send(res, 200, { ok: true });
       case 'push-test': {
         const r = await pushSend(user.id, ws, { title: '🔔 Hostexa', body: 'Thông báo thử: máy này sẽ nhận lời nhắc task.', tag: 'test', url: '/?tab=tasks' });

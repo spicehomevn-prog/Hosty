@@ -3,10 +3,9 @@
 // Gồm: đặt phòng trực tiếp + đặt phòng / ngày khoá từ các sàn khác của cùng phòng,
 // trừ lịch của chính sàn nhận link (x) và trừ các ngày trùng khớp với lịch của sàn đó (bản chép ngược).
 import { createHash } from 'node:crypto';
-import { getJSON, putJSON } from './_store.js';
+import { getJSON } from './_store.js';
 import { verifyFeed, wsFile } from './_auth.js';
-import { fetchIcs } from './_fetchics.js';
-import { parseICS } from '../src/lib/ical.js';
+import { eventsOf } from './_feeds.js';
 
 const CRLF = '\r\n';
 const ymd = (k) => k.replace(/-/g, '');
@@ -19,18 +18,6 @@ function sendText(res, status, text, extra = {}) {
   res.end(text);
 }
 
-/** Tải lịch của sàn; lỗi thì dùng bản tải được gần nhất để không lỡ mở lại ngày đã có khách */
-async function eventsOf(cal) {
-  const cacheName = `feedcache/${cal.id}.json`;
-  try {
-    const events = parseICS(await fetchIcs(cal.url)).map((e) => ({ start: e.start, end: e.end }));
-    putJSON(cacheName, { at: Date.now(), events }).catch(() => {});
-    return events;
-  } catch {
-    const c = await getJSON(cacheName).catch(() => null);
-    return c?.data?.events || [];
-  }
-}
 
 /* ---------- Lời nhắc task cho lịch điện thoại: GET /cal/task.ics?d=<base64url JSON> ----------
  * Không cần đăng nhập: chỉ chứa nội dung task người dùng tự gửi lên (tiêu đề, giờ, lặp lại, nhắc trước).

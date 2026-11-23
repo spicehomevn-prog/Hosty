@@ -7,7 +7,14 @@ import { Sheet } from './ui.jsx';
 
 const Spin = ({ on }) => (on ? <Loader2 size={14} className="spin" /> : null);
 
-/** Nhắc task bằng thông báo đẩy (bật trên từng máy) */
+const PREFS = [
+  { k: 'daily', label: 'Tổng quan lúc 8:00', hint: 'Lượt trả phòng, nhận phòng, khoản phải thu hôm nay' },
+  { k: 'checkout', label: 'Trả phòng', hint: 'Báo trước giờ trả phòng 1 tiếng, từng phòng' },
+  { k: 'checkin', label: 'Nhận phòng', hint: 'Báo trước giờ nhận phòng 1 tiếng, từng phòng' },
+  { k: 'task', label: 'Nhắc task', hint: 'Theo giờ và "Nhắc trước" đặt trong từng task' },
+];
+
+/** Thông báo đẩy (bật trên từng máy) + chọn loại thông báo muốn nhận */
 export function RemindersPanel({ n }) {
   const s = useSession();
   const { info, err, busy, pushOn } = n;
@@ -28,7 +35,7 @@ export function RemindersPanel({ n }) {
       <div className="rm-card">
         <div className="rm-head">
           <span className="rm-ico p"><Bell size={18} /></span>
-          <div><b>Thông báo trên máy này</b><small>Hostexa tự gửi thông báo tới điện thoại / máy tính này khi tới giờ nhắc. Bật riêng trên từng máy.</small></div>
+          <div><b>Thông báo trên máy này</b><small>Hostexa tự gửi thông báo tới điện thoại / máy tính này. Bật riêng trên từng máy.</small></div>
         </div>
         {pushNote ? <p className="rm-note">{pushNote}</p> : pushOn ? (
           <>
@@ -40,6 +47,17 @@ export function RemindersPanel({ n }) {
           </>
         ) : (
           <button className="btn primary block" onClick={n.enablePush} disabled={!!busy}><Spin on={busy === 'push'} /> Bật thông báo</button>
+        )}
+        {pushOn && info?.push?.prefs && (
+          <div className="rm-prefs">
+            <small className="rm-prefs-h">Nhận những thông báo:</small>
+            {PREFS.map((p) => (
+              <label key={p.k} className="rm-pref">
+                <span><b>{p.label}</b><small>{p.hint}</small></span>
+                <input type="checkbox" className="switch" checked={info.push.prefs[p.k] !== false} onChange={(e) => n.setPref(p.k, e.target.checked)} />
+              </label>
+            ))}
+          </div>
         )}
         {owner && info?.push && !info.push.cron && <p className="rm-note">Chủ hệ thống: máy chủ chưa có CRON_SECRET nên chưa gửi được lời nhắc theo giờ (xem README, mục Nhắc hẹn).</p>}
       </div>

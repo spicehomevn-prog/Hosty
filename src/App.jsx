@@ -104,11 +104,15 @@ function Workspace() {
     // mở từ thông báo nhắc task: /?tab=tasks
     const t = new URLSearchParams(location.search).get('tab');
     if (t) history.replaceState(null, '', location.pathname);
-    return t === 'tasks' ? 'tasks' : 'home';
+    return t === 'tasks' ? 'tasks' : 'home'; // ?tab=home: thông báo tổng quan / trả / nhận phòng
   });
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return undefined;
-    const onMsg = (e) => { if (e.data?.type === 'open' && /tab=tasks/.test(e.data.url || '')) setTab('tasks'); };
+    const onMsg = (e) => {
+      if (e.data?.type !== 'open') return;
+      const t = new URL(e.data.url || '/', location.origin).searchParams.get('tab');
+      if (t === 'tasks' || t === 'home') setTab(t);
+    };
     navigator.serviceWorker.addEventListener('message', onMsg);
     return () => navigator.serviceWorker.removeEventListener('message', onMsg);
   }, []);
