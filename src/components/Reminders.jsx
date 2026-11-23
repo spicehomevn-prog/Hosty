@@ -5,10 +5,9 @@ import { useSession } from '../lib/session.jsx';
 import { icsUrl, googleUrl } from '../lib/tasks.js';
 import { Sheet } from './ui.jsx';
 
+// Android: trang web / biểu tượng ngoài màn hình chính đều nhận thông báo QUA CHROME (không có app Hostexa riêng trong Cài đặt)
 const ANDROID_PERM = isAndroid()
-  ? (isStandalone()
-    ? 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Ứng dụng → Hostexa → Thông báo → bật Cho phép, rồi quay lại bấm Bật thông báo.'
-    : 'Chrome đang chặn thông báo của trang. Bấm biểu tượng ⓘ / ổ khoá cạnh địa chỉ → Quyền → Thông báo → Cho phép, rồi bấm Bật thông báo.')
+  ? 'Thông báo của Hostexa đi qua Chrome. Bật ở 2 chỗ: (1) Chrome → ⋮ → Cài đặt → Cài đặt trang web → Thông báo → hostexa.vercel.app → Cho phép; (2) Cài đặt điện thoại → Ứng dụng → Chrome → Thông báo → bật. Xong quay lại bấm Bật thông báo.'
   : 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Thông báo → Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
 
 /** Hướng dẫn theo bước bị kẹt khi bật thông báo */
@@ -16,7 +15,7 @@ function failHelp(step) {
   if (step === 'perm') return ANDROID_PERM;
   if (step === 'sub') {
     return isAndroid()
-      ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho ${isStandalone() ? 'Hostexa và Chrome' : 'Chrome'}. Vẫn không được: mở hostexa.vercel.app bằng Chrome rồi bật thông báo ở đó (biểu tượng ngoài màn hình chính dùng chung với Chrome nên cũng sẽ nhận được).`
+      ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho Chrome (Cài đặt điện thoại → Ứng dụng → Chrome → Pin → Không hạn chế). Vẫn không được: mở hostexa.vercel.app bằng Chrome rồi bật thông báo ở đó (biểu tượng ngoài màn hình chính dùng chung với Chrome nên cũng sẽ nhận được).`
       : 'Kiểm tra mạng rồi thử lại. Vẫn không được: dùng Chrome / Safari bản mới.';
   }
   if (step === 'sw') return 'Đóng hẳn Hostexa (vuốt tắt khỏi danh sách app đang mở) rồi mở lại và thử lại.';
