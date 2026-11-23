@@ -6,10 +6,10 @@ import { getJSON, putJSON, ConflictError } from './_store.js';
 import { requireUser, canAccess, loadWorkspaces, wsFile, signFeed } from './_auth.js';
 import { siteUrl } from '../site.config.js';
 
-export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'setupDone'];
+export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'cleanNotes', 'setupDone'];
 // giá trị mặc định khi khoá chưa có (dữ liệu cũ) – để so sánh "chưa có" với "rỗng" là như nhau
-const DEFAULTS = { property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, cleanAdj: {}, cleanExtra: [], setupDone: false };
-const TASK_TICK_FIELDS = new Set(['done', 'doneAt', 'doneBy', 'doneByName']);
+const DEFAULTS = { property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, cleanAdj: {}, cleanExtra: [], cleanNotes: {}, setupDone: false };
+const TASK_TICK_FIELDS = new Set(['done', 'doneAt', 'doneBy', 'doneByName', 'doneDates']);
 
 const pick = (d) => Object.fromEntries(SYNC_KEYS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
 

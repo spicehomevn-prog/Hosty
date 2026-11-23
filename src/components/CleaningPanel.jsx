@@ -59,7 +59,11 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
           <span className="sep">·</span>
           <span className={`status s-${st.tone}`}>{st.label}</span>
         </div>
-        {c.note && <div className="clean-note">{c.note}</div>}
+        {c.note
+          ? (onEdit
+            ? <button className="clean-note" onClick={() => onEdit(c, { focusNote: true })}><NotebookPen size={13} /><span>{c.note}</span></button>
+            : <div className="clean-note"><NotebookPen size={13} /><span>{c.note}</span></div>)
+          : onEdit && <button className="clean-add-note" onClick={() => onEdit(c, { focusNote: true })}><Plus size={12} /> Ghi chú</button>}
         {c.done && c.doneInfo?.at && (
           <div className="clean-done-by"><Check size={12} strokeWidth={3} /> Đã dọn{c.doneInfo.byName ? ` · ${c.doneInfo.byName}` : ''} lúc {hhmm(c.doneInfo.at)}</div>
         )}
@@ -84,7 +88,7 @@ export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, co
   const [openDone, setOpenDone] = useState(false);
   const todo = cards.filter((c) => !c.done);
   const done = cards.filter((c) => c.done);
-  const edit = canEdit ? (c) => setSheet({ card: c }) : null;
+  const edit = canEdit ? (c, opt) => setSheet({ card: c, ...opt }) : null;
   const groups = {};
   for (const c of todo) (groups[c.date] ||= []).push(c);
   const multiDay = new Set(cards.map((c) => c.date)).size > 1;
@@ -116,20 +120,21 @@ export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, co
       {canEdit && addDate && (
         <button className="add-clean" onClick={() => setSheet({ card: null })}><Plus size={16} /> Thêm thẻ dọn phòng</button>
       )}
-      {sheet && <CleanSheet card={sheet.card} defaultDate={addDate} onClose={() => setSheet(null)} />}
+      {sheet && <CleanSheet card={sheet.card} focusNote={sheet.focusNote} defaultDate={addDate} onClose={() => setSheet(null)} />}
     </>
   );
 }
 
 /** Sửa / dời ngày / xoá thẻ dọn phòng, hoặc thêm thẻ mới (admin) */
-function CleanSheet({ card, defaultDate, onClose }) {
+function CleanSheet({ card, focusNote, defaultDate, onClose }) {
   const { state, dispatch } = useStore();
   const isNew = !card;
   const custom = isNew || card.custom;
   const extra = custom && !isNew ? (state.cleanExtra || []).find((x) => x.id === card.id) : null;
   const firstRoom = state.locations[0]?.rooms[0]?.id || '';
   const [f, setF] = useState(() => ({
-    roomId: card?.roomId || firstRoom, date: card?.date || defaultDate || todayKey(), time: extra?.time || '', note: extra?.note || '',
+    roomId: card?.roomId || firstRoom, date: card?.date || defaultDate || todayKey(), time: extra?.time || '',
+    note: (custom ? extra?.note : state.cleanNotes?.[card.id]) || '',
   }));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = () => {
@@ -138,8 +143,11 @@ function CleanSheet({ card, defaultDate, onClose }) {
       dispatch({ type: 'SAVE_CLEAN_EXTRA', card: { id: extra?.id || `x-${uid()}`, roomId: f.roomId, date: f.date, time: f.time, note: f.note.trim() } });
       toast(isNew ? 'Đã thêm thẻ dọn phòng' : 'Đã lưu thẻ dọn phòng');
     } else {
-      dispatch({ type: 'CLEAN_ADJ', id: card.id, patch: f.date === card.origDate ? null : { date: f.date } });
-      toast(f.date === card.origDate ? 'Đã đưa thẻ về ngày trả phòng' : `Đã dời thẻ sang ${dm(f.date)}`);
+      if (f.date !== card.date) {
+        dispatch({ type: 'CLEAN_ADJ', id: card.id, patch: f.date === card.origDate ? null : { date: f.date } });
+      }
+      if ((state.cleanNotes?.[card.id] || '') !== f.note.trim()) dispatch({ type: 'CLEAN_NOTE', id: card.id, text: f.note });
+      toast(f.date !== card.date ? (f.date === card.origDate ? 'Đã đưa thẻ về ngày trả phòng' : `Đã dời thẻ sang ${dm(f.date)}`) : 'Đã lưu thẻ dọn phòng');
     }
     onClose();
   };
@@ -153,7 +161,7 @@ function CleanSheet({ card, defaultDate, onClose }) {
     <Sheet open onClose={onClose} title={isNew ? 'Thêm thẻ dọn phòng' : 'Sửa thẻ dọn phòng'}
       footer={<>
         {!isNew && <button className="icon-btn danger" onClick={remove} aria-label="Xoá thẻ dọn phòng"><Trash2 size={18} /></button>}
-        <button className="btn primary block" onClick={save}>{isNew ? 'Thêm thẻ' : custom ? 'Lưu thẻ' : 'Lưu ngày dọn'}</button>
+        <button className="btn primary block" onClick={save}>{isNew ? 'Thêm thẻ' : 'Lưu thẻ'}</button>
       </>}>
       {!custom && (
         <div className="fin-note">
@@ -175,7 +183,10 @@ function CleanSheet({ card, defaultDate, onClose }) {
       {!custom && card.moved && (
         <button className="btn ghost block" onClick={() => setF({ ...f, date: card.origDate })}><History size={16} /> Về ngày trả phòng {dm(card.origDate)}</button>
       )}
-      {custom && <Field label="Ghi chú"><input className="input" value={f.note} onChange={set('note')} placeholder="VD: Tổng vệ sinh, thay rèm, khách ở dài ngày…" /></Field>}
+      <Field label={custom ? 'Ghi chú' : 'Ghi chú cho thẻ này'} hint="Nhân viên dọn phòng thấy ghi chú này trên thẻ và khi copy gửi Zalo">
+        <textarea className="input" rows={2} value={f.note} onChange={set('note')} autoFocus={!!focusNote}
+          placeholder={custom ? 'VD: Tổng vệ sinh, thay rèm, khách ở dài ngày…' : 'VD: Khách làm đổ cà phê ra thảm, cần giặt'} />
+      </Field>
     </Sheet>
   );
 }

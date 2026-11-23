@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks, UserRound } from '../lib/icons.jsx';
+import { Check, Plus, CalendarDays, DoorOpen, Sparkles, ListChecks, UserRound, Clock, RefreshCw, Bell } from '../lib/icons.jsx';
 import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { useMembers } from '../lib/members.js';
 import { useStore } from '../lib/store.jsx';
@@ -7,6 +7,7 @@ import { getBookings, getCleanings, roomIndex } from '../lib/derive.js';
 import { todayKey, startOfWeek, addDays, dm } from '../lib/dates.js';
 import { ProgressRing } from './ProgressRing.jsx';
 import { PRIORITIES } from './TaskSheet.jsx';
+import { taskInstances, currentInstance, isRepeating, repeatLabel, remindLabel } from '../lib/tasks.js';
 
 const FILTERS = [
   { id: 'open', label: 'Chưa xong' },
@@ -27,13 +28,15 @@ export default function Tasks({ api }) {
   const ws = startOfWeek(today);
   const weekClean = getCleanings(state, bookings, ws, addDays(ws, 6));
   const todayClean = weekClean.filter((c) => c.date === today);
-  const todayTasks = tasks.filter((t) => t.date === today);
-  const weekTasks = tasks.filter((t) => t.date >= ws && t.date <= addDays(ws, 6));
+  const todayTasks = taskInstances(tasks, today, today);
+  const weekTasks = taskInstances(tasks, ws, addDays(ws, 6));
+  // task lặp lại: hiện lần hôm nay hoặc lần kế tiếp
+  const current = tasks.map((t) => currentInstance(t, today)).filter(Boolean);
   const ratio = (list) => (list.length ? Math.round((list.filter((x) => x.done).length / list.length) * 100) : 0);
 
-  const list = tasks
-    .filter((t) => (filter === 'open' ? !t.done : filter === 'done' ? t.done : filter === 'today' ? t.date === today : true))
-    .sort((a, b) => Number(a.done) - Number(b.done) || (a.date || '9').localeCompare(b.date || '9'));
+  const list = current
+    .filter((t) => (filter === 'open' ? !t.done : filter === 'done' ? t.done : filter === 'today' ? t.occ === today : true))
+    .sort((a, b) => Number(a.done) - Number(b.done) || (a.occ || '9').localeCompare(b.occ || '9') || (a.time || '99').localeCompare(b.time || '99'));
 
   const summary = [
     { tone: 'violet', title: 'Task hôm nay', list: todayTasks, icon: ListChecks },
@@ -45,7 +48,7 @@ export default function Tasks({ api }) {
   return (
     <div className="tasks">
       <header className="page-head rise">
-        <div><h1>{canEdit ? 'Công việc' : 'Việc của tôi'}</h1><p className="sub">{tasks.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
+        <div><h1>{canEdit ? 'Công việc' : 'Việc của tôi'}</h1><p className="sub">{current.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
         {canEdit && <button className="icon-btn" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={20} /></button>}
       </header>
 
@@ -64,19 +67,22 @@ export default function Tasks({ api }) {
           const room = idx[t.roomId]?.room;
           const pr = PRIORITIES.find((p) => p.id === t.priority) || PRIORITIES[0];
           return (
-            <div key={t.id} className={`task-card p-${t.priority} ${t.done ? 'done' : ''}`}>
-              <button className={`check ${t.done ? 'on' : ''}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, by: user?.id, byName: user?.name })} aria-label={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}>
+            <div key={t.iid} className={`task-card p-${t.priority} ${t.done ? 'done' : ''}`}>
+              <button className={`check ${t.done ? 'on' : ''}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, occ: t.occ, by: user?.id, byName: user?.name })} aria-label={t.done ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}>
                 {t.done && <Check size={14} strokeWidth={3} />}
               </button>
               <button className="task-body" onClick={() => canEdit && api.editTask(t)}>
                 <b>{t.title}</b>
                 {t.desc && <span>{t.desc}</span>}
                 <span className="task-tags">
-                  {t.date && <em className={`tag ${!t.done && t.date < today ? 'late' : ''}`}><CalendarDays size={12} />{t.date === today ? 'Hôm nay' : dm(t.date)}</em>}
+                  {t.occ && <em className={`tag ${!t.done && t.occ < today ? 'late' : ''}`}><CalendarDays size={12} />{t.occ === today ? 'Hôm nay' : dm(t.occ)}</em>}
+                  {t.time && <em className="tag"><Clock size={12} />{t.time}</em>}
+                  {isRepeating(t) && <em className="tag rep"><RefreshCw size={12} />{repeatLabel(t)}</em>}
+                  {t.remind != null && <em className="tag"><Bell size={12} />{remindLabel(t.remind)}</em>}
                   {room && <em className="tag"><DoorOpen size={12} />{room.name}</em>}
                   <em className={`tag pr-${t.priority}`}>{pr.label}</em>
                   {t.assignee && <em className="tag"><UserRound size={12} />{t.assignee === user?.id ? 'Giao cho tôi' : members.find((m) => m.id === t.assignee)?.name || 'Đã giao'}</em>}
-                  {t.done && t.doneByName && <em className="tag"><Check size={12} />{t.doneByName}</em>}
+                  {t.done && (t.doneInfo?.byName || t.doneByName) && <em className="tag"><Check size={12} />{t.doneInfo?.byName || t.doneByName}</em>}
                 </span>
               </button>
             </div>

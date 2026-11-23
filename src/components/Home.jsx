@@ -15,6 +15,7 @@ import OccupancySheet from './OccupancySheet.jsx';
 import { ChevronRight, Revenue, Payments } from '../lib/icons.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { ledger, monthSummary, collectStats } from '../lib/fin.js';
+import { taskInstances, isRepeating } from '../lib/tasks.js';
 import { ProgressRing } from './ProgressRing.jsx';
 import { fmtShort, fmtVND } from '../lib/money.js';
 import { Sheet } from './ui.jsx';
@@ -33,7 +34,9 @@ export default function Home({ api }) {
   const occupied = new Set(occupiedOn(bookings, today).map((b) => b.roomId)).size;
   const occPct = rooms.length ? Math.round((occupied / rooms.length) * 100) : 0;
   const failed = state.calendars.filter((c) => state.syncInfo[c.id] && !state.syncInfo[c.id].ok);
-  const todayTasks = visibleTasks(state.tasks, role, user).filter((t) => t.date === today || (!t.done && t.date && t.date < today));
+  const myTasks = visibleTasks(state.tasks, role, user);
+  // hôm nay: các lần trong ngày (gồm task lặp lại) + task thường quá hạn chưa xong
+  const todayTasks = [...taskInstances(myTasks, today, today), ...myTasks.filter((t) => !isRepeating(t) && !t.done && t.date && t.date < today).map((t) => ({ ...t, occ: t.date, iid: t.id }))];
   const nArr = useCountUp(arrivals.length);
   const nClean = useCountUp(cleanings.length);
   const nOcc = useCountUp(occPct);
@@ -99,7 +102,7 @@ export default function Home({ api }) {
       <div className="actions scroll-x stagger" style={{ '--i': 5 }}>
         {can(role, 'booking') && <button className="action" onClick={() => api.newBooking()}><span className="aico pink"><BedDouble size={22} /></span>Đặt phòng</button>}
         {can(role, 'task.create') && <button className="action" onClick={() => api.newTask()}><span className="aico violet"><ClipboardPlus size={22} /></span>Thêm task</button>}
-        <button className="action" onClick={() => api.openDay(today)}><span className="aico blue"><NotebookPen size={22} /></span>{can(role, 'note.edit') ? 'Ghi chú' : 'Hôm nay'}</button>
+        <button className="action" onClick={() => api.openNote(today)}><span className="aico blue"><NotebookPen size={22} /></span>{can(role, 'note.edit') ? 'Ghi chú' : 'Hôm nay'}</button>
         {!can(role, 'task.create') && <button className="action" onClick={() => api.goto('tasks')}><span className="aico violet"><Check size={22} /></span>Task của tôi</button>}
         <button className="action" onClick={() => { dispatch({ type: 'SETTINGS', patch: { calView: 'week' } }); api.goto('calendar'); }}><span className="aico yellow"><CalendarRange size={22} /></span>Lịch tuần</button>
       </div>
@@ -120,11 +123,11 @@ export default function Home({ api }) {
           </div>
           <div className="mini-tasks stagger" style={{ '--i': 7 }}>
             {todayTasks.slice(0, 4).map((t) => (
-              <div key={t.id} className={`mini-task ${t.done ? 'done' : ''}`}>
-                <button className={`check ${t.done ? 'on' : ''} p-${t.priority}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, by: user?.id, byName: user?.name })} aria-label="Hoàn thành">{t.done && <Check size={14} strokeWidth={3} />}</button>
+              <div key={t.iid} className={`mini-task ${t.done ? 'done' : ''}`}>
+                <button className={`check ${t.done ? 'on' : ''} p-${t.priority}`} disabled={!canTickTask(t, role, user)} onClick={() => dispatch({ type: 'TOGGLE_TASK', id: t.id, occ: t.occ, by: user?.id, byName: user?.name })} aria-label="Hoàn thành">{t.done && <Check size={14} strokeWidth={3} />}</button>
                 <button className="mini-task-body" onClick={() => (can(role, 'task.create') ? api.editTask(t) : api.goto('tasks'))}>
                   <b>{t.title}</b>
-                  {t.date < today && !t.done && <small className="overdue">Quá hạn {dm(t.date)}</small>}
+                  {t.occ < today && !t.done && <small className="overdue">Quá hạn {dm(t.occ)}</small>}
                 </button>
               </div>
             ))}

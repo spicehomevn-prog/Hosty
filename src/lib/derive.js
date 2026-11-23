@@ -94,7 +94,7 @@ export function getCleanings(state, bookings, from, to, locationId) {
     map[id] = {
       id, date, origDate: b.end, moved: !!a?.date && a.date !== b.end, roomId: b.roomId, room: idx[b.roomId].room, location: loc,
       outTime: b.checkOut, outPlatform: b.platform, outBooking: b,
-      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(id),
+      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(id), note: state.cleanNotes?.[id] || '',
     };
   }
   for (const x of state.cleanExtra || []) {
@@ -149,8 +149,9 @@ export function cleaningText(state, cards, { title, notes = {} } = {}) {
           ? `⚠️ GẤP – khách mới nhận ${c.inTime}`
           : c.next ? `khách tiếp theo ${dm(c.next.start)}` : 'chưa có khách tiếp theo';
         lines.push(c.custom
-          ? `${c.done ? '✅' : '▫️'} ${c.room.name}: dọn${c.outTime ? ` lúc ${c.outTime}` : ''}${c.note ? ` – ${c.note}` : ''} → ${st}`
+          ? `${c.done ? '✅' : '▫️'} ${c.room.name}: dọn${c.outTime ? ` lúc ${c.outTime}` : ''} → ${st}`
           : `${c.done ? '✅' : '▫️'} ${c.room.name}: khách trả ${c.outTime} → ${st}`);
+        if (c.note) lines.push(`   📝 ${c.note}`);
       }
     }
     if (notes[date]) lines.push(`📝 Ghi chú: ${notes[date].trim()}`);

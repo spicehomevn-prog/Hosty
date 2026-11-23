@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, MapPin } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
+import { reducedMotion } from '../lib/motion.js';
 import { getBookings, getCleanings, allRooms, roomIndex } from '../lib/derive.js';
 import {
   todayKey, addDays, startOfWeek, startOfMonth, endOfMonth, addMonths, rangeKeys, diffDays,
@@ -152,6 +153,19 @@ export default function CalendarView({ api, focus }) {
   const [locId, setLocId] = useState('');
 
   useEffect(() => { setAnchor(focus.date); setSelected(focus.selected); }, [focus.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Mở từ nút "Ghi chú": cuộn tới ô ghi chú của ngày (sau khi trang render xong và đã cuộn lên đầu)
+  useEffect(() => {
+    if (focus.section !== 'note') return undefined;
+    const t = setTimeout(() => {
+      const box = document.querySelector('.note-box');
+      const ta = document.getElementById('day-note');
+      if (!box) return;
+      box.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+      box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+      if (ta && !ta.readOnly) setTimeout(() => ta.focus({ preventScroll: true }), 450);
+    }, 380);
+    return () => clearTimeout(t);
+  }, [focus.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bookings = useMemo(() => getBookings(state), [state]);
   const idx = useMemo(() => roomIndex(state), [state]);

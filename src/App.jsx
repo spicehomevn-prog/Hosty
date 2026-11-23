@@ -125,9 +125,10 @@ function Workspace() {
     );
   }
 
-  const openDay = (date) => { setCalFocus({ date, selected: date, nonce: Date.now() }); setTab('calendar'); };
+  const openDay = (date, opt = {}) => { setCalFocus({ date, selected: date, nonce: Date.now(), section: opt.section || '' }); setTab('calendar'); };
   const api = {
     openDay,
+    openNote: (date) => openDay(date, { section: 'note' }),
     openBooking: (b) => setBooking({ mode: 'view', data: b }),
     newBooking: (preset) => setBooking({ mode: 'new', data: preset || {} }),
     newTask: (preset) => setTask(preset || {}),
@@ -174,7 +175,7 @@ function Workspace() {
             <button className="create-tile yellow" onClick={() => { setCreateOpen(false); api.newTask(); }}>
               <span className="tile-ico"><ClipboardPlus size={22} /></span><b>Task</b><small>Việc cần làm</small>
             </button>
-            <button className="create-tile pink" onClick={() => { setCreateOpen(false); openDay(todayKey()); }}>
+            <button className="create-tile pink" onClick={() => { setCreateOpen(false); openDay(todayKey(), { section: 'note' }); }}>
               <span className="tile-ico"><NotebookPen size={22} /></span><b>Ghi chú</b><small>Cho hôm nay</small>
             </button>
             {can(role, 'finance') && (

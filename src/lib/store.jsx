@@ -42,6 +42,7 @@ export const emptyState = () => ({
   cleanDone: {},
   cleanAdj: {}, // { [mã thẻ]: { hide: true } | { date: 'YYYY-MM-DD' } } – admin xoá / dời ngày thẻ dọn phòng
   cleanExtra: [], // [{ id, roomId, date, time, note }] – thẻ dọn phòng admin thêm tay
+  cleanNotes: {}, // { [mã thẻ]: 'ghi chú riêng của thẻ dọn phòng' }
   settings: { font: 'Be Vietnam Pro', calView: 'month' },
 });
 
@@ -106,6 +107,11 @@ function reducer(state, a) {
       if (a.patch) cleanAdj[a.id] = a.patch; else delete cleanAdj[a.id];
       return { ...state, cleanAdj };
     }
+    case 'CLEAN_NOTE': {
+      const cleanNotes = { ...(state.cleanNotes || {}) };
+      if (a.text && a.text.trim()) cleanNotes[a.id] = a.text.trim(); else delete cleanNotes[a.id];
+      return { ...state, cleanNotes };
+    }
     case 'SAVE_CLEAN_EXTRA': {
       const list = state.cleanExtra || [];
       const exists = list.some((x) => x.id === a.card.id);
@@ -124,6 +130,13 @@ function reducer(state, a) {
         ...state,
         tasks: state.tasks.map((t) => {
           if (t.id !== a.id) return t;
+          if (a.occ && t.repeat && t.repeat !== 'none') {
+            // task lặp lại: chỉ đánh dấu đúng lần này
+            const doneDates = { ...(t.doneDates || {}) };
+            if (doneDates[a.occ]) delete doneDates[a.occ];
+            else doneDates[a.occ] = { at: Date.now(), by: a.by || '', byName: a.byName || '' };
+            return { ...t, doneDates };
+          }
           if (t.done) { const { doneAt, doneBy, doneByName, ...rest } = t; return { ...rest, done: false }; } // eslint-disable-line no-unused-vars
           return { ...t, done: true, doneAt: Date.now(), doneBy: a.by || '', doneByName: a.byName || '' };
         }),

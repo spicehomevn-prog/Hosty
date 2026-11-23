@@ -149,6 +149,7 @@ export const EyeOff = make('eyeOff');
 export const Loader2 = make('loader');
 export const MapPin = make('pin');
 export const Clock = make('clock');
+export const Bell = make('notifications');
 export const Moon = make('moon');
 export const Ban = make('ban');
 export const DoorOpen = make('door');
