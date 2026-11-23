@@ -1251,3 +1251,7 @@ input.switch:checked::after { transform: translateX(18px); }
 .rm-fail { display: flex; flex-direction: column; gap: 6px; }
 .rm-fail .form-error { margin: 0; }
 .rm-diag { font-size: 11.5px; color: var(--ink-2); font-family: ui-monospace, monospace; margin: 0; word-break: break-word; }
+.rm-steps b { font-weight: 600; }
+.rm-steps ol { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.rm-steps p { margin: 6px 0 0; }
+.rm-steps a { color: var(--violet-ink); font-weight: 600; }

@@ -10,9 +10,28 @@ const ANDROID_PERM = isAndroid()
   ? 'Thông báo của Hostexa đi qua Chrome. Bật ở 2 chỗ: (1) Chrome → ⋮ → Cài đặt → Cài đặt trang web → Thông báo → hostexa.vercel.app → Cho phép; (2) Cài đặt điện thoại → Ứng dụng → Chrome → Thông báo → bật. Xong quay lại bấm Bật thông báo.'
   : 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Thông báo → Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
 
+/** Các bước mở chặn thông báo cho đúng trang đang mở (Chrome Android) */
+function DeniedHelp() {
+  const host = location.host;
+  if (!isAndroid()) return <p className="rm-note">{ANDROID_PERM}</p>;
+  return (
+    <div className="rm-note rm-steps">
+      <b>Chrome đang chặn thông báo của {host}</b>
+      <ol>
+        <li>Mở <b>Chrome</b>, vào đúng địa chỉ <b>{host}</b>.</li>
+        <li>Bấm biểu tượng <b>ⓘ / ổ khoá</b> cạnh thanh địa chỉ → <b>Quyền</b> (hoặc <b>Cài đặt trang web</b>) → <b>Thông báo</b> → <b>Cho phép</b>. Không thấy mục Thông báo thì bấm <b>Đặt lại quyền</b>.</li>
+        <li>Chrome → ⋮ → Cài đặt → Cài đặt trang web → <b>Thông báo</b>: công tắc trên cùng phải <b>bật</b>, và {host} không nằm trong mục <b>Bị chặn</b>.</li>
+        <li>Cài đặt điện thoại → Ứng dụng → <b>Chrome</b> → Thông báo → bật.</li>
+        <li>Quay lại Hostexa, bấm <b>Bật thông báo</b> → chọn <b>Cho phép</b> khi được hỏi.</li>
+      </ol>
+      {host.startsWith('hosty-rose') && <p>Bạn đang mở bằng tên miền cũ. Nên mở <a href="https://hostexa.vercel.app">hostexa.vercel.app</a> và thêm lại biểu tượng ra màn hình chính.</p>}
+    </div>
+  );
+}
+
 /** Hướng dẫn theo bước bị kẹt khi bật thông báo */
 function failHelp(step) {
-  if (step === 'perm') return ANDROID_PERM;
+  if (step === 'perm' || step === 'denied') return null; // DeniedHelp hiện riêng
   if (step === 'sub') {
     return isAndroid()
       ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho Chrome (Cài đặt điện thoại → Ứng dụng → Chrome → Pin → Không hạn chế). Vẫn không được: mở hostexa.vercel.app bằng Chrome rồi bật thông báo ở đó (biểu tượng ngoài màn hình chính dùng chung với Chrome nên cũng sẽ nhận được).`
@@ -46,7 +65,6 @@ export function RemindersPanel({ n }) {
   if (isInApp()) pushNote = 'Trang đang mở bên trong Zalo / Facebook nên không nhận được thông báo. Bấm ⋮ (hoặc …) → "Mở bằng trình duyệt" / "Mở bằng Chrome", rồi bật thông báo ở đó.';
   else if (!pushSupported() && isIOS() && !isStandalone()) pushNote = 'iPhone chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính: bấm nút Chia sẻ trong Safari > "Thêm vào MH chính", rồi mở từ biểu tượng đó.';
   else if (!pushSupported()) pushNote = isIOS() ? 'Cần iOS 16.4 trở lên để nhận thông báo.' : 'Trình duyệt này không hỗ trợ thông báo. Dùng Chrome hoặc Safari bản mới.';
-  else if (Notification.permission === 'denied') pushNote = ANDROID_PERM;
 
   return (
     <div className="rm-panel">
@@ -67,6 +85,8 @@ export function RemindersPanel({ n }) {
           <>
             <button className="btn primary block" onClick={n.enablePush} disabled={!!busy}><Spin on={busy === 'push'} /> Bật thông báo</button>
             {n.step && <p className="rm-step"><Loader2 size={14} className="spin" /> {n.step}</p>}
+            {!n.step && (n.perm === 'denied' || n.failStep === 'denied' || n.failStep === 'perm') && <DeniedHelp />}
+            {!err && n.perm === 'denied' && n.diag && <p className="rm-diag">{n.diag}</p>}
           </>
         )}
         {n.note && <p className="rm-note">{n.note}</p>}

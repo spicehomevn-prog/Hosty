@@ -39,7 +39,13 @@ const sameKey = (sub, key) => {
 
 /** Tình trạng máy này (hiện cho người dùng chụp lại khi bật không được) */
 export async function pushDiag() {
-  const out = [`Quyền: ${typeof Notification === 'undefined' ? 'không hỗ trợ' : Notification.permission}`, `Mở từ: ${isStandalone() ? 'biểu tượng' : isInApp() ? 'app khác' : 'trình duyệt'}`];
+  const out = [`Trang: ${location.host}`, `Quyền: ${typeof Notification === 'undefined' ? 'không hỗ trợ' : Notification.permission}`];
+  try { out.push(`Quyền (Chrome): ${(await withTimeout(navigator.permissions.query({ name: 'notifications' }), 2000, 'diag', '')).state}`); } catch { /* noop */ }
+  out.push(`Mở từ: ${isStandalone() ? 'biểu tượng' : isInApp() ? 'app khác' : 'trình duyệt'}`);
+  const v = ua().match(/(Chrome|SamsungBrowser|Firefox|OPR|EdgA|MiuiBrowser|HeyTapBrowser)\/([\d.]+)/);
+  if (v) out.push(`${v[1]} ${v[2].split('.')[0]}`);
+  const a = ua().match(/Android ([\d.]+)/);
+  if (a) out.push(`Android ${a[1]}`);
   try {
     const reg = await withTimeout(navigator.serviceWorker.getRegistration('/'), 3000, 'diag', '');
     out.push(`Service worker: ${reg?.active ? 'đang chạy' : reg ? 'đang cài' : 'chưa có'}`);
@@ -69,11 +75,18 @@ export function useNotify() {
   const [sub, setSub] = useState(null); // máy này đã bật thông báo
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
+  const [step, setStep] = useState('');
+  const [failStep, setFailStep] = useState('');
+  const [diag, setDiag] = useState('');
+  const [note, setNote] = useState('');
+  const [perm, setPerm] = useState(() => (typeof Notification === 'undefined' ? 'default' : Notification.permission));
 
   const load = useCallback(async () => {
     if (demo || !ws) return;
     try { setInfo(await s.call(`/api/notify?ws=${encodeURIComponent(ws)}`)); setErr(''); } catch (e) { setErr(e.message); }
     try { setSub(await currentSub()); } catch { setSub(null); }
+    if (typeof Notification !== 'undefined') setPerm(Notification.permission);
+    if (pushSupported() && Notification.permission === 'denied') pushDiag().then(setDiag).catch(() => {});
   }, [demo, ws]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -90,11 +103,6 @@ export function useNotify() {
     try { const r = await fn(); await load(); return r; } catch (e) { setErr(e.message); return null; } finally { setBusy(''); }
   };
 
-  const [step, setStep] = useState('');
-  const [failStep, setFailStep] = useState('');
-  const [diag, setDiag] = useState('');
-  const [note, setNote] = useState('');
-
   const enablePush = async () => {
     setBusy('push'); setErr(''); setFailStep(''); setDiag(''); setNote('');
     try {
@@ -104,9 +112,12 @@ export function useNotify() {
       const appKey = b64ToBytes(key);
 
       setStep('Đang xin quyền thông báo…');
-      let perm = Notification.permission;
-      if (perm !== 'granted') perm = await withTimeout(Notification.requestPermission(), 15000, 'perm', 'Máy không hiện hộp xin quyền thông báo.');
-      if (perm !== 'granted') throw new StepError('perm', 'Bạn chưa cho phép thông báo.');
+      let p0 = Notification.permission;
+      // kể cả khi đang 'denied' vẫn thử hỏi lại: nếu người dùng vừa mở chặn trong Chrome thì hộp hỏi sẽ hiện
+      if (p0 !== 'granted') p0 = await withTimeout(Notification.requestPermission(), p0 === 'denied' ? 4000 : 15000, 'perm', 'Máy không hiện hộp xin quyền thông báo.').catch((e) => { if (Notification.permission === 'denied') return 'denied'; throw e; });
+      setPerm(Notification.permission);
+      if (p0 === 'denied') throw new StepError('denied', `Chrome đang chặn thông báo của ${location.host}.`);
+      if (p0 !== 'granted') throw new StepError('perm', 'Bạn chưa cho phép thông báo.');
 
       setStep('Đang khởi động dịch vụ thông báo…');
       let reg = await withTimeout(navigator.serviceWorker.getRegistration('/'), 5000, 'sw', 'Không đọc được dịch vụ thông báo của trang.');
@@ -151,7 +162,7 @@ export function useNotify() {
   };
 
   return {
-    demo, info, err, busy, load, step, failStep, diag, note,
+    demo, info, err, busy, load, step, failStep, diag, note, perm,
     pushOn: !!sub && (info?.push?.devices || 0) > 0,
     enablePush, disablePush, testPush, setPref,
   };
