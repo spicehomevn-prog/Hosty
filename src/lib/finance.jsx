@@ -29,6 +29,13 @@ function reducer(s, a) {
       if (a.rule && (a.rule.week || a.rule.month)) stayDiscount[a.key] = a.rule; else delete stayDiscount[a.key];
       return { ...s, stayDiscount, prices: withPrices(s.prices, a.reprice) };
     }
+    case 'OTA_LISTING': {
+      const otaListings = { ...(s.otaListings || {}) };
+      const cur = { ...(otaListings[a.roomId] || {}) };
+      if (a.value) cur[a.platform] = a.value; else delete cur[a.platform];
+      if (Object.keys(cur).length) otaListings[a.roomId] = cur; else delete otaListings[a.roomId];
+      return { ...s, otaListings };
+    }
     case 'PRICE': {
       const prices = { ...s.prices };
       if (a.entry) prices[a.id] = a.entry; else delete prices[a.id];
@@ -145,7 +152,20 @@ function FinanceInner({ cloud, children }) {
     if (Object.keys(entries).length) dispatch({ type: 'PRICES', entries });
   }, [state.events, state.overrides, fin.rateTable, status.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const value = { fin, dispatch, status: { ...status, dirty, enabled: !!cloud }, sync };
+  // Lấy giá Airbnb qua Apify ngay (máy chủ chạy actor bằng APIFY_TOKEN, ghi vào file tài chính)
+  const runOta = useCallback(async () => {
+    if (!cloud) return { ok: false, error: 'Chế độ xem thử không chạy Apify' };
+    await sync(); // lưu link Airbnb vừa nhập trước khi máy chủ đọc
+    try {
+      const r = await api(`/api/finance?ws=${cloud.ws}&action=ota`, { token: cloud.token, method: 'POST' });
+      await sync();
+      return { ok: !!r.otaRun?.ok, error: r.otaRun?.error || '', run: r.otaRun };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }, [cloud?.ws, cloud?.token, sync]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const value = { fin, dispatch, status: { ...status, dirty, enabled: !!cloud }, sync, runOta };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -166,6 +186,16 @@ export function demoFinance(state) {
     }
     fin.rateTable[roomId] = days;
   }
+  // Giá Airbnb lấy qua Apify (mẫu) cho Phòng Đồi Thông
+  fin.otaListings = { rA1: { Airbnb: 'https://www.airbnb.com/rooms/50000001' } };
+  const air = {};
+  for (let i = -25; i <= 45; i++) {
+    const d = addDays(t, i);
+    const wd = new Date(`${d}T00:00:00`).getDay();
+    air[d] = [539203, 571307, 571307, 571307, 571307, 596146, 596146][wd];
+  }
+  fin.otaRates = { rA1: { Airbnb: air } };
+  fin.otaRun = { at: Date.now() - 864e5 * 3, by: 'Tự cập nhật hằng tháng', ok: true, error: '', rooms: { rA1: { id: '50000001', ok: true, error: '', priced: 38, available: 38 } } };
   // Giảm giá: theo số đêm cho mọi phòng; giảm 15% các ngày thường tuần sau ở Phòng Đồi Thông
   fin.stayDiscount = { '*': { week: 10, month: 25 } };
   const promo = {};

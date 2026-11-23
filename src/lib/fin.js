@@ -3,7 +3,7 @@ import { addDays, diffDays, todayKey } from './dates.js';
 import { PLATFORMS } from './store.jsx';
 import { coveredByDirect } from './derive.js';
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'prices', 'expenses', 'history', 'roomMap'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap'];
 export const DEFAULT_FEES = { Airbnb: 15, 'Booking.com': 15, Agoda: 18, Traveloka: 15, Expedia: 18, 'Trực tiếp': 0 };
 export const EXPENSE_GROUPS = ['Điện nước', 'Internet', 'Vật tư', 'Sửa chữa', 'Thuê nhà', 'Khác'];
 export const WEEK_NIGHTS = 7;
@@ -11,15 +11,15 @@ export const MONTH_NIGHTS = 28;
 
 export const emptyFin = () => ({
   settings: { taxOn: true, taxRate: 7, fees: { ...DEFAULT_FEES } },
-  rateTable: {}, dayDiscount: {}, stayDiscount: {}, prices: {}, expenses: [], history: {}, roomMap: {},
+  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {},
 });
 export const pickFin = (f) => {
   const e = emptyFin();
   return Object.fromEntries(FIN_KEYS.map((k) => [k, f?.[k] ?? e[k]]));
 };
 
-export const SOURCE_LABEL = { rate: 'Theo bảng giá', report: 'Theo file báo cáo của sàn', manual: 'Nhập tay' };
-export const SOURCE_SHORT = { rate: 'bảng giá', report: 'file sàn', manual: 'nhập tay' };
+export const SOURCE_LABEL = { ota: 'Theo giá Airbnb (Apify)', rate: 'Theo bảng giá', report: 'Theo file báo cáo của sàn', manual: 'Nhập tay' };
+export const SOURCE_SHORT = { ota: 'giá Airbnb', rate: 'bảng giá', report: 'file sàn', manual: 'nhập tay' };
 export const monthOf = (k) => k.slice(0, 7);
 export const feePct = (fin, platform) => Number(fin.settings?.fees?.[platform] ?? DEFAULT_FEES[platform] ?? 0);
 const feeOf = (fin, platform, amount, fee) => (fee != null && fee !== '' ? Number(fee) : Math.round((amount * feePct(fin, platform)) / 100));
@@ -66,26 +66,34 @@ export function applyDiscount(base, discount) {
   return Math.max(0, b - Math.min(b, off));
 }
 
+/** Giá sàn (Apify) của một đêm cho đúng sàn của đặt phòng */
+export const otaNight = (fin, roomId, platform, day) => Number(fin.otaRates?.[roomId]?.[platform]?.[day]) || 0;
+
 /**
- * Giá theo bảng giá của phòng cho các đêm [nhận, trả), đã trừ giảm theo ngày và theo số đêm.
- * -> { base, amount, dayOff, stayPct, stayOff } ; thiếu giá một đêm thì null
+ * Giá các đêm [nhận, trả) của đặt phòng: mỗi đêm ưu tiên giá sàn lấy qua Apify (đúng sàn của đặt phòng,
+ * đã gồm giảm giá của sàn), không có thì dùng Bảng giá tự đặt (trừ giảm theo ngày); sau đó trừ giảm theo số đêm.
+ * -> { base, amount, dayOff, stayPct, stayOff, otaNights, nights } ; thiếu giá một đêm thì null
  */
 export function rateEstimate(b, fin) {
-  const t = fin.rateTable?.[b.roomId];
-  if (!t || !b.start || !b.end) return null;
+  if (!b.start || !b.end) return null;
+  const t = fin.rateTable?.[b.roomId] || {};
   const dd = fin.dayDiscount?.[b.roomId] || {};
-  let base = 0; let dayOff = 0; let nights = 0;
+  let base = 0; let dayOff = 0; let nights = 0; let otaNights = 0;
   for (let d = b.start; d < b.end; d = addDays(d, 1)) {
+    const o = b.platform ? otaNight(fin, b.roomId, b.platform, d) : 0;
+    nights += 1;
+    if (o) { base += o; otaNights += 1; continue; }
     const p = Number(t[d]);
     if (!p) return null;
-    base += p; nights += 1;
+    base += p;
     if (dd[d]) dayOff += Math.round((p * clampPct(dd[d])) / 100);
   }
   if (!base) return null;
   const stayPct = stayPctFor(fin, b.roomId, nights);
   const stayOff = Math.round(((base - dayOff) * stayPct) / 100);
-  return { base, amount: base - dayOff - stayOff, dayOff, stayPct, stayOff };
+  return { base, amount: base - dayOff - stayOff, dayOff, stayPct, stayOff, otaNights, nights };
 }
+const estSource = (est) => (est.otaNights === est.nights ? 'ota' : 'rate');
 
 /** Giá của một đặt phòng: { amount, base, discountTotal, fee, net, source, missing, estimated } */
 export function bookingPrice(b, fin) {
@@ -103,7 +111,7 @@ export function bookingPrice(b, fin) {
     const est = rateEstimate(b, fin);
     if (est) {
       const fee = feeOf(fin, b.platform, est.amount);
-      return { amount: est.amount, base: est.base, discountTotal: est.base - est.amount, rate: est, fee, net: est.amount - fee, source: 'rate', estimated: true, missing: false };
+      return { amount: est.amount, base: est.base, discountTotal: est.base - est.amount, rate: est, fee, net: est.amount - fee, source: estSource(est), estimated: true, missing: false };
     }
   }
   return { amount: null, fee: null, net: null, source: null, missing: !b.blocked };
@@ -111,7 +119,7 @@ export function bookingPrice(b, fin) {
 
 const freezeEntry = (b, est) => ({
   roomId: b.roomId, platform: b.platform, guest: '', start: b.start, end: b.end, amount: est.amount,
-  ...(est.base !== est.amount ? { base: est.base } : {}), source: 'rate', at: Date.now(),
+  ...(est.base !== est.amount ? { base: est.base } : {}), source: estSource(est), at: Date.now(),
 });
 
 /** Đặt phòng từ sàn đủ giá theo bảng giá mà chưa có trong sổ -> các mục cần chốt */
@@ -136,7 +144,7 @@ export function repriceAfter(bookings, fin, roomIds, days, { all = false } = {})
   for (const b of bookings) {
     if (b.source !== 'ical' || b.blocked || !rooms.has(b.roomId)) continue;
     const e = fin.prices?.[b.id];
-    if (e && e.source !== 'rate') continue;
+    if (e && e.source !== 'rate' && e.source !== 'ota') continue;
     let hit = all;
     for (let d = b.start; !hit && d < b.end; d = addDays(d, 1)) if (set.has(d)) hit = true;
     if (!hit) continue;
@@ -167,7 +175,7 @@ export function ledger(state, bookings, fin, today = todayKey()) {
     const manualGone = !calId && !id.startsWith('rep:'); // đặt phòng trực tiếp đã xoá
     if (manualGone) continue;
     // bản sao lịch khoá của đặt phòng trực tiếp (sàn trả ngược về) đã lỡ chốt giá -> không tính
-    if (calId && e.source === 'rate' && coveredByDirect(e.start, e.end, (state.manual || []).filter((m) => m.roomId === e.roomId))) continue;
+    if (calId && (e.source === 'rate' || e.source === 'ota') && coveredByDirect(e.start, e.end, (state.manual || []).filter((m) => m.roomId === e.roomId))) continue;
     const b = {
       id, roomId: e.roomId || '', platform: e.platform || 'Khác', start: e.start, end: e.end, summary: e.guest || '',
       source: id.startsWith('rep:') ? 'report' : 'ical', calendarId: calId, ledgerOnly: true, color: null,

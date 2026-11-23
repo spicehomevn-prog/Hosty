@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Trash2, Pricing } from '../lib/icons.jsx';
+import { Trash2, Pricing, RefreshCw, CheckCircle2, AlertCircle, Link2 } from '../lib/icons.jsx';
 import { useStore, uid, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { roomIndex } from '../lib/derive.js';
 import { useMembers } from '../lib/members.js';
 import { rateEstimate, feePct, EXPENSE_GROUPS, platformOrder, DEFAULT_FEES, applyDiscount } from '../lib/fin.js';
 import { fmtVND } from '../lib/money.js';
-import { dm, diffDays, todayKey, monthTitle } from '../lib/dates.js';
+import { dm, diffDays, todayKey, monthTitle, timeAgo } from '../lib/dates.js';
 import { Sheet, Field, MoneyInput, DiscountInput, toast } from './ui.jsx';
 
 /* ---------- Giá của một đặt phòng từ sàn ---------- */
@@ -50,10 +50,10 @@ export function PriceSheet({ b, onClose }) {
       </div>
       {est && (
         <div className="calc-lines">
-          <div><span>Theo bảng giá ({nights} đêm)</span><b>{fmtVND(est.base)}</b></div>
+          <div><span>{est.otaNights === est.nights ? `Theo giá ${b.platform} (Apify)` : est.otaNights ? `Giá ${b.platform} ${est.otaNights} đêm + bảng giá ${est.nights - est.otaNights} đêm` : 'Theo bảng giá'} ({nights} đêm)</span><b>{fmtVND(est.base)}</b></div>
           {est.dayOff > 0 && <div className="off"><span>Giảm giá theo ngày</span><b>−{fmtVND(est.dayOff)}</b></div>}
           {est.stayOff > 0 && <div className="off"><span>Giảm ở dài ngày ({est.stayPct}%)</span><b>−{fmtVND(est.stayOff)}</b></div>}
-          <div className="tot"><span>Giá theo bảng giá</span><b>{fmtVND(est.amount)}</b></div>
+          <div className="tot"><span>Giá tính được</span><b>{fmtVND(est.amount)}</b></div>
         </div>
       )}
       <Field label={<>Giá phòng (trước giảm giá riêng) <em className="req">*</em></>}>
@@ -216,6 +216,66 @@ export function FinanceSettings({ onClose, onOpenRates }) {
       <h4 className="fin-h"><Pricing size={16} /> Bảng giá phòng</h4>
       <p className="tiny muted">Đặt giá một đêm cho từng phòng theo ngày. Đặt phòng từ sàn sẽ tự tính giá = tổng giá các đêm. Đặt phòng có giá trong file báo cáo hoặc nhập tay thì giữ nguyên.</p>
       <button className="btn ghost block" onClick={onOpenRates}><Pricing size={16} /> Mở bảng giá</button>
+
+      <AirbnbRates />
     </Sheet>
+  );
+}
+
+/* ---------- Giá Airbnb theo ngày qua Apify (Hotel Rates API) ---------- */
+function AirbnbRates() {
+  const { state } = useStore();
+  const { fin, dispatch, runOta, status } = useFinance();
+  const [busy, setBusy] = useState(false);
+  const rooms = state.locations.flatMap((l) => l.rooms.map((r) => ({ ...r, loc: l.name })));
+  // chỉ những phòng có lịch Airbnb (hoặc đã dán link)
+  const airRooms = rooms.filter((r) => state.calendars.some((c) => c.roomId === r.id && c.platform === 'Airbnb') || fin.otaListings?.[r.id]?.Airbnb);
+  const run = fin.otaRun;
+  const n = Object.values(fin.otaListings || {}).filter((v) => v?.Airbnb).length;
+  const today = todayKey();
+  const go = async () => {
+    setBusy(true);
+    const r = await runOta();
+    setBusy(false);
+    toast(r.ok ? `Đã cập nhật giá Airbnb${r.run ? ` · ${Object.values(r.run.rooms || {}).reduce((a, x) => a + (x.priced || 0), 0)} đêm có giá` : ''}` : (r.error || 'Không lấy được giá'));
+  };
+  return (
+    <>
+      <h4 className="fin-h"><Link2 size={16} /> Giá Airbnb theo ngày (Apify)</h4>
+      <p className="tiny muted">
+        Dán link phòng trên Airbnb. Máy chủ lấy giá từng đêm còn trống (tháng này và tháng sau) bằng actor Hotel Rates API của Apify,
+        tự chạy <b>ngày 1 hằng tháng</b>. Đặt phòng Airbnb sẽ tính theo giá này; đêm không có giá thì dùng Bảng giá.
+        Chi phí khoảng $0,06 mỗi phòng mỗi lần chạy.
+      </p>
+      <div className="listing-list">
+        {airRooms.length === 0 && <p className="tiny muted">Chưa có phòng nào có lịch Airbnb.</p>}
+        {airRooms.map((r) => {
+          const rr = run?.rooms?.[r.id];
+          const future = Object.keys(fin.otaRates?.[r.id]?.Airbnb || {}).filter((d) => d >= today).length;
+          return (
+            <div key={r.id} className="listing-item">
+              <div className="listing-top"><span className="pdot" style={{ background: platformColor('Airbnb') }} /><b>{r.name}</b><small>{r.loc}</small></div>
+              <input className="input sm" inputMode="url" placeholder="airbnb.com/rooms/… hoặc airbnb.com/h/…" value={fin.otaListings?.[r.id]?.Airbnb || ''}
+                onChange={(e) => dispatch({ type: 'OTA_LISTING', roomId: r.id, platform: 'Airbnb', value: e.target.value.trim() })} />
+              {fin.otaListings?.[r.id]?.Airbnb && (rr || future > 0) && (
+                <small className={`listing-st ${rr && !rr.ok ? 'bad' : 'ok'}`}>
+                  {rr && !rr.ok ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}
+                  {rr && !rr.ok ? rr.error : `Có giá ${future} đêm sắp tới${rr ? ` · lần chạy gần nhất ${rr.priced} đêm` : ''}`}
+                </small>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {run && (
+        <p className={`tiny ${run.ok ? 'muted' : 'form-error'}`}>
+          Cập nhật lần cuối {timeAgo(run.at)} ({dm(new Date(run.at + 7 * 3600e3).toISOString().slice(0, 10))}) · {run.by}{run.ok ? '' : ` · ${run.error}`}
+        </p>
+      )}
+      <button className="btn ghost block" onClick={go} disabled={busy || !n}>
+        <RefreshCw size={16} className={busy ? 'spin' : ''} /> {busy ? 'Đang lấy giá từ Airbnb… (khoảng 30 giây)' : 'Cập nhật giá Airbnb ngay'}
+      </button>
+      {!status.enabled && <p className="tiny muted">Chế độ xem thử dùng giá mẫu, không chạy Apify.</p>}
+    </>
   );
 }

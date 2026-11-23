@@ -7,4 +7,5 @@
 - Stack: Vite + React SPA, Vercel Functions trong `api/` (file bắt đầu bằng `_` là module dùng chung), dữ liệu trên Vercel Blob.
 - Font: Cal Sans (tiêu đề), Afacad Flux (nội dung), Manrope 700 (wordmark). Icon: bộ Hostexa trong `src/lib/icons.jsx`.
 - Tài chính: chỉ owner/admin (`can(role,'finance')`, máy chủ kiểm tra lại trong `api/finance.js`). Dữ liệu tiền KHÔNG được đưa vào `ws/<id>.json` (`SYNC_KEYS`) vì member tải file đó; luôn để trong `fin/<id>.json`.
+- Giá Airbnb theo ngày lấy qua Apify (actor `scrapercompany/scrapercompany-hotel-rates`, endpoint `/v1/airbnb/calendar`) chỉ ở máy chủ (`api/_apify.js`), token trong env `APIFY_TOKEN`, không bao giờ gửi xuống trình duyệt. Chạy hằng tháng (cron `?cron=ota`) + nút chạy tay (1 lần/giờ).
 - Không commit `.env`, `.hosty-sync`, `hosty.zip`.

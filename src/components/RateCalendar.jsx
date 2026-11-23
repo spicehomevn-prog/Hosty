@@ -138,6 +138,7 @@ export function RateCalendar({ onClose, initialRoom }) {
           if (out) return <span key={d} className="rate-day out" />;
           const p = table[d];
           const off = disc[d];
+          const air = fin.otaRates?.[roomId]?.Airbnb?.[d];
           return (
             <button key={d} type="button" role="gridcell" aria-selected={sel.has(d)}
               className={`rate-day ${sel.has(d) ? 'sel' : ''} ${d < today ? 'past' : ''} ${d === today ? 'today' : ''} ${anchor === d ? 'anchor' : ''}`}
@@ -150,12 +151,13 @@ export function RateCalendar({ onClose, initialRoom }) {
                 </>
               ) : <span className={`rate-p ${p ? '' : 'none'}`}>{p ? fmtShort(p) : '—'}</span>}
               {off && !p && <span className="rate-off">−{off}%</span>}
+              {air && !off && <span className="rate-air" title={`Giá Airbnb ${fmtVND(air)}`}>A {fmtShort(air)}</span>}
               {busy[d] && <span className="rate-busy" style={{ background: busy[d] }} />}
             </button>
           );
         })}
       </div>
-      <p className="tiny muted rate-legend"><span className="rate-busy inline" /> Đêm đã có khách · giá hiển thị là giá 1 đêm (nhận phòng ngày đó)</p>
+      <p className="tiny muted rate-legend"><span className="rate-busy inline" /> Đêm đã có khách · giá hiển thị là giá 1 đêm (nhận phòng ngày đó){Object.keys(fin.otaRates?.[roomId]?.Airbnb || {}).length ? ' · A = giá Airbnb lấy qua Apify, đặt phòng Airbnb dùng giá này' : ''}</p>
 
       <StayDiscount roomId={roomId} roomName={state.locations.flatMap((l) => l.rooms).find((r) => r.id === roomId)?.name} bookings={bookings} />
 

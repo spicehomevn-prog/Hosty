@@ -4,5 +4,16 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/cal/:token", "destination": "/api/ical-out?k=:token" }
+  ],
+  "functions": {
+    "api/finance.js": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/finance?cron=ota",
+      "schedule": "0 0 1 * *"
+    }
   ]
 }

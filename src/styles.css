@@ -1075,3 +1075,6 @@ button.fin-row:hover { border-color: #DCD2F7; box-shadow: var(--shadow); }
 @keyframes pring-dot { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 10% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-44px) scale(.4); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .pring-check { stroke-dashoffset: 0; } .pring-burst { display: none; } }
 .create-grid.four { grid-template-columns: repeat(2, 1fr); }
+.rate-air { font-size: 9.5px; font-weight: 700; color: #E0457B; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rate-day.sel .rate-air { color: #FFC1D6; }
+.rate-day:has(.rate-air) { gap: 0; }
