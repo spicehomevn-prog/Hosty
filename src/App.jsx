@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, Loader2, CloudOff, LogOut, RefreshCw, Revenue } from './lib/icons.jsx';
+import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, Loader2, CloudOff, LogOut, RefreshCw, Revenue, Payments } from './lib/icons.jsx';
 import { useFlipNav } from './lib/motion.js';
 import { StoreProvider, useStore, demoState } from './lib/store.jsx';
 import { useSession } from './lib/session.jsx';
@@ -16,6 +16,7 @@ import Places from './components/Places.jsx';
 import Finance from './components/Finance.jsx';
 import { BookingSheet } from './components/BookingSheet.jsx';
 import { TaskSheet } from './components/TaskSheet.jsx';
+import { ExpenseSheet } from './components/FinanceSheets.jsx';
 import { Sheet, Toaster } from './components/ui.jsx';
 import { LogoMark } from './components/Logo.jsx';
 
@@ -98,6 +99,7 @@ function Workspace() {
   const [createOpen, setCreateOpen] = useState(false);
   const [booking, setBooking] = useState(null); // {mode:'new'|'view', data}
   const [task, setTask] = useState(null);
+  const [expense, setExpense] = useState(null);
   const [editing, setEditing] = useState(false);
   // inSetup: đang làm các câu hỏi thiết lập trên máy này (giữ màn thiết lập tới khi bấm "Vào ứng dụng")
   const [inSetup, setInSetup] = useState(false);
@@ -130,6 +132,7 @@ function Workspace() {
     newBooking: (preset) => setBooking({ mode: 'new', data: preset || {} }),
     newTask: (preset) => setTask(preset || {}),
     editTask: (t) => setTask(t),
+    newExpense: (preset) => setExpense(preset || {}),
     editSetup: () => setEditing(true),
     goto: setTab,
   };
@@ -164,7 +167,7 @@ function Workspace() {
 
       {canCreate && (
         <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Tạo mới">
-          <div className="create-grid">
+          <div className={`create-grid ${can(role, 'finance') ? 'four' : ''}`}>
             <button className="create-tile violet" onClick={() => { setCreateOpen(false); api.newBooking(); }}>
               <span className="tile-ico"><BedDouble size={22} /></span><b>Đặt phòng</b><small>Khách đặt trực tiếp</small>
             </button>
@@ -174,12 +177,18 @@ function Workspace() {
             <button className="create-tile pink" onClick={() => { setCreateOpen(false); openDay(todayKey()); }}>
               <span className="tile-ico"><NotebookPen size={22} /></span><b>Ghi chú</b><small>Cho hôm nay</small>
             </button>
+            {can(role, 'finance') && (
+              <button className="create-tile blue" onClick={() => { setCreateOpen(false); api.newExpense(); }}>
+                <span className="tile-ico"><Payments size={22} /></span><b>Chi phí</b><small>Lương, điện nước…</small>
+              </button>
+            )}
           </div>
         </Sheet>
       )}
 
       {booking && <BookingSheet {...booking} onClose={() => setBooking(null)} />}
       {task && <TaskSheet task={task} onClose={() => setTask(null)} />}
+      {expense && can(role, 'finance') && <ExpenseSheet expense={expense} onClose={() => setExpense(null)} />}
     </div>
   );
 }

@@ -14,7 +14,8 @@ import { CleaningCard } from './CleaningPanel.jsx';
 import OccupancySheet from './OccupancySheet.jsx';
 import { ChevronRight, Revenue, Payments } from '../lib/icons.jsx';
 import { useFinance } from '../lib/finance.jsx';
-import { ledger, monthSummary } from '../lib/fin.js';
+import { ledger, monthSummary, collectStats } from '../lib/fin.js';
+import { ProgressRing } from './ProgressRing.jsx';
 import { fmtShort, fmtVND } from '../lib/money.js';
 import { Sheet } from './ui.jsx';
 import { platformColor } from '../lib/store.jsx';
@@ -72,6 +73,7 @@ export default function Home({ api }) {
           <span className="hero-deco" aria-hidden="true" />
         </button>
       </div>
+      <FinanceTiles state={state} bookings={bookings} idx={idx} api={api} />
 
       <button className="occ-card rise" style={{ '--i': 4 }} onClick={() => setOccOpen(true)} aria-haspopup="dialog">
         <div>
@@ -84,8 +86,6 @@ export default function Home({ api }) {
           <ChevronRight size={18} className="occ-chev" />
         </div>
       </button>
-      <RevenueCard state={state} bookings={bookings} onOpen={() => api.goto('finance')} />
-      <DueCard state={state} bookings={bookings} idx={idx} api={api} />
       <OccupancySheet open={occOpen} onClose={() => setOccOpen(false)} day={today} bookings={bookings} api={api} />
 
       {failed.length > 0 && (
@@ -150,56 +150,57 @@ export default function Home({ api }) {
   );
 }
 
-/** Owner / admin: doanh thu & lợi nhuận tháng này */
-function RevenueCard({ state, bookings, onOpen }) {
-  const finance = useFinance();
-  const m = todayKey().slice(0, 7);
-  const s = useMemo(() => (finance ? monthSummary(ledger(state, bookings, finance.fin).items, finance.fin, m) : null), [finance, state, bookings, m]);
-  if (!s) return null;
-  return (
-    <button className="occ-card rev-card rise" style={{ '--i': 4 }} onClick={onOpen}>
-      <span className="rev-ico"><Revenue size={20} /></span>
-      <div>
-        <b>Doanh thu tháng này</b>
-        <span className="muted">Lợi nhuận {fmtShort(s.profit)}{s.missing ? ` · ${s.missing} đặt phòng chưa có giá` : ''}</span>
-      </div>
-      <div className="occ-right rev-right">
-        <b>{fmtShort(s.revenueTotal)}</b>
-        <ChevronRight size={18} className="occ-chev" />
-      </div>
-    </button>
-  );
-}
+// Số tiền gọn cho ô vuông: đơn vị cố định theo giá trị cuối để số đếm lên không đổi đơn vị giữa chừng
+const moneyUnit = (v) => (v >= 1e9 ? { d: 1e9, u: 'tỷ' } : v >= 1e6 ? { d: 1e6, u: 'tr' } : v >= 1e3 ? { d: 1e3, u: 'k' } : { d: 1, u: '₫' });
+const tenths = (n) => (n / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 });
 
-/** Owner / admin: khách đặt trực tiếp còn phải thu (mọi thời điểm) */
-function DueCard({ state, bookings, idx, api }) {
+/** Owner / admin: 2 ô vuông Doanh thu tháng này + Còn phải thu (vòng tiến độ thu tiền) */
+function FinanceTiles({ state, bookings, idx, api }) {
   const finance = useFinance();
   const [open, setOpen] = useState(false);
-  const list = useMemo(() => (finance
-    ? ledger(state, bookings, finance.fin).items.filter((b) => b.price.due > 0).sort((a, b) => (a.start < b.start ? -1 : 1))
-    : []), [finance, state, bookings]);
-  if (!finance) return null;
-  const total = list.reduce((a, b) => a + b.price.due, 0);
+  const [doneVis, setDoneVis] = useState(false); // nền xanh chỉ hiện khi vòng tròn đã chạy xong (không bị sheet che)
   const today = todayKey();
-  const late = list.filter((b) => b.end <= today).length;
+  const m = today.slice(0, 7);
+  const data = useMemo(() => {
+    if (!finance) return null;
+    const { items } = ledger(state, bookings, finance.fin);
+    const due = items.filter((b) => b.price.due > 0).sort((a, b) => (a.start < b.start ? -1 : 1));
+    return { sum: monthSummary(items, finance.fin, m), col: collectStats(items, m), due };
+  }, [finance, state, bookings, m]);
+  const ru = moneyUnit(data?.sum.revenueTotal || 0);
+  const du = moneyUnit(data?.col.due || 0);
+  const nRev = useCountUp(Math.round(((data?.sum.revenueTotal || 0) / ru.d) * 10), 900);
+  const nDue = useCountUp(Math.round(((data?.col.due || 0) / du.d) * 10), 900);
+  if (!data) return null;
+  const { sum, col, due } = data;
+  const late = due.filter((b) => b.end <= today).length;
   return (
     <>
-      <button className={`occ-card rev-card due-card rise ${list.length ? '' : 'clear'}`} style={{ '--i': 4 }} onClick={() => (list.length ? setOpen(true) : api.goto('finance'))}>
-        <span className="rev-ico due-ico"><Payments size={20} /></span>
-        <div>
-          <b>Còn phải thu</b>
-          <span className="muted">{list.length ? `${list.length} khách đặt trực tiếp${late ? ` · ${late} đã trả phòng` : ''}` : 'Đã thu đủ tất cả'}</span>
-        </div>
-        <div className="occ-right rev-right">
-          <b className={list.length ? 'due-amt' : ''}>{fmtShort(total)}</b>
-          <ChevronRight size={18} className="occ-chev" />
-        </div>
-      </button>
+      <div className="hero-cards rise" style={{ '--i': 3 }}>
+        <button className="hero blue" onClick={() => api.goto('finance')}>
+          <span className="hero-ico"><Revenue size={18} /></span>
+          <span className="hero-label">Doanh thu tháng này</span>
+          <b className="hero-num">{tenths(nRev)} <small>{ru.u}</small></b>
+          <span className="hero-sub">Lợi nhuận {fmtShort(sum.profit)}</span>
+          <span className="hero-deco" aria-hidden="true" />
+        </button>
+        <button className={`hero due pink ${doneVis ? 'done' : ''}`} onClick={() => (due.length ? setOpen(true) : api.goto('finance'))}>
+          <ProgressRing pct={col.pct} done={col.done} onShown={setDoneVis} />
+          <span className="hero-label">{col.done ? 'Đã thu đủ' : 'Còn phải thu'}</span>
+          <b className="hero-num">{col.done ? <>0 <small>₫</small></> : <>{tenths(nDue)} <small>{du.u}</small></>}</b>
+          <span className="hero-sub">
+            {col.done
+              ? (col.count ? `${col.count} khách · tháng này` : 'Không có khoản cần thu')
+              : `Đã thu ${col.pct}% · ${col.dueCount} khách${late ? ` · ${late} đã trả phòng` : ''}`}
+          </span>
+          <span className="hero-deco" aria-hidden="true" />
+        </button>
+      </div>
       <Sheet open={open} onClose={() => setOpen(false)} title="Còn phải thu"
         footer={<button className="btn ghost block" onClick={() => { setOpen(false); api.goto('finance'); }}>Xem trong Tài chính</button>}>
-        <div className="due-head"><span>{list.length} khách đặt trực tiếp</span><b>{fmtVND(total)}</b></div>
+        <div className="due-head"><span>{due.length} khách đặt trực tiếp</span><b>{fmtVND(due.reduce((a, b) => a + b.price.due, 0))}</b></div>
         <div className="fin-list">
-          {list.map((b) => {
+          {due.map((b) => {
             const out = b.end <= today; const inNow = b.start <= today && b.end > today;
             return (
               <button key={b.id} className="fin-row due-row" onClick={() => { setOpen(false); api.openBooking(b); }}>

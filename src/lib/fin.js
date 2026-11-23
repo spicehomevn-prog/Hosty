@@ -260,3 +260,25 @@ export const platformOrder = (names) => {
   const order = PLATFORMS.map((p) => p.name);
   return [...names].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
 };
+
+/**
+ * Tiến độ thu tiền khách đặt trực tiếp: đặt phòng trực tiếp có ngày ở trong tháng `m`
+ * + mọi đặt phòng trực tiếp tháng cũ còn nợ.
+ * -> { total, collected, due, count, dueCount, pct (0..100), done }
+ */
+export function collectStats(items, m) {
+  let total = 0; let collected = 0; let due = 0; let count = 0; let dueCount = 0;
+  for (const b of items) {
+    if (b.source !== 'manual' || b.price?.amount == null) continue;
+    const p = b.price;
+    const inMonth = b.start.slice(0, 7) <= m && b.end > `${m}-01`;
+    if (!inMonth && !(p.due > 0 && b.start.slice(0, 7) < m)) continue;
+    count += 1;
+    total += p.total;
+    collected += p.entry?.paidAt ? p.total : Math.min(p.deposit || 0, p.total);
+    due += p.due;
+    if (p.due > 0) dueCount += 1;
+  }
+  const pct = total ? Math.min(100, Math.round((collected / total) * 100)) : 100;
+  return { total, collected, due, count, dueCount, pct: due > 0 ? Math.min(pct, 99) : 100, done: due === 0 };
+}

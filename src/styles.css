@@ -1041,3 +1041,37 @@ button.fin-row:hover { border-color: #DCD2F7; box-shadow: var(--shadow); }
 .due-card.clear .due-ico { color: #1E8763; }
 .due-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; font-size: 14px; color: var(--ink-2); }
 .due-head b { font-size: 20px; color: #C26A00; font-variant-numeric: tabular-nums; }
+
+/* ô vuông tài chính trên Tổng quan */
+.hero-cards + .hero-cards { margin-top: 12px; }
+.hero.blue { background: linear-gradient(155deg, #9CC8FF 0%, #5E97F5 100%); }
+.hero.pink { background: linear-gradient(155deg, #FFB3CC 0%, #EE6E9C 100%); }
+.hero.due::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(155deg, #7FE0B5 0%, #2DB386 100%);
+  opacity: 0; transition: opacity .7s ease .95s; }
+.hero.due.done::before { opacity: 1; }
+.hero.blue .hero-deco { animation-delay: -2s; }
+.hero.due .hero-deco { animation-delay: -7s; }
+.hero-sub { font-size: 12.5px; font-weight: 500; opacity: .9; position: relative; z-index: 1; margin-top: 2px; }
+.hero.due .hero-label { margin-top: 10px; }
+
+/* vòng tiến độ */
+.pring { position: relative; display: grid; place-items: center; margin-bottom: auto; flex: none; z-index: 1; }
+.pring svg { display: block; overflow: visible; }
+.pring-bg { stroke: rgba(255,255,255,.3); }
+.pring-fg { stroke: #fff; transition: stroke-dashoffset 1.1s cubic-bezier(.22,.9,.3,1); }
+.pring-num { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.pring-num small { font-size: 10px; font-weight: 700; margin-left: 1px; }
+.pring-num { grid-auto-flow: column; justify-content: center; align-items: center; }
+.pring.done svg { animation: pring-pop .55s cubic-bezier(.34,1.56,.64,1) 1s both; }
+.pring-check { stroke: #fff; stroke-dasharray: 1; stroke-dashoffset: 1; animation: pring-draw .45s ease-out 1.15s forwards; }
+.pring-burst { position: absolute; inset: 0; pointer-events: none; }
+.pring-wave { position: absolute; inset: 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.85); opacity: 0; animation: pring-wave .8s ease-out 1.05s both; }
+.pring-dot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #fff; opacity: 0;
+  animation: pring-dot .75s cubic-bezier(.2,.8,.3,1) 1.1s both; }
+.pring-dot:nth-child(odd) { background: #FFF3B0; width: 5px; height: 5px; }
+@keyframes pring-pop { 0% { transform: scale(1); } 45% { transform: scale(1.14); } 100% { transform: scale(1); } }
+@keyframes pring-draw { to { stroke-dashoffset: 0; } }
+@keyframes pring-wave { 0% { transform: scale(1); opacity: 0; } 10% { opacity: .9; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes pring-dot { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 10% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-44px) scale(.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pring-check { stroke-dashoffset: 0; } .pring-burst { display: none; } }
+.create-grid.four { grid-template-columns: repeat(2, 1fr); }
