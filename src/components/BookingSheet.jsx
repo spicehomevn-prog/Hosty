@@ -7,8 +7,10 @@ import { Sheet, Field, toast, MoneyInput, DiscountInput } from './ui.jsx';
 import { can } from '../lib/perm.js';
 import { useFinance } from '../lib/finance.jsx';
 import { bookingPrice, SOURCE_LABEL, feePct, applyDiscount } from '../lib/fin.js';
+import { dm as dmShort, toKey } from '../lib/dates.js';
 import { fmtVND } from '../lib/money.js';
 import { PriceSheet } from './FinanceSheets.jsx';
+import { PaymentFields } from './PaymentFields.jsx';
 
 export function BookingSheet({ mode, data, onClose }) {
   if (mode === 'new' || (mode === 'edit')) return <ManualForm data={data} onClose={onClose} />;
@@ -80,12 +82,34 @@ function PriceBlock({ b, finance, onEdit }) {
       <div className="bk-price-grid">
         <div><span>{p.discountTotal > 0 ? 'Sau giảm' : 'Giá phòng'}</span><b>{fmtVND(p.amount)}</b></div>
         <div><span>Phí sàn{p.entry?.fee == null ? ` (${feePct(finance.fin, b.platform)}%)` : ''}</span><b>{p.fee ? `−${fmtVND(p.fee)}` : fmtVND(0)}</b></div>
-        <div className="net"><span>Thực nhận</span><b>{fmtVND(p.net)}</b></div>
+        <div className="net"><span>Thực nhận{p.extras > 0 ? ' (gồm DV)' : ''}</span><b>{fmtVND(p.net)}</b></div>
       </div>
+      {b.source === 'manual' && p.entry && <PayBlock p={p} b={b} finance={finance} />}
       <div className="bk-price-foot">
         <small>{SOURCE_LABEL[p.source]}{p.estimated ? ' · ước tính' : ''}</small>
         <button className="link" onClick={onEdit}><Pencil size={14} /> Sửa giá</button>
       </div>
+    </div>
+  );
+}
+
+function PayBlock({ p, b, finance }) {
+  const e = p.entry;
+  const toggle = () => finance.dispatch({ type: 'PRICE', id: b.id, entry: e.paidAt ? (({ paidAt, ...r }) => r)(e) : { ...e, paidAt: Date.now() } }); // eslint-disable-line no-unused-vars
+  return (
+    <div className="pay-block">
+      {(e.extras || []).map((x) => (
+        <div key={x.id} className="pay-line"><span>{x.name}{x.qty > 1 ? ` × ${x.qty}` : ''}</span><b>{fmtVND(x.price * (x.qty || 1))}</b></div>
+      ))}
+      <div className="pay-line sum"><span>Tổng tiền</span><b>{fmtVND(p.total)}</b></div>
+      {p.deposit > 0 && <div className="pay-line"><span>Đã cọc{e.depositNote ? ` (${e.depositNote.toLowerCase()})` : ''}</span><b>−{fmtVND(p.deposit)}</b></div>}
+      <div className={`pay-line due ${e.paidAt ? 'paid' : ''}`}>
+        <span>{e.paidAt ? `Đã thu đủ ${dmShort(toKey(new Date(e.paidAt)))}` : 'Còn phải thu'}</span>
+        <b>{fmtVND(e.paidAt ? 0 : p.due)}</b>
+      </div>
+      {(p.due > 0 || e.paidAt) && (
+        <button className={`btn tiny pay-toggle ${e.paidAt ? '' : 'go'}`} onClick={toggle}>{e.paidAt ? 'Bỏ đánh dấu đã thu' : '✓ Đã thu đủ'}</button>
+      )}
     </div>
   );
 }
@@ -97,6 +121,9 @@ function ManualForm({ data, onClose }) {
   const [price, setPrice] = useState(() => (oldEntry ? oldEntry.base ?? oldEntry.amount ?? null : null));
   const [discount, setDiscount] = useState(() => oldEntry?.discount || null);
   const pay = applyDiscount(price, discount);
+  const [extras, setExtras] = useState(() => oldEntry?.extras || []);
+  const [deposit, setDeposit] = useState(() => oldEntry?.deposit ?? null);
+  const [method, setMethod] = useState(() => oldEntry?.depositNote || '');
   const firstRoom = state.locations[0]?.rooms[0]?.id || '';
   const t = todayKey();
   const [f, setF] = useState({
@@ -114,9 +141,18 @@ function ManualForm({ data, onClose }) {
     dispatch({ type: 'SAVE_MANUAL', booking: { ...clean, id } });
     if (finance) {
       const old = finance.fin.prices?.[id];
-      const { base, discount: _d, ...rest } = old || {}; // eslint-disable-line no-unused-vars
+      const { base, discount: _d, extras: _x, deposit: _p, depositNote: _n, ...rest } = old || {}; // eslint-disable-line no-unused-vars
       const disc = discount?.value ? discount : null;
-      finance.dispatch({ type: 'PRICE', id, entry: { ...rest, roomId: f.roomId, platform: f.platform, guest: f.guest, start: f.start, end: f.end, amount: pay, ...(disc ? { base: price, discount: disc } : {}), source: 'manual', at: Date.now(), by: user?.name || '' } });
+      const ex = extras.filter((x) => x.name.trim() && x.price > 0).map((x) => ({ ...x, name: x.name.trim(), qty: x.qty || 1 }));
+      finance.dispatch({
+        type: 'PRICE', id,
+        entry: {
+          ...rest, roomId: f.roomId, platform: f.platform, guest: f.guest, start: f.start, end: f.end, amount: pay,
+          ...(disc ? { base: price, discount: disc } : {}), ...(ex.length ? { extras: ex } : {}),
+          ...(deposit > 0 ? { deposit, ...(method ? { depositNote: method } : {}) } : {}),
+          source: 'manual', at: Date.now(), by: user?.name || '',
+        },
+      });
     }
     toast('Đã lưu đặt phòng');
     onClose();
@@ -146,7 +182,8 @@ function ManualForm({ data, onClose }) {
           {!priceOk && <span className="field-error">Bắt buộc nhập giá phòng để tạo đặt phòng</span>}
         </Field>
         <Field label="Giảm giá (không bắt buộc)"><DiscountInput value={discount} onChange={setDiscount} /></Field>
-        {priceOk && <div className="pay-sum"><small>Khách trả{price !== pay ? ` · đã giảm ${fmtVND(price - pay)}` : ''}</small><b>{fmtVND(pay)}</b></div>}
+        {priceOk && price !== pay && <p className="tiny muted pay-note">Đã giảm {fmtVND(price - pay)} · tiền phòng còn {fmtVND(pay)}</p>}
+        <PaymentFields room={priceOk ? pay : 0} extras={extras} setExtras={setExtras} deposit={deposit} setDeposit={setDeposit} method={method} setMethod={setMethod} />
         </>
       )}
       <div className="grid2">

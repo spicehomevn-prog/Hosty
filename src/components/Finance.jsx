@@ -95,6 +95,7 @@ export default function Finance({ api }) {
           </div>
         ))}
         {platforms.length > 0 && <div className="fin-total"><span>Tổng doanh thu</span><b>{fmtVND(s.revenueTotal)}</b></div>}
+        {s.servicesTotal > 0 && <div className="fin-discount"><span>Trong đó dịch vụ cộng thêm</span><span>{fmtVND(s.servicesTotal)}</span></div>}
         {s.discountTotal > 0 && <div className="fin-discount"><span>Đã giảm giá cho khách (đã trừ trong doanh thu)</span><span>{fmtVND(s.discountTotal)}</span></div>}
       </div>
 
@@ -107,6 +108,27 @@ export default function Finance({ api }) {
         {!Object.keys(s.otherByGroup).length && <div className="cost-row"><span>Chi phí khác</span><b>{fmtVND(0)}</b></div>}
         <div className="fin-total"><span>Tổng chi phí</span><b>{fmtVND(s.cost)}</b></div>
       </div>
+
+      {s.dueList.length > 0 && (
+        <>
+          <div className="section-row">
+            <h2 className="section-title">Còn phải thu</h2>
+            <b className="due-total">{fmtVND(s.dueList.reduce((a, x) => a + x.due, 0))}</b>
+          </div>
+          <div className="fin-list">
+            {s.dueList.map(({ b, due, total, deposit }) => (
+              <button key={b.id} className="fin-row due-row" onClick={() => api.openBooking(b)}>
+                <span className="fin-bar" style={{ background: platformColor(b.platform) }} />
+                <span className="arr-main">
+                  <b>{idx[b.roomId]?.room.name || 'Phòng'}{b.summary ? ` · ${b.summary}` : ''}</b>
+                  <small>{dm(b.start)} → {dm(b.end)} · tổng {fmtVND(total)}{deposit ? ` · đã cọc ${fmtShort(deposit)}` : ''}</small>
+                </span>
+                <span className="fin-amt"><b className="due-amt">{fmtVND(due)}</b><small>còn thu</small></span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="section-row">
         <h2 className="section-title">Đặt phòng trong tháng</h2>
@@ -126,7 +148,7 @@ export default function Finance({ api }) {
               ? <em className="ftag warn">Chưa có giá</em>
               : (
                 <span className="fin-amt">
-                  <b>{fmtVND(amount)}{b.price.discountTotal > 0 && <em className="disc-tag">giảm</em>}</b>
+                  <b>{fmtVND(amount)}{b.price.discountTotal > 0 && <em className="disc-tag">giảm</em>}{b.price.due > 0 && <em className="disc-tag due">còn thu</em>}</b>
                   <small>{SOURCE_SHORT[b.price.source]}{b.price.estimated ? ' · ước tính' : ''}{fee ? ` · phí ${fmtShort(fee)}` : ''}</small>
                 </span>
               )}

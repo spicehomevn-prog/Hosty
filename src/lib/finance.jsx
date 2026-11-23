@@ -172,7 +172,10 @@ export function demoFinance(state) {
   for (let i = 7; i <= 13; i++) { const d = addDays(t, i); const w = new Date(`${d}T00:00:00`).getDay(); if (w !== 5 && w !== 6) promo[d] = 15; }
   fin.dayDiscount = { rA1: promo };
   // Đặt phòng trực tiếp mẫu
-  const manualPrice = { m1: { base: 3000000, discount: { type: 'pct', value: 5 }, amount: 2850000 }, m2: { amount: 1300000 } };
+  const manualPrice = {
+    m1: { base: 3000000, discount: { type: 'pct', value: 5 }, amount: 2850000, extras: [{ id: 'x1', name: 'Ăn sáng', price: 80000, qty: 6 }], deposit: 1000000, depositNote: 'Chuyển khoản', paidAt: Date.now() - 864e5 * 3 },
+    m2: { amount: 1300000, extras: [{ id: 'x2', name: 'Đưa đón sân bay', price: 250000, qty: 1 }], deposit: 500000, depositNote: 'Chuyển khoản' },
+  };
   for (const m of state.manual || []) if (manualPrice[m.id]) fin.prices[m.id] = { roomId: m.roomId, platform: m.platform, guest: m.guest, start: m.start, end: m.end, ...manualPrice[m.id], source: 'manual', at: Date.now() };
   // Đặt phòng Booking.com đã qua: nhập từ file báo cáo
   for (const id of ['c2', 'c5']) {

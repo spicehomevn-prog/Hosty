@@ -1,6 +1,7 @@
 // Tính toán tài chính (hàm thuần): giá đặt phòng, tổng hợp theo tháng
 import { addDays, diffDays, todayKey } from './dates.js';
 import { PLATFORMS } from './store.jsx';
+import { coveredByDirect } from './derive.js';
 
 export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'prices', 'expenses', 'history', 'roomMap'];
 export const DEFAULT_FEES = { Airbnb: 15, 'Booking.com': 15, Agoda: 18, Traveloka: 15, Expedia: 18, 'Trực tiếp': 0 };
@@ -48,6 +49,15 @@ export function stayPctFor(fin, roomId, nights) {
   return 0;
 }
 
+/* ---------- Thanh toán đặt phòng trực tiếp: dịch vụ cộng thêm, đặt cọc, còn phải thu ---------- */
+export const EXTRA_SUGGEST = [
+  { name: 'Ăn sáng', price: 80000 }, { name: 'Đưa đón sân bay', price: 250000 }, { name: 'Thuê xe máy', price: 150000 },
+  { name: 'Giặt ủi', price: 100000 }, { name: 'Nệm phụ', price: 150000 }, { name: 'Nhận sớm / trả muộn', price: 200000 },
+];
+export const extrasTotal = (e) => (e?.extras || []).reduce((a, x) => a + Math.round(Number(x.price) || 0) * Math.max(0, Number(x.qty) || 0), 0);
+export const bookingTotal = (e) => (Number(e?.amount) || 0) + extrasTotal(e);
+export const balanceDue = (e) => (e?.paidAt ? 0 : Math.max(0, bookingTotal(e) - (Number(e?.deposit) || 0)));
+
 /** Giảm giá cho riêng một đặt phòng: { type: 'pct'|'amount', value } -> giá sau giảm (không âm) */
 export function applyDiscount(base, discount) {
   const b = Number(base) || 0;
@@ -83,7 +93,11 @@ export function bookingPrice(b, fin) {
   if (e && e.amount != null) {
     const fee = feeOf(fin, e.platform || b.platform, e.amount, e.fee);
     const base = e.base != null ? Number(e.base) : e.amount;
-    return { amount: e.amount, base, discountTotal: Math.max(0, base - e.amount), fee, net: e.amount - fee, source: e.source || 'manual', entry: e, missing: false };
+    const extras = extrasTotal(e);
+    return {
+      amount: e.amount, base, discountTotal: Math.max(0, base - e.amount), fee, net: e.amount - fee + extras, source: e.source || 'manual', entry: e, missing: false,
+      extras, total: e.amount + extras, deposit: Number(e.deposit) || 0, due: b.source === 'manual' ? balanceDue(e) : 0, // chỉ khách trực tiếp mới thu tại chỗ
+    };
   }
   if (b.source === 'ical' && !b.blocked) {
     const est = rateEstimate(b, fin);
@@ -152,6 +166,8 @@ export function ledger(state, bookings, fin, today = todayKey()) {
     const calId = id.includes(':') && !id.startsWith('rep:') ? id.split(':')[0] : null;
     const manualGone = !calId && !id.startsWith('rep:'); // đặt phòng trực tiếp đã xoá
     if (manualGone) continue;
+    // bản sao lịch khoá của đặt phòng trực tiếp (sàn trả ngược về) đã lỡ chốt giá -> không tính
+    if (calId && e.source === 'rate' && coveredByDirect(e.start, e.end, (state.manual || []).filter((m) => m.roomId === e.roomId))) continue;
     const b = {
       id, roomId: e.roomId || '', platform: e.platform || 'Khác', start: e.start, end: e.end, summary: e.guest || '',
       source: id.startsWith('rep:') ? 'report' : 'ical', calendarId: calId, ledgerOnly: true, color: null,
@@ -186,7 +202,8 @@ export function expensesIn(fin, m) {
 /** Tổng hợp tháng m */
 export function monthSummary(items, fin, m) {
   const revenue = {}; const fees = {};
-  let discountTotal = 0;
+  let discountTotal = 0; let servicesTotal = 0;
+  const dueList = [];
   let nights = 0; let pricedNights = 0; let missing = 0;
   const rows = [];
   for (const b of items) {
@@ -197,8 +214,11 @@ export function monthSummary(items, fin, m) {
     nights += n;
     const p = b.price;
     if (p.amount == null) { missing += 1; rows.push({ b, n, share, amount: null, fee: null }); continue; }
-    const amount = Math.round(p.amount * share); const fee = Math.round(p.fee * share);
+    const ext = Math.round((p.extras || 0) * share);
+    const amount = Math.round(p.amount * share) + ext; const fee = Math.round(p.fee * share);
     discountTotal += Math.round((p.discountTotal || 0) * share);
+    servicesTotal += ext;
+    if (p.due > 0) dueList.push({ b, due: p.due, total: p.total, deposit: p.deposit });
     pricedNights += n;
     revenue[b.platform] = (revenue[b.platform] || 0) + amount;
     fees[b.platform] = (fees[b.platform] || 0) + fee;
@@ -230,8 +250,8 @@ export function monthSummary(items, fin, m) {
   rows.sort((a, b) => (a.b.start < b.b.start ? -1 : a.b.start > b.b.start ? 1 : 0));
   return {
     month: m, revenue: rev, fees: fee, revenueTotal, feeTotal, tax, salary, other, otherByGroup, cost,
-    profit: revenueTotal - cost, nights, adr: !fromHistory && pricedNights ? Math.round(revenueTotal / pricedNights) : null,
-    missing, rows, expenses: exp, fromHistory, history: hist || null, discountTotal: fromHistory ? 0 : discountTotal,
+    profit: revenueTotal - cost, nights, adr: !fromHistory && pricedNights ? Math.round((revenueTotal - servicesTotal) / pricedNights) : null,
+    missing, rows, expenses: exp, fromHistory, history: hist || null, discountTotal: fromHistory ? 0 : discountTotal, servicesTotal: fromHistory ? 0 : servicesTotal, dueList,
   };
 }
 
