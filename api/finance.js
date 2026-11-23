@@ -97,7 +97,9 @@ export default route(async (req, res) => {
     const user = await requireFinance(req, ws);
     if (q.get('action') !== 'ota') throw new HttpError(400, 'Thao tác không hợp lệ');
     const cur = await getJSON(finFile(ws));
-    const last = cur?.data?.data?.otaRun?.at || 0;
+    // chỉ giới hạn sau lần chạy thành công (lần lỗi không tốn tiền, cho thử lại ngay)
+    const lastRun = cur?.data?.data?.otaRun;
+    const last = lastRun?.ok ? lastRun.at || 0 : 0;
     if (Date.now() - last < OTA_EVERY) {
       throw new HttpError(429, `Vừa cập nhật giá lúc ${new Date(last + 7 * 3600e3).toISOString().slice(11, 16)}, thử lại sau ${Math.ceil((OTA_EVERY - (Date.now() - last)) / 60000)} phút`);
     }

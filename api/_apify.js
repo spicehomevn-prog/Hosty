@@ -12,7 +12,16 @@ export const COST_PER_LISTING = 0.1; // trần chi phí mỗi listing mỗi lầ
 
 export class OtaError extends Error {}
 
-export const apifyToken = () => envClean(process.env.APIFY_TOKEN);
+export const apifyToken = () => envClean(process.env.APIFY_TOKEN).replace(/^Bearer\s+/i, '');
+
+/** Tình trạng APIFY_TOKEN (không bao giờ trả giá trị) cho /api/health và thông báo lỗi */
+export function apifyTokenStatus() {
+  const t = apifyToken();
+  if (!t) return 'thiếu';
+  if (!/^[\x21-\x7E]+$/.test(t)) return 'có ký tự lạ (khoảng trắng, xuống dòng, dấu tiếng Việt…) – dán lại token trên Vercel';
+  if (!/^apify_api_/.test(t)) return 'không đúng dạng (token Apify bắt đầu bằng apify_api_)';
+  return 'ok';
+}
 
 /** Link / mã listing Airbnb -> mã số listing (hoặc null nếu là link rút gọn cần mở ra) */
 export function airbnbId(text) {
@@ -67,6 +76,8 @@ export function parseAirbnbCalendar(item) {
 export async function runAirbnbCalendars(listings, { now = new Date(), months = OTA_MONTHS } = {}) {
   const token = apifyToken();
   if (!token) throw new OtaError('Máy chủ chưa có biến APIFY_TOKEN (xem README)');
+  const st = apifyTokenStatus();
+  if (st !== 'ok') throw new OtaError(`APIFY_TOKEN ${st}`);
   if (!listings.length) return {};
   const vn = new Date(now.getTime() + 7 * 3600e3);
   const body = {
@@ -87,7 +98,11 @@ export async function runAirbnbCalendars(listings, { now = new Date(), months = 
       body: JSON.stringify(body),
     });
   } catch (e) {
-    throw new OtaError(e.name === 'AbortError' ? 'Apify chạy quá lâu, thử lại sau' : 'Không kết nối được Apify');
+    if (e.name === 'AbortError') throw new OtaError('Apify chạy quá lâu, thử lại sau');
+    // ghi kèm nguyên nhân kỹ thuật (không chứa token) để dễ tìm lỗi
+    const why = String(e.cause?.code || e.cause?.message || e.message || '').replace(/apify_api_\w+/g, '***').slice(0, 80);
+    console.error('apify fetch', why);
+    throw new OtaError(`Không kết nối được Apify${why ? ` (${why})` : ''}`);
   } finally { clearTimeout(t); }
   if (r.status === 401 || r.status === 403) throw new OtaError('APIFY_TOKEN không hợp lệ hoặc hết quyền');
   if (r.status === 402) throw new OtaError('Tài khoản Apify hết hạn mức / chưa thanh toán');
