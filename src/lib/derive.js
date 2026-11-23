@@ -11,26 +11,49 @@ export function roomIndex(state) {
 export const allRooms = (state, locationId) =>
   state.locations.filter((l) => !locationId || l.id === locationId).flatMap((l) => l.rooms.map((r) => ({ ...r, location: l })));
 
-/** Gộp tất cả đặt phòng từ iCal + nhập tay, loại trùng giữa các sàn */
+/** Sự kiện iCal có tiêu đề chung chung (không có tên khách) – kiểu lịch khoá các sàn trả ngược về */
+const GENERIC = /^\s*(closed\s*-\s*)?(airbnb\s*)?\(?(not available|unavailable|blocked|closed|không khả dụng)\)?(\s*\(hostexa\))?\s*$/i;
+
+/** Mọi đêm trong [start, end) đều nằm trong các đặt phòng trực tiếp `list` (cùng phòng) */
+export function coveredByDirect(start, end, list) {
+  if (!list?.length) return false;
+  for (let d = start; d < end; d = addDays(d, 1)) {
+    if (!list.some((m) => m.start <= d && m.end > d)) return false;
+  }
+  return true;
+}
+
+/**
+ * Gộp tất cả đặt phòng từ iCal + nhập tay, loại trùng giữa các sàn.
+ * Đặt phòng trực tiếp được Hostexa xuất lên các sàn; sàn chặn ngày rồi trả ngược về trong iCal của nó
+ * ("Airbnb (Not available)", Booking.com "CLOSED - Not available"). Những sự kiện đó nằm trọn trong
+ * đặt phòng trực tiếp của cùng phòng -> ẩn, để không hiện trùng và không tính 2 lần.
+ */
 export function getBookings(state) {
+  const manualByRoom = {};
+  for (const m of state.manual) (manualByRoom[m.roomId] ||= []).push(m);
   const raw = [];
   for (const cal of state.calendars) {
     for (const e of state.events[cal.id] || []) {
       const id = `${cal.id}:${e.uid || e.start}`;
       const ov = state.overrides[id] || {};
+      const blocked = ov.blocked ?? isBlockEvent(e.summary);
+      const echo = ov.blocked !== false && (blocked || GENERIC.test(e.summary || '')) && coveredByDirect(e.start, e.end, manualByRoom[cal.roomId]);
+      if (echo) continue;
       raw.push({
         id, roomId: cal.roomId, calendarId: cal.id, platform: cal.platform || 'Khác',
         start: e.start, end: e.end, summary: e.summary || '', description: e.description || '',
         checkIn: cal.checkIn || '14:00', checkOut: cal.checkOut || '12:00',
-        blocked: ov.blocked ?? isBlockEvent(e.summary), source: 'ical',
+        blocked, source: 'ical',
       });
     }
   }
   for (const m of state.manual) {
     raw.push({ ...m, summary: m.guest || 'Khách đặt trực tiếp', description: m.note || '', blocked: false, source: 'manual', platform: m.platform || 'Trực tiếp' });
   }
-  // loại trùng: cùng phòng + cùng ngày -> ưu tiên đặt phòng thật hơn lịch khoá
-  raw.sort((a, b) => Number(a.blocked) - Number(b.blocked));
+  // loại trùng: cùng phòng + cùng ngày -> ưu tiên đặt phòng thật hơn lịch khoá, đặt phòng trực tiếp hơn iCal
+  const rank = (b) => (b.blocked ? 2 : 0) + (b.source === 'manual' ? 0 : 1);
+  raw.sort((a, b) => rank(a) - rank(b));
   const seen = new Set();
   const out = [];
   for (const b of raw) {

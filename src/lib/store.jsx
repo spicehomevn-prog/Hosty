@@ -311,7 +311,7 @@ export function demoState() {
   const calendars = [
     cal('c1', 'rA1', 'Airbnb'), cal('c2', 'rA1', 'Booking.com'), cal('c3', 'rA2', 'Airbnb'),
     cal('c4', 'rA3', 'Agoda'), cal('c5', 'rB1', 'Booking.com'), cal('c6', 'rB2', 'Airbnb'),
-    cal('c7', 'rB3', 'Agoda'),
+    cal('c7', 'rB3', 'Agoda'), cal('c8', 'rB2', 'Booking.com'), cal('c9', 'rA4', 'Airbnb'),
   ];
   const ev = (s, e, summary, description = '') => ({ uid: uid(), start: r(s), end: r(e), summary, description });
   const events = {
@@ -322,6 +322,9 @@ export function demoState() {
     c5: [ev(-4, 1, 'CLOSED - Not available'), ev(1, 5, 'CLOSED - Not available'), ev(8, 10, 'CLOSED - Not available'), ev(18, 21, 'CLOSED - Not available')],
     c6: [ev(0, 2, 'Reserved'), ev(4, 9, 'Reserved'), ev(13, 17, 'Reserved')],
     c7: [ev(-2, 0, 'Agoda Booking'), ev(3, 5, 'Agoda Booking'), ev(12, 14, 'Agoda Booking')],
+    // lịch khoá do Hostexa xuất đặt phòng trực tiếp lên sàn, sàn trả ngược về -> app tự ẩn (trùng m1, m2)
+    c8: [ev(-3, 0, 'CLOSED - Not available'), ev(9, 11, 'CLOSED - Not available')],
+    c9: [ev(2, 4, 'Airbnb (Not available)'), ev(8, 10, 'Reserved')],
   };
   const syncInfo = Object.fromEntries(calendars.map((c) => [c.id, { at: Date.now(), ok: true, count: events[c.id].length }]));
   return {
