@@ -1,6 +1,6 @@
 // Tính toán tài chính (hàm thuần): giá đặt phòng, tổng hợp theo tháng
 import { addDays, diffDays, todayKey } from './dates.js';
-import { PLATFORMS } from './store.jsx';
+import { PLATFORMS } from './platforms.js';
 import { coveredByDirect } from './derive.js';
 
 export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap'];

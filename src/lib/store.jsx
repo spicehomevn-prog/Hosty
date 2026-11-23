@@ -8,21 +8,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 const CLOUD_EVERY = 15 * 60 * 1000; // tự đồng bộ mỗi 15 phút
 const EDIT_DEBOUNCE = 20 * 1000; // và 20 giây sau lần sửa cuối
 
-export const PLATFORMS = [
-  { name: 'Airbnb', color: '#EF4F7A' },
-  { name: 'Booking.com', color: '#3D7CF5' },
-  { name: 'Agoda', color: '#9A6BFF' },
-  { name: 'Traveloka', color: '#1FA7D8' },
-  { name: 'Expedia', color: '#22A779' },
-  { name: 'Trực tiếp', color: '#F0A132' },
-];
-const EXTRA = ['#E86A4A', '#6C7BEA', '#C25BC9', '#3AA6A0', '#B98A2E'];
-export function platformColor(name = '') {
-  const p = PLATFORMS.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
-  if (p) return p.color;
-  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return EXTRA[h % EXTRA.length];
-}
+export { PLATFORMS, platformColor } from './platforms.js';
 
 export const LOCATION_EMOJI = ['🏡', '🌿', '🏝️', '🏙️', '⛰️', '🌸', '🏖️', '🌙'];
 

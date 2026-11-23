@@ -1,5 +1,5 @@
 import { isBlockEvent } from './ical.js';
-import { platformColor } from './store.jsx';
+import { platformColor } from './platforms.js';
 import { dm, longDate, wdLong, addDays } from './dates.js';
 
 export function roomIndex(state) {
