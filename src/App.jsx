@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, Loader2, CloudOff, LogOut, RefreshCw, Revenue, Payments } from './lib/icons.jsx';
+import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, CloudOff, LogOut, RefreshCw, Revenue, Payments } from './lib/icons.jsx';
 import { useFlipNav } from './lib/motion.js';
 import { StoreProvider, useStore, demoState } from './lib/store.jsx';
 import { useSession } from './lib/session.jsx';
@@ -19,6 +19,10 @@ import { TaskSheet } from './components/TaskSheet.jsx';
 import { ExpenseSheet } from './components/FinanceSheets.jsx';
 import { Sheet, Toaster } from './components/ui.jsx';
 import { LogoMark } from './components/Logo.jsx';
+import { Intro, LoadingRing } from './components/Intro.jsx';
+
+// màn chào chỉ chạy 1 lần mỗi lần mở app (không chạy lại khi đăng nhập / đổi cơ sở)
+let introPlayed = false;
 
 const TABS = [
   { id: 'home', label: 'Tổng quan', icon: LayoutGrid },
@@ -30,6 +34,8 @@ const TABS = [
 
 export default function App() {
   const s = useSession();
+  const [intro, setIntro] = useState(() => !introPlayed);
+  useEffect(() => { introPlayed = true; }, []);
   const scope = useMemo(() => {
     if (s.session?.demo) return { cacheKey: 'hosty:demo', cloud: null, initial: demoState };
     if (s.token && s.workspace) {
@@ -51,14 +57,14 @@ export default function App() {
       </StoreProvider>
     );
   }
-  return <>{body}<Toaster /></>;
+  return <>{body}<Toaster />{intro && <Intro name={s.session?.demo ? '' : s.user?.name} onDone={() => setIntro(false)} />}</>;
 }
 
 function Splash({ cloud, onLogout }) {
   const failed = cloud.status === 'offline' || cloud.status === 'error';
   return (
-    <div className="splash">
-      <LogoMark size={72} animated />
+    <div className="splash loading">
+      <span className="splash-logo"><LogoMark size={72} animated /></span>
       {failed ? (
         <>
           <p className="splash-msg"><CloudOff size={18} /> {cloud.error || 'Không tải được dữ liệu'}</p>
@@ -68,7 +74,7 @@ function Splash({ cloud, onLogout }) {
           </div>
         </>
       ) : (
-        <p className="splash-msg"><Loader2 size={18} className="spin" /> Đang tải dữ liệu cơ sở…</p>
+        <LoadingRing />
       )}
     </div>
   );
