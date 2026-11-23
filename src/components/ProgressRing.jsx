@@ -17,7 +17,7 @@ function whenUncovered(fn) {
  * `done`: vòng đầy + dấu ✓ vẽ dần + vòng sáng lan ra + chấm bắn ra (mỗi lần chuyển sang hoàn thành).
  * Animation chỉ bắt đầu khi không còn sheet nào che. `onShown(done)` báo khi trạng thái đã hiện ra.
  */
-export function ProgressRing({ pct, done, size = 56, stroke = 6, onShown }) {
+export function ProgressRing({ pct, done, size = 56, stroke = 6, onShown, className = '', empty = false }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const target = done ? 100 : Math.max(0, Math.min(100, pct));
@@ -40,7 +40,7 @@ export function ProgressRing({ pct, done, size = 56, stroke = 6, onShown }) {
   const half = size / 2;
   const dots = Array.from({ length: 8 }, (_, i) => i * 45);
   return (
-    <span className={`pring ${doneShown ? 'done' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
+    <span className={`pring ${className} ${doneShown ? 'done' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle className="pring-bg" cx={half} cy={half} r={r} strokeWidth={stroke} fill="none" />
         <circle
@@ -52,7 +52,7 @@ export function ProgressRing({ pct, done, size = 56, stroke = 6, onShown }) {
             fill="none" strokeWidth={stroke - 1.5} strokeLinecap="round" strokeLinejoin="round" pathLength="1" />
         )}
       </svg>
-      {!doneShown && <span className="pring-num">{num}<small>%</small></span>}
+      {!doneShown && <span className="pring-num">{empty ? '—' : <>{num}<small>%</small></>}</span>}
       {doneShown && burst > 0 && (
         <span key={`b${burst}`} className="pring-burst">
           <span className="pring-wave" />

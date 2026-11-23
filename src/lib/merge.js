@@ -2,9 +2,9 @@
 // Chỗ nào máy này đã sửa so với base thì giữ bản máy này, còn lại lấy bản máy chủ.
 // Mảng phần tử có id gộp theo từng phần tử, object gộp theo từng khoá.
 
-export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'setupDone'];
+export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'setupDone'];
 const DEFAULTS = {
-  property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, setupDone: false,
+  property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, cleanAdj: {}, cleanExtra: [], setupDone: false,
 };
 /** Lấy phần dữ liệu được đồng bộ; khoá thiếu / null lấy giá trị mặc định để so sánh nhất quán */
 export const pickSync = (s) => Object.fromEntries(SYNC_KEYS.map((k) => [k, s?.[k] ?? DEFAULTS[k]]));

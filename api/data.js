@@ -6,7 +6,9 @@ import { getJSON, putJSON, ConflictError } from './_store.js';
 import { requireUser, canAccess, loadWorkspaces, wsFile, signFeed } from './_auth.js';
 import { siteUrl } from '../site.config.js';
 
-export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'setupDone'];
+export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'setupDone'];
+// giá trị mặc định khi khoá chưa có (dữ liệu cũ) – để so sánh "chưa có" với "rỗng" là như nhau
+const DEFAULTS = { property: { name: '' }, locations: [], calendars: [], manual: [], overrides: {}, notes: {}, tasks: [], cleanDone: {}, cleanAdj: {}, cleanExtra: [], setupDone: false };
 const TASK_TICK_FIELDS = new Set(['done', 'doneAt', 'doneBy', 'doneByName']);
 
 const pick = (d) => Object.fromEntries(SYNC_KEYS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
@@ -28,7 +30,7 @@ function deepEqual(a, b) {
 function checkMemberChange(prev, next, user) {
   for (const k of SYNC_KEYS) {
     if (k === 'cleanDone' || k === 'tasks') continue;
-    if (!deepEqual(prev[k], next[k])) throw new HttpError(403, 'Tài khoản dọn phòng không được sửa mục này');
+    if (!deepEqual(prev[k] ?? DEFAULTS[k], next[k] ?? DEFAULTS[k])) throw new HttpError(403, 'Tài khoản dọn phòng không được sửa mục này');
   }
   const before = new Map((prev.tasks || []).map((t) => [t.id, t]));
   const after = next.tasks || [];
@@ -92,8 +94,8 @@ export default route(async (req, res) => {
     if (!body.data || typeof body.data !== 'object' || !Array.isArray(body.data.locations)) {
       throw new HttpError(400, 'Dữ liệu không hợp lệ');
     }
-    const data = pick(body.data);
-    if (JSON.stringify(data).length > MAX_BYTES) throw new HttpError(413, 'Dữ liệu quá lớn');
+    const incoming = pick(body.data);
+    if (JSON.stringify(incoming).length > MAX_BYTES) throw new HttpError(413, 'Dữ liệu quá lớn');
 
     const cur = await getJSON(wsFile(ws));
     const curVersion = cur ? cur.data.version : 0;
@@ -101,6 +103,8 @@ export default route(async (req, res) => {
       version: curVersion, updatedAt: cur?.data.updatedAt || 0, updatedBy: cur?.data.updatedBy || '', data: cur?.data.data || null,
     });
     if (Number(body.baseVersion || 0) !== curVersion) throw conflict();
+    // máy chạy bản app cũ không gửi các khoá mới -> giữ nguyên giá trị đang có trên máy chủ
+    const data = { ...pick(cur?.data?.data || {}), ...incoming };
 
     if (user.role === 'member') {
       if (!cur) throw new HttpError(403, 'Cơ sở chưa được admin thiết lập');

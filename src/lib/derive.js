@@ -65,33 +65,55 @@ export function getBookings(state) {
   return out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
 }
 
-/** Thẻ dọn phòng: mỗi lượt khách trả phòng (không phải lịch khoá) trong khoảng [from, to] */
+/**
+ * Thẻ dọn phòng trong khoảng [from, to]:
+ * - mỗi lượt khách trả phòng (không phải lịch khoá) -> một thẻ, ngày = ngày trả phòng;
+ * - admin có thể xoá thẻ (cleanAdj[id].hide) hoặc dời ngày (cleanAdj[id].date);
+ * - thẻ admin thêm tay (cleanExtra).
+ */
 export function getCleanings(state, bookings, from, to, locationId) {
   const idx = roomIndex(state);
   const real = bookings.filter((b) => !b.blocked && idx[b.roomId]);
+  const adj = state.cleanAdj || {};
+  const nextAfter = (roomId, day, exceptId) => real
+    .filter((n) => n.roomId === roomId && n.start >= day && n.id !== exceptId)
+    .sort((x, y) => (x.start < y.start ? -1 : 1))[0] || null;
+  const doneOf = (id) => ({ done: !!state.cleanDone[id], doneInfo: typeof state.cleanDone[id] === 'object' ? state.cleanDone[id] : null });
   const map = {};
   for (const b of real) {
-    if (b.end < from || b.end > to) continue;
-    const loc = idx[b.roomId].location;
-    if (locationId && loc.id !== locationId) continue;
     const id = `${b.end}|${b.roomId}`;
     if (map[id]) continue;
-    const next = real
-      .filter((n) => n.roomId === b.roomId && n.start >= b.end && n.id !== b.id)
-      .sort((x, y) => (x.start < y.start ? -1 : 1))[0];
-    const sameDay = next && next.start === b.end;
+    const a = adj[id];
+    if (a?.hide) continue;
+    const date = a?.date || b.end;
+    if (date < from || date > to) continue;
+    const loc = idx[b.roomId].location;
+    if (locationId && loc.id !== locationId) continue;
+    const next = nextAfter(b.roomId, b.end, b.id);
+    const sameDay = next && next.start === date;
     map[id] = {
-      id, date: b.end, roomId: b.roomId, room: idx[b.roomId].room, location: loc,
+      id, date, origDate: b.end, moved: !!a?.date && a.date !== b.end, roomId: b.roomId, room: idx[b.roomId].room, location: loc,
       outTime: b.checkOut, outPlatform: b.platform, outBooking: b,
-      next: next || null, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null,
-      done: !!state.cleanDone[id],
-      doneInfo: typeof state.cleanDone[id] === 'object' ? state.cleanDone[id] : null,
+      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(id),
     };
   }
+  for (const x of state.cleanExtra || []) {
+    if (!idx[x.roomId] || x.date < from || x.date > to) continue;
+    const loc = idx[x.roomId].location;
+    if (locationId && loc.id !== locationId) continue;
+    const next = nextAfter(x.roomId, x.date);
+    const sameDay = next && next.start === x.date;
+    map[x.id] = {
+      id: x.id, date: x.date, roomId: x.roomId, room: idx[x.roomId].room, location: loc, custom: true, note: x.note || '',
+      outTime: x.time || '', outPlatform: 'Thêm tay', outBooking: null,
+      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(x.id),
+    };
+  }
+  const t = (c) => c.outTime || '99:99';
   return Object.values(map).sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1)
       : a.sameDay !== b.sameDay ? (a.sameDay ? -1 : 1)
-        : a.outTime.localeCompare(b.outTime),
+        : t(a).localeCompare(t(b)),
   );
 }
 
@@ -126,7 +148,9 @@ export function cleaningText(state, cards, { title, notes = {} } = {}) {
         const st = c.sameDay
           ? `⚠️ GẤP – khách mới nhận ${c.inTime}`
           : c.next ? `khách tiếp theo ${dm(c.next.start)}` : 'chưa có khách tiếp theo';
-        lines.push(`${c.done ? '✅' : '▫️'} ${c.room.name}: khách trả ${c.outTime} → ${st}`);
+        lines.push(c.custom
+          ? `${c.done ? '✅' : '▫️'} ${c.room.name}: dọn${c.outTime ? ` lúc ${c.outTime}` : ''}${c.note ? ` – ${c.note}` : ''} → ${st}`
+          : `${c.done ? '✅' : '▫️'} ${c.room.name}: khách trả ${c.outTime} → ${st}`);
       }
     }
     if (notes[date]) lines.push(`📝 Ghi chú: ${notes[date].trim()}`);

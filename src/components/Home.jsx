@@ -10,7 +10,7 @@ import { SyncStatus } from './Account.jsx';
 import { useSession } from '../lib/session.jsx';
 import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { ArrowLeftRight } from '../lib/icons.jsx';
-import { CleaningCard } from './CleaningPanel.jsx';
+import { CleaningList } from './CleaningPanel.jsx';
 import OccupancySheet from './OccupancySheet.jsx';
 import { ChevronRight, Revenue, Payments } from '../lib/icons.jsx';
 import { useFinance } from '../lib/finance.jsx';
@@ -108,10 +108,8 @@ export default function Home({ api }) {
         <h2 className="section-title">Dọn phòng hôm nay</h2>
         <button className="link" onClick={() => api.openDay(today)}>Xem lịch</button>
       </div>
-      <div className="clean-list stagger" style={{ '--i': 6 }}>
-        {cleanings.length === 0
-          ? <div className="empty-card"><Sparkles size={20} /><p>Hôm nay không có phòng nào cần dọn.</p></div>
-          : cleanings.map((c) => <CleaningCard key={c.id} c={c} />)}
+      <div className="clean-list rise" style={{ "--i": 6 }}>
+        <CleaningList cards={cleanings} addDate={today} emptyText="Hôm nay không có phòng nào cần dọn." />
       </div>
 
       {todayTasks.length > 0 && (

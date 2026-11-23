@@ -48,6 +48,7 @@ const EXTRA = {
   check: { b: 'M5 12.5 L10 17.5 L19 7' },
   chevronLeft: { b: 'M15 5 L8 12 L15 19' },
   chevronRight: { b: 'M9 5 L16 12 L9 19' },
+  chevronDown: { b: 'M5 9 L12 16 L19 9' },
   arrowLeft: { b: 'M19 12 H5', a: 'M11 6 L5 12 L11 18' },
   arrowRight: { b: 'M5 12 H19', a: 'M13 6 L19 12 L13 18' },
   swap: { b: 'M4 8 H20 M16 4 L20 8 L16 12', a: 'M20 16 H4 M8 12 L4 16 L8 20' },
@@ -136,6 +137,7 @@ export const AlertCircle = make('alertCircle');
 export const AlertTriangle = make('alertTriangle');
 export const ChevronLeft = make('chevronLeft');
 export const ChevronRight = make('chevronRight');
+export const ChevronDown = make('chevronDown');
 export const ArrowLeft = make('arrowLeft');
 export const ArrowRight = make('arrowRight');
 export const ArrowLeftRight = make('swap');

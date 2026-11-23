@@ -5,7 +5,7 @@ import { useMembers } from '../lib/members.js';
 import { useStore } from '../lib/store.jsx';
 import { getBookings, getCleanings, roomIndex } from '../lib/derive.js';
 import { todayKey, startOfWeek, addDays, dm } from '../lib/dates.js';
-import { Progress } from './ui.jsx';
+import { ProgressRing } from './ProgressRing.jsx';
 import { PRIORITIES } from './TaskSheet.jsx';
 
 const FILTERS = [
@@ -51,14 +51,7 @@ export default function Tasks({ api }) {
 
       <h2 className="section-title">Tiến độ</h2>
       <div className="active-cards scroll-x stagger">
-        {summary.map((s) => (
-          <div key={s.title} className={`active-card tone-${s.tone}`}>
-            <s.icon size={18} />
-            <b>{s.title}</b>
-            <div className="ac-foot"><span>{s.list.filter((x) => x.done).length}/{s.list.length}</span><span>{ratio(s.list)}%</span></div>
-            <Progress value={ratio(s.list)} />
-          </div>
-        ))}
+        {summary.map((s) => <ProgressTile key={s.title} s={s} pct={ratio(s.list)} />)}
       </div>
 
       <div className="chips scroll-x">
@@ -91,6 +84,27 @@ export default function Tasks({ api }) {
         })}
       </div>
       {canEdit && <button className="fab" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={24} /></button>}
+    </div>
+  );
+}
+
+/** Ô vuông tiến độ: vòng tròn chạy lên khi xuất hiện, hoàn thành thì vòng đầy + dấu ✓ + hiệu ứng */
+function ProgressTile({ s, pct }) {
+  const [doneVis, setDoneVis] = useState(false);
+  const n = s.list.length;
+  const ok = s.list.filter((x) => x.done).length;
+  const done = n > 0 && ok === n;
+  return (
+    <div className={`active-card ring-card tone-${s.tone} ${doneVis ? 'done' : ''}`}>
+      <div className="ac-top">
+        <s.icon size={18} />
+        <ProgressRing pct={pct} done={done} empty={!n} size={58} stroke={6} className="ink" onShown={setDoneVis} />
+      </div>
+      <b>{s.title}</b>
+      <div className="ac-foot">
+        <span>{n ? `${ok}/${n} xong` : 'Không có việc'}</span>
+        {done && <span className="ac-done">Hoàn thành</span>}
+      </div>
     </div>
   );
 }

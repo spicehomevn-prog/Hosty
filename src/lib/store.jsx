@@ -40,6 +40,8 @@ export const emptyState = () => ({
   notes: {},
   tasks: [],
   cleanDone: {},
+  cleanAdj: {}, // { [mã thẻ]: { hide: true } | { date: 'YYYY-MM-DD' } } – admin xoá / dời ngày thẻ dọn phòng
+  cleanExtra: [], // [{ id, roomId, date, time, note }] – thẻ dọn phòng admin thêm tay
   settings: { font: 'Be Vietnam Pro', calView: 'month' },
 });
 
@@ -98,6 +100,20 @@ function reducer(state, a) {
       if (cleanDone[a.id]) delete cleanDone[a.id];
       else cleanDone[a.id] = { at: Date.now(), by: a.by || '', byName: a.byName || '' };
       return { ...state, cleanDone };
+    }
+    case 'CLEAN_ADJ': {
+      const cleanAdj = { ...(state.cleanAdj || {}) };
+      if (a.patch) cleanAdj[a.id] = a.patch; else delete cleanAdj[a.id];
+      return { ...state, cleanAdj };
+    }
+    case 'SAVE_CLEAN_EXTRA': {
+      const list = state.cleanExtra || [];
+      const exists = list.some((x) => x.id === a.card.id);
+      return { ...state, cleanExtra: exists ? list.map((x) => (x.id === a.card.id ? a.card : x)) : [...list, a.card] };
+    }
+    case 'DELETE_CLEAN_EXTRA': {
+      const cleanDone = { ...state.cleanDone }; delete cleanDone[a.id];
+      return { ...state, cleanExtra: (state.cleanExtra || []).filter((x) => x.id !== a.id), cleanDone };
     }
     case 'SAVE_TASK': {
       const exists = state.tasks.some((t) => t.id === a.task.id);
