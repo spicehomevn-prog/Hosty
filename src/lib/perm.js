@@ -3,6 +3,7 @@
 // admin  : admin cơ sở — toàn quyền trên dữ liệu cơ sở
 // member : chỉ dọn phòng — xem, tick dọn phòng, tick task được giao, copy thẻ
 // demo   : chế độ xem thử trên máy (không đồng bộ)
+// Tài chính (can(role, 'finance')): chỉ owner, admin (và xem thử). Máy chủ cũng chặn member ở /api/finance.
 const MEMBER = new Set(['view', 'clean.tick', 'task.tick']);
 
 export function can(role, action) {

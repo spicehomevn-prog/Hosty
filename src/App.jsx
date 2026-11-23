@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, Loader2, CloudOff, LogOut, RefreshCw } from './lib/icons.jsx';
+import { Plus, LayoutGrid, CalendarDays, ListChecks, Building2, BedDouble, ClipboardPlus, NotebookPen, Loader2, CloudOff, LogOut, RefreshCw, Revenue } from './lib/icons.jsx';
 import { useFlipNav } from './lib/motion.js';
 import { StoreProvider, useStore, demoState } from './lib/store.jsx';
 import { useSession } from './lib/session.jsx';
+import { FinanceProvider } from './lib/finance.jsx';
 import { can } from './lib/perm.js';
 import { todayKey } from './lib/dates.js';
 import Login from './components/Login.jsx';
@@ -12,6 +13,7 @@ import Home from './components/Home.jsx';
 import CalendarView from './components/CalendarView.jsx';
 import Tasks from './components/Tasks.jsx';
 import Places from './components/Places.jsx';
+import Finance from './components/Finance.jsx';
 import { BookingSheet } from './components/BookingSheet.jsx';
 import { TaskSheet } from './components/TaskSheet.jsx';
 import { Sheet, Toaster } from './components/ui.jsx';
@@ -21,6 +23,7 @@ const TABS = [
   { id: 'home', label: 'Tổng quan', icon: LayoutGrid },
   { id: 'calendar', label: 'Lịch', icon: CalendarDays },
   { id: 'tasks', label: 'Task', icon: ListChecks },
+  { id: 'finance', label: 'Tài chính', icon: Revenue, perm: 'finance' },
   { id: 'places', label: 'Cơ sở', icon: Building2 },
 ];
 
@@ -41,7 +44,9 @@ export default function App() {
     const user = s.session.demo ? { id: 'demo', name: 'Khách xem thử' } : s.user;
     body = (
       <StoreProvider key={scope.cacheKey} scope={scope} role={s.role} user={user}>
-        <Workspace />
+        <FinanceProvider enabled={can(s.role, 'finance')} cloud={scope.cloud}>
+          <Workspace />
+        </FinanceProvider>
       </StoreProvider>
     );
   }
@@ -136,10 +141,11 @@ function Workspace() {
         {tab === 'home' && <Home api={api} />}
         {tab === 'calendar' && <CalendarView api={api} focus={calFocus} />}
         {tab === 'tasks' && <Tasks api={api} />}
+        {tab === 'finance' && can(role, 'finance') && <Finance api={api} />}
         {tab === 'places' && <Places api={api} />}
       </main>
 
-      <nav className="bottom-nav" aria-label="Điều hướng" ref={navRef}>
+      <nav className={`bottom-nav ${can(role, 'finance') ? 'crowded' : ''}`} aria-label="Điều hướng" ref={navRef}>
         {blob && (
           <span
             className={`nav-blob ${blob.animate ? (blob.dir > 0 ? 'to-right' : 'to-left') : ''}`}
@@ -148,7 +154,7 @@ function Workspace() {
           />
         )}
         {canCreate && <button className="nav-plus" data-flip="plus" onClick={() => setCreateOpen(true)} aria-label="Tạo mới"><Plus size={22} /></button>}
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {TABS.filter((t) => !t.perm || can(role, t.perm)).map(({ id, label, icon: Icon }) => (
           <button key={id} data-flip={id} className={`nav-item ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)} aria-label={label} aria-current={tab === id ? 'page' : undefined}>
             <span className="nav-ico"><Icon size={19} /></span>
             {tab === id && <span className="nav-label">{label}</span>}

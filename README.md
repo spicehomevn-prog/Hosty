@@ -13,6 +13,11 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
 - **Thiết lập cơ sở** (admin): tên cơ sở → số địa điểm → địa chỉ + số phòng + tên phòng → link iCal của từng sàn cho từng phòng, giờ nhận/trả phòng riêng cho từng lịch.
 - **Đồng bộ ngược lên sàn**: Cơ sở → *Lấy link xuất lịch*. Mỗi phòng có link iCal riêng cho từng sàn (vd. "Dán vào Airbnb") gồm khách đặt trực tiếp + khách từ các sàn khác, đã loại khách của chính sàn đó để không chặn vòng. Dán vào mục *Nhập lịch* của sàn để sàn tự chặn ngày. Link có chữ ký bảo mật, không chứa tên/SĐT khách; đổi `AUTH_SECRET` sẽ vô hiệu mọi link cũ.
 - **Lịch đặt phòng** theo Tuần / Tháng, **thẻ dọn phòng** theo tuần/tháng hoặc từng ngày, ghi rõ ai đã dọn lúc mấy giờ, **copy thẻ** gửi Zalo, **ghi chú ngày**, **task** (giao cho từng nhân viên), đặt phòng thủ công.
+- **Tài chính** (chỉ chủ hệ thống & admin cơ sở; tài khoản dọn phòng không thấy và máy chủ cũng từ chối): doanh thu theo sàn, chi phí (phí sàn, thuế % trên doanh thu, lương nhân viên, chi phí khác – khoản lặp lại hằng tháng tự cộng), lợi nhuận, giá TB/đêm, biểu đồ 6 tháng. Doanh thu chia theo đêm ở.
+  - Đặt phòng trực tiếp: **bắt buộc nhập giá** khi tạo.
+  - Đặt phòng từ sàn (iCal không có giá): **Bảng giá** – chọn các ngày trên lịch và áp chung một giá một đêm cho phòng; giá đặt phòng = tổng giá các đêm. Số thực tế lấy từ **file báo cáo** của sàn, hoặc nhập tay từng đặt phòng. Ưu tiên: nhập tay > file báo cáo > bảng giá.
+  - **Giảm giá**: theo số đêm ở (từ 7 / 28 đêm, chung hoặc riêng từng phòng), theo ngày trên Bảng giá (%), và cho từng đặt phòng (% hoặc số tiền). Doanh thu và phí sàn tính trên giá sau giảm.
+  - Tháng trước khi dùng app: nhập tay **số tổng** của tháng, hoặc **tải file báo cáo** xuất từ Airbnb / Booking.com / Agoda (CSV, XLSX) – app tự nhận cột, ghép phòng, bỏ dòng đã huỷ.
 - Font: **Cal Sans** cho tiêu đề & heading, **Afacad Flux** cho chữ nội dung (Google Fonts, hỗ trợ tiếng Việt).
 
 ## Tên miền
@@ -64,6 +69,7 @@ npx vercel --prod
 - `api/data.js` – đọc/ghi dữ liệu cơ sở (ghi có điều kiện theo phiên bản, kiểm tra quyền member phía server).
 - `api/admin.js` – quản lý cơ sở & tài khoản (chỉ chủ hệ thống).
 - `api/ical-out.js` – lịch iCal xuất cho các sàn, truy cập qua `/cal/<mã>.ics`.
+- `api/finance.js` – dữ liệu tài chính (chỉ owner/admin): bảng giá, giá đặt phòng, khoản chi, số tổng tháng cũ. Lưu riêng ở `fin/<cơ sở>.json`, không nằm trong dữ liệu mà member tải về.
 - `api/health.js` – kiểm tra cấu hình máy chủ (chỉ báo có/thiếu).
 
 ## Nhận diện

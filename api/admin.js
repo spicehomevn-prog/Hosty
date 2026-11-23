@@ -89,6 +89,7 @@ export default route(async (req, res) => {
       await updateJSON(WORKSPACES, (d) => ({ ...d, workspaces: d.workspaces.filter((w) => w.id !== b.id) }), { workspaces: [] });
       await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.filter((a) => a.ws !== b.id) }), { accounts: [] });
       await delJSON(wsFile(b.id));
+      await delJSON(`fin/${b.id}.json`);
       return send(res, 200, { ok: true });
     }
     case 'add-account': {

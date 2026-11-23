@@ -12,7 +12,10 @@ import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { ArrowLeftRight } from '../lib/icons.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
 import OccupancySheet from './OccupancySheet.jsx';
-import { ChevronRight } from '../lib/icons.jsx';
+import { ChevronRight, Revenue } from '../lib/icons.jsx';
+import { useFinance } from '../lib/finance.jsx';
+import { ledger, monthSummary } from '../lib/fin.js';
+import { fmtShort } from '../lib/money.js';
 
 export default function Home({ api }) {
   const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
@@ -79,6 +82,7 @@ export default function Home({ api }) {
           <ChevronRight size={18} className="occ-chev" />
         </div>
       </button>
+      <RevenueCard state={state} bookings={bookings} onOpen={() => api.goto('finance')} />
       <OccupancySheet open={occOpen} onClose={() => setOccOpen(false)} day={today} bookings={bookings} api={api} />
 
       {failed.length > 0 && (
@@ -140,5 +144,26 @@ export default function Home({ api }) {
       </div>
       <p className="tiny muted center">Lịch iCal tải lần cuối: {timeAgo(state.lastSync)}</p>
     </div>
+  );
+}
+
+/** Owner / admin: doanh thu & lợi nhuận tháng này */
+function RevenueCard({ state, bookings, onOpen }) {
+  const finance = useFinance();
+  const m = todayKey().slice(0, 7);
+  const s = useMemo(() => (finance ? monthSummary(ledger(state, bookings, finance.fin).items, finance.fin, m) : null), [finance, state, bookings, m]);
+  if (!s) return null;
+  return (
+    <button className="occ-card rev-card rise" style={{ '--i': 4 }} onClick={onOpen}>
+      <span className="rev-ico"><Revenue size={20} /></span>
+      <div>
+        <b>Doanh thu tháng này</b>
+        <span className="muted">Lợi nhuận {fmtShort(s.profit)}{s.missing ? ` · ${s.missing} đặt phòng chưa có giá` : ''}</span>
+      </div>
+      <div className="occ-right rev-right">
+        <b>{fmtShort(s.revenueTotal)}</b>
+        <ChevronRight size={18} className="occ-chev" />
+      </div>
+    </button>
   );
 }

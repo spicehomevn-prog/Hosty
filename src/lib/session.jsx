@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 const KEY = 'hosty:session';
 const DATA_PREFIX = 'hosty:data:';
+const FIN_PREFIX = 'hosty:fin:';
 
 function loadSession() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; }
@@ -11,7 +12,7 @@ function saveSession(s) {
 }
 function clearCaches() {
   try {
-    Object.keys(localStorage).filter((k) => k.startsWith(DATA_PREFIX) || k === 'hosty:demo').forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => k.startsWith(DATA_PREFIX) || k.startsWith(FIN_PREFIX) || k === 'hosty:demo').forEach((k) => localStorage.removeItem(k));
   } catch { /* noop */ }
 }
 

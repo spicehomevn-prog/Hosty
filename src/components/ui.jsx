@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { X, Minus, Plus } from '../lib/icons.jsx';
+import { parseVND, groupDigits } from '../lib/money.js';
 
 export function Sheet({ open, onClose, title, children, footer }) {
   const [closing, setClosing] = useState(false);
@@ -77,4 +78,50 @@ export function Progress({ value }) {
 export function Avatar({ name }) {
   const initials = (name || 'L').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   return <div className="avatar">{initials}</div>;
+}
+
+/** Ô nhập tiền VND: gõ số, tự thêm dấu chấm; value là số (hoặc null) */
+export function MoneyInput({ value, onChange, placeholder = '0', invalid, autoFocus, id }) {
+  const [text, setText] = useState(value == null ? '' : groupDigits(value));
+  useEffect(() => {
+    if (parseVND(text) !== (value ?? null)) setText(value == null ? '' : groupDigits(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className={`money-input ${invalid ? 'invalid' : ''}`}>
+      <input
+        id={id} className="input" inputMode="numeric" autoComplete="off" placeholder={placeholder} value={text} autoFocus={autoFocus}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const n = parseVND(raw);
+          setText(/[a-zà-ỹ]/i.test(raw) ? raw : (n == null ? '' : groupDigits(n)));
+          onChange(n);
+        }}
+        onBlur={() => setText(value == null ? '' : groupDigits(value))}
+      />
+      <span className="money-unit">₫</span>
+    </div>
+  );
+}
+
+/** Giảm giá cho một đặt phòng: % hoặc số tiền. value = { type: 'pct'|'amount', value } | null */
+export function DiscountInput({ value, onChange }) {
+  const type = value?.type || 'pct';
+  const set = (patch) => onChange({ type, value: value?.value ?? null, ...patch });
+  return (
+    <div className="discount-input">
+      <div className="seg">
+        <button type="button" className={type === 'pct' ? 'on' : ''} onClick={() => set({ type: 'pct', value: null })}>%</button>
+        <button type="button" className={type === 'amount' ? 'on' : ''} onClick={() => set({ type: 'amount', value: null })}>₫</button>
+      </div>
+      {type === 'pct' ? (
+        <div className="money-input">
+          <input className="input" type="number" inputMode="decimal" min="0" max="100" step="1" placeholder="0" value={value?.value ?? ''}
+            onChange={(e) => set({ value: e.target.value === '' ? null : Math.min(100, Math.max(0, Number(e.target.value))) })} />
+          <span className="money-unit">%</span>
+        </div>
+      ) : (
+        <MoneyInput value={value?.value ?? null} onChange={(v) => set({ value: v })} placeholder="Số tiền giảm" />
+      )}
+    </div>
+  );
 }

@@ -6,4 +6,5 @@
 - Ngôn ngữ giao diện và tài liệu: tiếng Việt. Tên sản phẩm: Hostexa.
 - Stack: Vite + React SPA, Vercel Functions trong `api/` (file bắt đầu bằng `_` là module dùng chung), dữ liệu trên Vercel Blob.
 - Font: Cal Sans (tiêu đề), Afacad Flux (nội dung), Manrope 700 (wordmark). Icon: bộ Hostexa trong `src/lib/icons.jsx`.
+- Tài chính: chỉ owner/admin (`can(role,'finance')`, máy chủ kiểm tra lại trong `api/finance.js`). Dữ liệu tiền KHÔNG được đưa vào `ws/<id>.json` (`SYNC_KEYS`) vì member tải file đó; luôn để trong `fin/<id>.json`.
 - Không commit `.env`, `.hosty-sync`, `hosty.zip`.

@@ -155,3 +155,7 @@ export const Cloud = make('cloud');
 export const CloudOff = make('cloudOff');
 export const History = make('history');
 export const Type = make('type');
+export const Revenue = make('revenue');
+export const Reports = make('reports');
+export const Payments = make('payments');
+export const Pricing = make('pricing');
