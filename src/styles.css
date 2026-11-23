@@ -1036,3 +1036,8 @@ button.fin-row:hover { border-color: #DCD2F7; box-shadow: var(--shadow); }
 .due-row { border-color: #F6DDB7; }
 .due-amt { color: #C26A00; }
 .disc-tag.due { color: #A65A00; background: var(--yellow-soft); }
+.due-card { margin-top: 10px; }
+.due-ico { color: #C26A00; }
+.due-card.clear .due-ico { color: #1E8763; }
+.due-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; font-size: 14px; color: var(--ink-2); }
+.due-head b { font-size: 20px; color: #C26A00; font-variant-numeric: tabular-nums; }

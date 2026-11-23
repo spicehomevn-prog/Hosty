@@ -12,10 +12,12 @@ import { can, visibleTasks, canTickTask } from '../lib/perm.js';
 import { ArrowLeftRight } from '../lib/icons.jsx';
 import { CleaningCard } from './CleaningPanel.jsx';
 import OccupancySheet from './OccupancySheet.jsx';
-import { ChevronRight, Revenue } from '../lib/icons.jsx';
+import { ChevronRight, Revenue, Payments } from '../lib/icons.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { ledger, monthSummary } from '../lib/fin.js';
-import { fmtShort } from '../lib/money.js';
+import { fmtShort, fmtVND } from '../lib/money.js';
+import { Sheet } from './ui.jsx';
+import { platformColor } from '../lib/store.jsx';
 
 export default function Home({ api }) {
   const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
@@ -83,6 +85,7 @@ export default function Home({ api }) {
         </div>
       </button>
       <RevenueCard state={state} bookings={bookings} onOpen={() => api.goto('finance')} />
+      <DueCard state={state} bookings={bookings} idx={idx} api={api} />
       <OccupancySheet open={occOpen} onClose={() => setOccOpen(false)} day={today} bookings={bookings} api={api} />
 
       {failed.length > 0 && (
@@ -165,5 +168,55 @@ function RevenueCard({ state, bookings, onOpen }) {
         <ChevronRight size={18} className="occ-chev" />
       </div>
     </button>
+  );
+}
+
+/** Owner / admin: khách đặt trực tiếp còn phải thu (mọi thời điểm) */
+function DueCard({ state, bookings, idx, api }) {
+  const finance = useFinance();
+  const [open, setOpen] = useState(false);
+  const list = useMemo(() => (finance
+    ? ledger(state, bookings, finance.fin).items.filter((b) => b.price.due > 0).sort((a, b) => (a.start < b.start ? -1 : 1))
+    : []), [finance, state, bookings]);
+  if (!finance) return null;
+  const total = list.reduce((a, b) => a + b.price.due, 0);
+  const today = todayKey();
+  const late = list.filter((b) => b.end <= today).length;
+  return (
+    <>
+      <button className={`occ-card rev-card due-card rise ${list.length ? '' : 'clear'}`} style={{ '--i': 4 }} onClick={() => (list.length ? setOpen(true) : api.goto('finance'))}>
+        <span className="rev-ico due-ico"><Payments size={20} /></span>
+        <div>
+          <b>Còn phải thu</b>
+          <span className="muted">{list.length ? `${list.length} khách đặt trực tiếp${late ? ` · ${late} đã trả phòng` : ''}` : 'Đã thu đủ tất cả'}</span>
+        </div>
+        <div className="occ-right rev-right">
+          <b className={list.length ? 'due-amt' : ''}>{fmtShort(total)}</b>
+          <ChevronRight size={18} className="occ-chev" />
+        </div>
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Còn phải thu"
+        footer={<button className="btn ghost block" onClick={() => { setOpen(false); api.goto('finance'); }}>Xem trong Tài chính</button>}>
+        <div className="due-head"><span>{list.length} khách đặt trực tiếp</span><b>{fmtVND(total)}</b></div>
+        <div className="fin-list">
+          {list.map((b) => {
+            const out = b.end <= today; const inNow = b.start <= today && b.end > today;
+            return (
+              <button key={b.id} className="fin-row due-row" onClick={() => { setOpen(false); api.openBooking(b); }}>
+                <span className="fin-bar" style={{ background: platformColor(b.platform) }} />
+                <span className="arr-main">
+                  <b>{idx[b.roomId]?.room.name || 'Phòng'}{b.summary ? ` · ${b.summary}` : ''}</b>
+                  <small>{dm(b.start)} → {dm(b.end)} · tổng {fmtVND(b.price.total)}{b.price.deposit ? ` · đã cọc ${fmtShort(b.price.deposit)}` : ''}</small>
+                </span>
+                <span className="fin-amt">
+                  <b className="due-amt">{fmtVND(b.price.due)}</b>
+                  <small>{out ? 'đã trả phòng' : inNow ? 'đang ở' : `nhận ${dm(b.start)}`}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Sheet>
+    </>
   );
 }
