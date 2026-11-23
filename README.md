@@ -36,10 +36,20 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
    | `HOSTY_OWNER_PASSWORD` | mật khẩu mạnh của chủ hệ thống |
    | `AUTH_SECRET` | chuỗi ngẫu nhiên dài ≥ 32 ký tự (dùng để ký phiên đăng nhập) |
    | `APIFY_TOKEN` | API token của Apify (Apify Console → Settings → API & Integrations) – để lấy giá Airbnb theo ngày. Không có thì bỏ qua tính năng này |
-   | `CRON_SECRET` | chuỗi ngẫu nhiên dài ≥ 16 ký tự – để Vercel Cron tự cập nhật giá Airbnb ngày 1 hằng tháng |
+   | `CRON_SECRET` | chuỗi ngẫu nhiên dài ≥ 16 ký tự – để Vercel Cron tự cập nhật giá Airbnb ngày 1 hằng tháng, và để dịch vụ hẹn giờ gọi gửi thông báo nhắc task |
 
    Tạo `AUTH_SECRET` nhanh: chạy `openssl rand -base64 32` hoặc gõ bừa một chuỗi dài. Đổi `AUTH_SECRET` sẽ đăng xuất mọi người; đổi `HOSTY_OWNER_PASSWORD` sẽ đăng xuất chủ hệ thống trên mọi máy.
 3. **Deployments → Redeploy** để áp dụng.
+
+## Nhắc hẹn task
+Mỗi người tự bật ở **Cơ sở → Nhắc hẹn task** (hoặc nút **Cài đặt nhắc hẹn** trong form task). Task giao riêng chỉ nhắc người được giao; task "Chung" nhắc mọi người đã bật.
+
+**Thông báo đẩy của Hostexa** – gửi thẳng tới điện thoại / máy tính đã bấm **Bật thông báo**. iPhone cần iOS 16.4+ và phải mở Hostexa từ biểu tượng ngoài Màn hình chính (Safari → Chia sẻ → Thêm vào MH chính). Khoá gửi thông báo (VAPID) máy chủ tự tạo lần đầu. Vì Vercel gói miễn phí chỉ chạy hẹn giờ 1 lần/ngày, cần một dịch vụ hẹn giờ miễn phí gọi máy chủ mỗi 5 phút:
+1. Đặt biến `CRON_SECRET` trên Vercel (nếu chưa có) → Redeploy.
+2. Tạo tài khoản [cron-job.org](https://cron-job.org) → **Create cronjob**: URL `https://hostexa.vercel.app/api/notify?cron=push`, lịch **Every 5 minutes**; tab **Advanced → Headers** thêm `Authorization` = `Bearer <CRON_SECRET>`.
+3. Kiểm tra: tab **History** của cronjob báo `200`. Thông báo có thể đến trễ tối đa ~5 phút so với giờ nhắc.
+
+Ngoài ra trong form task vẫn có **Thêm tay vào lịch** (.ics cho iPhone, link Google Calendar) – thêm một lần, không tự cập nhật.
 
 ## Quy trình sử dụng
 1. Chủ hệ thống đăng nhập → **Tạo cơ sở mới** → Hostexa tự tạo tài khoản `<cơ sở>-admin` và hiện mật khẩu → bấm **Copy để gửi** qua Zalo.
@@ -73,6 +83,7 @@ npx vercel --prod
 - `api/admin.js` – quản lý cơ sở & tài khoản (chỉ chủ hệ thống).
 - `api/ical-out.js` – lịch iCal xuất cho các sàn, truy cập qua `/cal/<mã>.ics`.
 - `api/finance.js` – dữ liệu tài chính (chỉ owner/admin): bảng giá, giá đặt phòng, khoản chi, số tổng tháng cũ; `POST ?action=ota` / Cron `?cron=ota` lấy giá Airbnb qua Apify (`api/_apify.js`). Lưu riêng ở `fin/<cơ sở>.json`, không nằm trong dữ liệu mà member tải về.
+- `api/notify.js` – nhắc hẹn task: đăng ký thông báo đẩy, `?cron=push` gửi thông báo tới giờ (`api/_notify.js`, service worker `public/sw.js`).
 - `api/health.js` – kiểm tra cấu hình máy chủ (chỉ báo có/thiếu).
 
 ## Nhận diện

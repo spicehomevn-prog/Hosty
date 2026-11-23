@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Trash2, CalendarPlus, Clock } from '../lib/icons.jsx';
+import { Trash2 } from '../lib/icons.jsx';
+import { TaskReminderBox } from './Reminders.jsx';
 import { useStore, uid } from '../lib/store.jsx';
 import { todayKey, dm } from '../lib/dates.js';
-import { REPEATS, REMINDS, repeatLabel, icsUrl, googleUrl } from '../lib/tasks.js';
+import { REPEATS, REMINDS, repeatLabel } from '../lib/tasks.js';
 import { roomIndex } from '../lib/derive.js';
 import { Sheet, Field } from './ui.jsx';
 import { useMembers } from '../lib/members.js';
@@ -67,19 +68,13 @@ export function TaskSheet({ task, onClose }) {
         </div>
       </Field>
       {(f.remind != null || f.time) && f.title.trim() && (
-        <div className="remind-box">
-          <b><CalendarPlus size={16} /> Thêm lời nhắc vào điện thoại</b>
-          <small>
+        <TaskReminderBox f={f} roomName={roomName} summary={(
+          <>
             {f.time ? `${dm(f.date)} lúc ${f.time}` : `${dm(f.date)} (cả ngày)`}
             {f.repeat && f.repeat !== 'none' ? ` · ${repeatLabel(f)}` : ''}
-            {f.remind != null ? ` · nhắc ${f.remind === 0 ? 'đúng giờ' : `trước ${REMINDS.find((r) => r.v === f.remind)?.label}`}` : ''}
-          </small>
-          <div className="row gap8 wrap">
-            <a className="btn ghost" href={icsUrl(f, roomName)} target="_blank" rel="noopener"><Clock size={16} /> Lịch iPhone / tệp .ics</a>
-            <a className="btn ghost" href={googleUrl(f, roomName)} target="_blank" rel="noopener"><CalendarPlus size={16} /> Google Calendar</a>
-          </div>
-          <small className="muted">iPhone: mở bằng Safari rồi bấm "Thêm vào Lịch". Google Calendar dùng thông báo mặc định của lịch. Sửa task trong app thì bấm thêm lại để cập nhật.</small>
-        </div>
+            {f.remind != null ? ` · nhắc ${f.remind === 0 ? 'đúng giờ' : `trước ${REMINDS.find((r) => r.v === f.remind)?.label}`}` : ' · chưa chọn nhắc trước'}
+          </>
+        )} />
       )}
       <Field label="Phòng">
         <select className="input" value={f.roomId} onChange={set('roomId')}>

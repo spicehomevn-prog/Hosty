@@ -94,7 +94,18 @@ function NotSetup() {
 function Workspace() {
   const { state, cloud, role } = useStore();
   const s = useSession();
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState(() => {
+    // mở từ thông báo nhắc task: /?tab=tasks
+    const t = new URLSearchParams(location.search).get('tab');
+    if (t) history.replaceState(null, '', location.pathname);
+    return t === 'tasks' ? 'tasks' : 'home';
+  });
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    const onMsg = (e) => { if (e.data?.type === 'open' && /tab=tasks/.test(e.data.url || '')) setTab('tasks'); };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, []);
   const [calFocus, setCalFocus] = useState({ date: todayKey(), selected: null, nonce: 0 });
   const [createOpen, setCreateOpen] = useState(false);
   const [booking, setBooking] = useState(null); // {mode:'new'|'view', data}

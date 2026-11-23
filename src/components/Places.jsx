@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, UserRound, Link2 } from '../lib/icons.jsx';
+import { Building2, Pencil, RefreshCw, CheckCircle2, AlertCircle, Download, Upload, MapPin, UserRound, Link2, Bell } from '../lib/icons.jsx';
 import { useStore } from '../lib/store.jsx';
 import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
 import { AccountCard } from './Account.jsx';
+import { RemindersCard } from './Reminders.jsx';
 import { ExportLinksSheet } from './ExportLinks.jsx';
 import { can } from '../lib/perm.js';
 
@@ -46,6 +47,9 @@ export default function Places({ api }) {
 
       <h2 className="section-title"><UserRound size={18} /> Tài khoản</h2>
       <AccountCard />
+
+      <h2 className="section-title"><Bell size={18} /> Nhắc hẹn task</h2>
+      <RemindersCard />
 
       {canSetup && <>
       <h2 className="section-title">Địa điểm & phòng</h2>

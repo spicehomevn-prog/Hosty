@@ -20,9 +20,9 @@ export default route(async (req, res) => {
     HOSTY_OWNER_PASSWORD: c.ownerPassword,
     'Số ký tự tên đăng nhập chủ hệ thống': c.ownerUsernameLength,
     'APIFY_TOKEN (giá Airbnb)': apifyTokenStatus(),
-    'CRON_SECRET (tự cập nhật hằng tháng)': envClean(process.env.CRON_SECRET).length >= 16 ? 'ok' : (process.env.CRON_SECRET ? 'quá ngắn (cần ≥ 16 ký tự)' : 'thiếu'),
+    'CRON_SECRET (cập nhật giá hằng tháng + gửi thông báo nhắc task)': envClean(process.env.CRON_SECRET).length >= 16 ? 'ok' : (process.env.CRON_SECRET ? 'quá ngắn (cần ≥ 16 ký tự)' : 'thiếu'),
     // chỉ TÊN biến (không có giá trị) để phát hiện gõ sai tên, ví dụ thiếu chữ hay dư khoảng trắng
-    'Tên biến máy chủ thấy': Object.keys(process.env).filter((k) => /hosty|owner|auth_secret|apify|cron/i.test(k)).map((k) => JSON.stringify(k)),
+    'Tên biến máy chủ thấy': Object.keys(process.env).filter((k) => /hosty|owner|auth_secret|apify|cron|vapid/i.test(k)).map((k) => JSON.stringify(k)),
     'Môi trường Vercel': process.env.VERCEL_ENV || 'local',
   });
 }, { needStore: false });
