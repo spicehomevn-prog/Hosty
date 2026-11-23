@@ -1,11 +1,14 @@
 // Lịch iCal XUẤT từ Hostexa cho các sàn (Airbnb, Booking.com, Agoda…) tự đọc để chặn ngày.
 // GET /cal/<token>.ics   (rewrite -> /api/ical-out?k=<token>)
 // Gồm: đặt phòng trực tiếp + đặt phòng / ngày khoá từ các sàn khác của cùng phòng,
-// trừ lịch của chính sàn nhận link (x) và trừ các ngày trùng khớp với lịch của sàn đó (bản chép ngược).
+// trừ lịch của chính sàn nhận link (x), và trừ sự kiện của sàn khác trùng hệt một ĐẶT PHÒNG THẬT của sàn x (bản chép ngược).
+// Lưu ý: ngày sàn x chặn theo chính link này ("Airbnb (Not available)") KHÔNG được coi là của sàn x, nếu không sẽ tự mở chặn.
 import { createHash } from 'node:crypto';
 import { getJSON } from './_store.js';
 import { verifyFeed, wsFile } from './_auth.js';
 import { eventsOf } from './_feeds.js';
+import { isBlockEvent } from '../src/lib/ical.js';
+import { GENERIC } from '../src/lib/derive.js';
 
 const CRLF = '\r\n';
 const ymd = (k) => k.replace(/-/g, '');
@@ -90,24 +93,32 @@ export default async function handler(req, res) {
 
     const cals = (data.calendars || []).filter((c) => c.roomId === p.r && c.url);
     const lists = await Promise.all(cals.map(async (c) => ({ cal: c, events: await eventsOf(c) })));
-    const own = new Set((lists.find((l) => l.cal.id === p.x)?.events || []).map((e) => `${e.start}|${e.end}`));
+    // đặt phòng thật của sàn nhận link (không gồm lịch khoá / ngày sàn chặn theo link Hostexa)
+    const isReal = (calId, e) => {
+      const ov = data.overrides?.[`${calId}:${e.uid || e.start}`];
+      if (ov?.blocked === false) return true;
+      if (ov?.blocked === true || !e.summary) return false; // bản đệm cũ không có tiêu đề -> coi là lịch khoá
+      return !isBlockEvent(e.summary) && !GENERIC.test(e.summary);
+    };
+    const own = new Set((lists.find((l) => l.cal.id === p.x)?.events || []).filter((e) => isReal(p.x, e)).map((e) => `${e.start}|${e.end}`));
 
     const today = new Date().toISOString().slice(0, 10);
     const cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
     const ranges = new Map();
-    const add = (start, end) => {
+    const add = (start, end, { skipOwn = true } = {}) => {
       if (!start || !end || end <= start || end < cutoff) return;
       const k = `${start}|${end}`;
-      if (own.has(k)) return; // bản chép ngược đặt phòng của chính sàn nhận link
+      if (skipOwn && own.has(k)) return; // bản chép ngược đặt phòng của chính sàn nhận link
       ranges.set(k, { start, end });
     };
     for (const l of lists) if (l.cal.id !== p.x) for (const e of l.events) add(e.start, e.end);
-    for (const m of data.manual || []) if (m.roomId === p.r) add(m.start, m.end);
+    // đặt phòng trực tiếp luôn được xuất
+    for (const m of data.manual || []) if (m.roomId === p.r) add(m.start, m.end, { skipOwn: false });
 
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const lines = [
       'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Hostexa//Lich phong//VI', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-      `X-WR-CALNAME:${esc(`Hostexa - ${room.name}`)}`,
+      `X-WR-CALNAME:${esc(`Hostexa - ${room.name}`)}`, 'X-PUBLISHED-TTL:PT1H', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     ];
     for (const { start, end } of [...ranges.values()].sort((a, b) => (a.start < b.start ? -1 : 1))) {
       const uid = createHash('sha1').update(`${p.r}|${start}|${end}`).digest('hex').slice(0, 20);
@@ -117,7 +128,7 @@ export default async function handler(req, res) {
     }
     lines.push('END:VCALENDAR');
     return sendText(res, 200, lines.join(CRLF) + CRLF, {
-      'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+      'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
       'Content-Disposition': `inline; filename="hostexa-${today}.ics"`,
     });
   } catch (e) {

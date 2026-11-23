@@ -12,7 +12,7 @@ export const allRooms = (state, locationId) =>
   state.locations.filter((l) => !locationId || l.id === locationId).flatMap((l) => l.rooms.map((r) => ({ ...r, location: l })));
 
 /** Sự kiện iCal có tiêu đề chung chung (không có tên khách) – kiểu lịch khoá các sàn trả ngược về */
-const GENERIC = /^\s*(closed\s*-\s*)?(airbnb\s*)?\(?(not available|unavailable|blocked|closed|không khả dụng)\)?(\s*\(hostexa\))?\s*$/i;
+export const GENERIC = /^\s*(closed\s*-\s*)?(airbnb\s*)?\(?(not available|unavailable|blocked|closed|không khả dụng)\)?(\s*\(hostexa\))?\s*$/i;
 
 /** Mọi đêm trong [start, end) đều nằm trong các đặt phòng trực tiếp `list` (cùng phòng) */
 export function coveredByDirect(start, end, list) {
