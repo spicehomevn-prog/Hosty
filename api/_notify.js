@@ -126,7 +126,7 @@ export async function pushSend(uid, ws, payload, pref = null) {
   const dead = []; let sent = 0;
   await Promise.all(subs.map(async (s) => {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(payload), { vapidDetails: { subject, publicKey: v.publicKey, privateKey: v.privateKey }, TTL: 3600, urgency: 'high' });
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(payload), { vapidDetails: { subject, publicKey: v.publicKey, privateKey: v.privateKey }, TTL: 3600, urgency: 'high', timeout: 8000 });
       sent += 1;
     } catch (e) {
       if (e.statusCode === 404 || e.statusCode === 410) dead.push(s.endpoint); else console.error('push', e.statusCode, String(e.body || e.message).slice(0, 120));

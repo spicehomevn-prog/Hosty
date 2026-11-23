@@ -1,9 +1,27 @@
 import { useState } from 'react';
 import { Bell, CalendarPlus, CheckCircle2, Loader2, Clock } from '../lib/icons.jsx';
-import { useNotify, isIOS, isAndroid, isStandalone, pushSupported } from '../lib/notify.js';
+import { useNotify, isIOS, isAndroid, isStandalone, isInApp, pushSupported } from '../lib/notify.js';
 import { useSession } from '../lib/session.jsx';
 import { icsUrl, googleUrl } from '../lib/tasks.js';
 import { Sheet } from './ui.jsx';
+
+const ANDROID_PERM = isAndroid()
+  ? (isStandalone()
+    ? 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Ứng dụng → Hostexa → Thông báo → bật Cho phép, rồi quay lại bấm Bật thông báo.'
+    : 'Chrome đang chặn thông báo của trang. Bấm biểu tượng ⓘ / ổ khoá cạnh địa chỉ → Quyền → Thông báo → Cho phép, rồi bấm Bật thông báo.')
+  : 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Thông báo → Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
+
+/** Hướng dẫn theo bước bị kẹt khi bật thông báo */
+function failHelp(step) {
+  if (step === 'perm') return ANDROID_PERM;
+  if (step === 'sub') {
+    return isAndroid()
+      ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho ${isStandalone() ? 'Hostexa và Chrome' : 'Chrome'}. Vẫn không được: mở hostexa.vercel.app bằng Chrome rồi bật thông báo ở đó (biểu tượng ngoài màn hình chính dùng chung với Chrome nên cũng sẽ nhận được).`
+      : 'Kiểm tra mạng rồi thử lại. Vẫn không được: dùng Chrome / Safari bản mới.';
+  }
+  if (step === 'sw') return 'Đóng hẳn Hostexa (vuốt tắt khỏi danh sách app đang mở) rồi mở lại và thử lại.';
+  return '';
+}
 
 const Spin = ({ on }) => (on ? <Loader2 size={14} className="spin" /> : null);
 
@@ -26,9 +44,10 @@ export function RemindersPanel({ n }) {
   if (!info && !err) return <p className="tiny muted"><Loader2 size={14} className="spin" /> Đang tải…</p>;
 
   let pushNote = null;
-  if (!pushSupported() && isIOS() && !isStandalone()) pushNote = 'iPhone chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính: bấm nút Chia sẻ trong Safari > "Thêm vào MH chính", rồi mở từ biểu tượng đó.';
+  if (isInApp()) pushNote = 'Trang đang mở bên trong Zalo / Facebook nên không nhận được thông báo. Bấm ⋮ (hoặc …) → "Mở bằng trình duyệt" / "Mở bằng Chrome", rồi bật thông báo ở đó.';
+  else if (!pushSupported() && isIOS() && !isStandalone()) pushNote = 'iPhone chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính: bấm nút Chia sẻ trong Safari > "Thêm vào MH chính", rồi mở từ biểu tượng đó.';
   else if (!pushSupported()) pushNote = isIOS() ? 'Cần iOS 16.4 trở lên để nhận thông báo.' : 'Trình duyệt này không hỗ trợ thông báo. Dùng Chrome hoặc Safari bản mới.';
-  else if (Notification.permission === 'denied') pushNote = 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy > Thông báo > Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
+  else if (Notification.permission === 'denied') pushNote = ANDROID_PERM;
 
   return (
     <div className="rm-panel">
@@ -46,8 +65,12 @@ export function RemindersPanel({ n }) {
             </div>
           </>
         ) : (
-          <button className="btn primary block" onClick={n.enablePush} disabled={!!busy}><Spin on={busy === 'push'} /> Bật thông báo</button>
+          <>
+            <button className="btn primary block" onClick={n.enablePush} disabled={!!busy}><Spin on={busy === 'push'} /> Bật thông báo</button>
+            {n.step && <p className="rm-step"><Loader2 size={14} className="spin" /> {n.step}</p>}
+          </>
         )}
+        {n.note && <p className="rm-note">{n.note}</p>}
         {pushOn && info?.push?.prefs && (
           <div className="rm-prefs">
             <small className="rm-prefs-h">Nhận những thông báo:</small>
@@ -61,7 +84,13 @@ export function RemindersPanel({ n }) {
         )}
         {owner && info?.push && !info.push.cron && <p className="rm-note">Chủ hệ thống: máy chủ chưa có CRON_SECRET nên chưa gửi được lời nhắc theo giờ (xem README, mục Nhắc hẹn).</p>}
       </div>
-      {err && <p className="form-error">{err}</p>}
+      {err && (
+        <div className="rm-fail">
+          <p className="form-error">{err}</p>
+          {failHelp(n.failStep) && <p className="rm-note">{failHelp(n.failStep)}</p>}
+          {n.diag && <p className="rm-diag">{n.diag}</p>}
+        </div>
+      )}
     </div>
   );
 }
