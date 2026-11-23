@@ -50,9 +50,10 @@ export function stayPctFor(fin, roomId, nights) {
 }
 
 /* ---------- Thanh toán đặt phòng trực tiếp: dịch vụ cộng thêm, đặt cọc, còn phải thu ---------- */
+// gợi ý tên dịch vụ (không điền sẵn giá: chỉ ghi nhận khi người dùng tự nhập đơn giá)
 export const EXTRA_SUGGEST = [
-  { name: 'Ăn sáng', price: 80000 }, { name: 'Đưa đón sân bay', price: 250000 }, { name: 'Thuê xe máy', price: 150000 },
-  { name: 'Giặt ủi', price: 100000 }, { name: 'Nệm phụ', price: 150000 }, { name: 'Nhận sớm / trả muộn', price: 200000 },
+  { name: 'Ăn sáng' }, { name: 'Đưa đón sân bay' }, { name: 'Thuê xe máy' },
+  { name: 'Giặt ủi' }, { name: 'Nệm phụ' }, { name: 'Nhận sớm / trả muộn' },
 ];
 export const extrasTotal = (e) => (e?.extras || []).reduce((a, x) => a + Math.round(Number(x.price) || 0) * Math.max(0, Number(x.qty) || 0), 0);
 export const bookingTotal = (e) => (Number(e?.amount) || 0) + extrasTotal(e);
@@ -123,14 +124,88 @@ const freezeEntry = (b, est) => ({
 });
 
 /** Đặt phòng từ sàn đủ giá theo bảng giá mà chưa có trong sổ -> các mục cần chốt */
+/**
+ * Ghép khoảng ngày của một dòng báo cáo / mục sổ với booking trong `list` (đã lọc đúng sàn) cùng phòng:
+ * đúng ngày nhận + trả > cùng ngày nhận > chồng nhiều đêm nhất (≥ 1 đêm). Trả booking hoặc null.
+ */
+export function matchStay(list, { roomId, start, end }, taken = new Set()) {
+  let best = null; let score = 0;
+  for (const b of list) {
+    if (b.roomId !== roomId || taken.has(b.id)) continue;
+    let sc = 0;
+    if (b.start === start && b.end === end) sc = 1e6;
+    else if (b.start === start) sc = 1e5;
+    else {
+      const a = b.start > start ? b.start : start; const z = b.end < end ? b.end : end;
+      const ov = a < z ? diffDays(a, z) : 0;
+      if (ov >= 1) sc = ov;
+    }
+    if (sc > score) { score = sc; best = b; }
+  }
+  return best;
+}
+const sameSourceList = (bookings, platform) => bookings.filter((b) => b.source === 'ical' && !b.blocked && b.platform === platform);
+
+/**
+ * Chốt giá cho đặt phòng từ sàn:
+ * 1. booking iCal mới xuất hiện mà đã có dòng file báo cáo cùng sàn (mục rep:… nhập trước) -> chuyển giá file sang booking;
+ * 2. còn lại: đủ giá theo bảng giá / giá Airbnb mà chưa có trong sổ -> chốt.
+ */
 export function toFreeze(bookings, fin) {
   const out = {};
+  const prices = fin.prices || {};
+  const taken = new Set();
+  for (const [key, e] of Object.entries(prices)) {
+    if (!key.startsWith('rep:') || e?.amount == null || !e.roomId || !e.start || !e.end) continue;
+    const cands = sameSourceList(bookings, e.platform).filter((b) => !prices[b.id] || prices[b.id].source === 'rate' || prices[b.id].source === 'ota');
+    const hit = matchStay(cands, e, taken);
+    if (!hit) continue;
+    taken.add(hit.id);
+    out[hit.id] = { ...e, roomId: hit.roomId, start: hit.start, end: hit.end, at: Date.now() };
+    out[key] = null;
+  }
   for (const b of bookings) {
-    if (b.source !== 'ical' || b.blocked || fin.prices?.[b.id]) continue;
+    if (b.source !== 'ical' || b.blocked || prices[b.id] || taken.has(b.id)) continue;
     const est = rateEstimate(b, fin);
     if (est) out[b.id] = freezeEntry(b, est);
   }
   return out;
+}
+
+/**
+ * Nhập file báo cáo của một sàn -> { entries (cho PRICES), summary }.
+ * Chỉ ghép / ghi / xoá mục của ĐÚNG sàn đó; không bao giờ đụng đặt phòng trực tiếp hay sàn khác.
+ * rows: [{ code, listing, guest, start, end, amount, fee }] ; roomOf: listing -> roomId ; mul: tỉ giá (1 nếu VND)
+ */
+export function planReportImport(rows, { platform, roomOf = {}, bookings, prices = {}, mul = 1, by = '' }) {
+  const list = sameSourceList(bookings, platform);
+  const taken = new Set();
+  const entries = {}; const items = [];
+  const sum = { updated: 0, added: 0, replacedManual: 0, noRoom: 0 };
+  for (const r of rows) {
+    const roomId = roomOf[r.listing] || '';
+    const hit = roomId ? matchStay(list, { roomId, start: r.start, end: r.end }, taken) : null;
+    if (hit) taken.add(hit.id);
+    const key = hit ? hit.id : `rep:${platform}:${r.code || `${r.start}:${r.end}:${roomId}:${r.amount}`}`;
+    const old = prices[key];
+    // cùng mã đặt phòng đã nhập trước đây dưới khoá khác (cùng sàn) -> bỏ bản cũ để không trùng
+    if (r.code) for (const [id, e] of Object.entries(prices)) if (id !== key && e?.source === 'report' && e.platform === platform && e.ref === r.code) entries[id] = null;
+    const amount = Math.round(r.amount * mul);
+    entries[key] = {
+      roomId, platform, guest: r.guest || old?.guest || '', start: hit ? hit.start : r.start, end: hit ? hit.end : r.end, amount,
+      ...(r.fee != null ? { fee: Math.round(r.fee * mul) } : {}), source: 'report', ref: r.code || '', at: Date.now(), by,
+    };
+    if (hit) { sum.updated += 1; if (old?.source === 'manual') sum.replacedManual += 1; } else sum.added += 1;
+    if (!roomId) sum.noRoom += 1;
+    items.push({ ...r, raw: r.amount, roomId, key, kind: hit ? 'update' : 'add', oldAmount: old?.amount ?? null, amount });
+  }
+  // bảo vệ: chỉ giữ thao tác trên mục của đúng sàn (rep:<sàn>:… hoặc booking iCal của sàn đó)
+  const allowed = new Set(list.map((b) => b.id));
+  for (const id of Object.keys(entries)) {
+    const okKey = allowed.has(id) || id.startsWith(`rep:${platform}:`) || (prices[id]?.source === 'report' && prices[id]?.platform === platform);
+    if (!okKey) delete entries[id];
+  }
+  return { entries, items, summary: sum };
 }
 
 /**

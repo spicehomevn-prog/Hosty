@@ -5,6 +5,7 @@ import { useFinance } from '../lib/finance.jsx';
 import { getBookings, allRooms } from '../lib/derive.js';
 import { readRows, detect, toBookings, guessRoom, FIELD_LABEL } from '../lib/report.js';
 import { fmtVND } from '../lib/money.js';
+import { planReportImport } from '../lib/fin.js';
 import { dm } from '../lib/dates.js';
 import { Sheet, Field, MoneyInput, toast } from './ui.jsx';
 
@@ -54,29 +55,18 @@ export function ImportReport({ onClose }) {
   const heads = rows && det ? rows[det.header].map((h, i) => ({ i, name: String(h || `Cột ${i + 1}`) })) : [];
   const setCol = (f, v) => setDet({ ...det, map: { ...det.map, [f]: v === '' ? undefined : Number(v) } });
 
-  const run = () => {
-    if (!parsed) return;
+  const plan = useMemo(() => {
+    if (!parsed) return null;
     const mul = foreign ? rate : 1;
-    if (!mul) return;
-    const current = getBookings(state).filter((b) => !b.blocked);
-    const entries = {}; let kept = 0; let n = 0;
-    for (const r of parsed.bookings) {
-      const roomId = roomOf[r.listing] || '';
-      const hit = roomId ? current.find((b) => b.roomId === roomId && b.start === r.start && b.end === r.end) : null;
-      const key = hit ? hit.id : `rep:${platform}:${r.code || `${r.start}:${r.end}:${roomId}:${r.amount}`}`;
-      const old = fin.prices?.[key];
-      if (old?.source === 'manual') { kept += 1; continue; }
-      // cùng mã đặt phòng đã nhập trước đây dưới khoá khác -> bỏ bản cũ để không bị trùng
-      if (r.code) for (const [id, e] of Object.entries(fin.prices || {})) if (id !== key && e.source === 'report' && e.platform === platform && e.ref === r.code) entries[id] = null;
-      entries[key] = {
-        roomId, platform, guest: r.guest, start: r.start, end: r.end, amount: Math.round(r.amount * mul),
-        ...(r.fee != null ? { fee: Math.round(r.fee * mul) } : {}), source: 'report', ref: r.code || '', at: Date.now(), by: user?.name || '',
-      };
-      n += 1;
-    }
-    dispatch({ type: 'PRICES', entries });
+    return planReportImport(parsed.bookings, { platform, roomOf, bookings: getBookings(state), prices: fin.prices || {}, mul: mul || 1, by: user?.name || '' });
+  }, [parsed, platform, roomOf, state, fin.prices, foreign, rate, user?.name]);
+
+  const run = () => {
+    if (!plan || (foreign && !rate)) return;
+    dispatch({ type: 'PRICES', entries: plan.entries });
     dispatch({ type: 'ROOMMAP', platform, map: roomOf });
-    toast(`Đã nhập ${n} đặt phòng${kept ? ` · giữ ${kept} giá nhập tay` : ''}`);
+    const s = plan.summary;
+    toast([s.updated && `Đã cập nhật ${s.updated} booking ${platform}`, s.added && `thêm ${s.added} đặt phòng cũ`].filter(Boolean).join(' · ') || 'Không có gì để nhập');
     onClose();
   };
 
@@ -126,7 +116,13 @@ export function ImportReport({ onClose }) {
               </select>
             </div>
           ))}
-          <p className="tiny muted">Đặt phòng trùng phòng và ngày với lịch iCal sẽ được ghép vào đặt phòng đó; giá trong file thay giá tính theo bảng giá. Giá đã nhập tay được giữ nguyên.</p>
+          {plan && (
+            <div className="imp-plan">
+              {plan.summary.updated > 0 && <p><b>{plan.summary.updated}</b> booking {platform} trên lịch sẽ được cập nhật doanh thu theo file{plan.summary.replacedManual ? ` (trong đó ${plan.summary.replacedManual} giá nhập tay được thay bằng số trong file)` : ''}</p>}
+              {plan.summary.added > 0 && <p><b>{plan.summary.added}</b> đặt phòng không còn trên lịch → thêm vào sổ{plan.summary.noRoom ? ` · ${plan.summary.noRoom} dòng chưa gắn phòng (chọn phòng ở trên)` : ''}</p>}
+              <p className="muted">Không thay đổi đặt phòng trực tiếp và các sàn khác.</p>
+            </div>
+          )}
 
           <details className="imp-cols">
             <summary>Cột trong file (tự nhận · bấm để sửa)</summary>
@@ -143,10 +139,17 @@ export function ImportReport({ onClose }) {
 
           <h4 className="fin-h">Xem trước</h4>
           <div className="imp-list">
-            {parsed.bookings.slice(0, 6).map((b, i) => (
+            {(plan?.items || parsed.bookings).slice(0, 6).map((b, i) => (
               <div key={i} className="imp-row">
-                <span><b>{dm(b.start)} → {dm(b.end)}</b><small>{[b.code, b.listing, b.guest].filter(Boolean).join(' · ')}</small></span>
-                <span className="imp-amt"><b>{foreign ? `${b.amount} ${b.cur}` : fmtVND(b.amount)}</b>{b.fee != null && <small>phí {foreign ? b.fee : fmtVND(b.fee)}</small>}</span>
+                <span>
+                  <b>{dm(b.start)} → {dm(b.end)} {b.kind && <em className={`imp-tag ${b.kind}`}>{b.kind === 'update' ? 'cập nhật' : 'thêm mới'}</em>}</b>
+                  <small>{[b.code, b.listing, b.guest].filter(Boolean).join(' · ')}</small>
+                </span>
+                <span className="imp-amt">
+                  <b>{foreign ? `${b.raw ?? b.amount} ${b.cur}` : fmtVND(b.amount)}</b>
+                  {b.kind === 'update' && b.oldAmount != null && b.oldAmount !== b.amount && <small>trước: {fmtVND(b.oldAmount)}</small>}
+                  {b.fee != null && <small>phí {foreign ? b.fee : fmtVND(b.fee)}</small>}
+                </span>
               </div>
             ))}
             {parsed.bookings.length > 6 && <p className="tiny muted center">… và {parsed.bookings.length - 6} đặt phòng khác</p>}

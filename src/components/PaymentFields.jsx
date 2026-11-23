@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus, Trash2 } from '../lib/icons.jsx';
 import { uid } from '../lib/store.jsx';
 import { EXTRA_SUGGEST } from '../lib/fin.js';
@@ -9,7 +10,8 @@ export const DEPOSIT_METHODS = ['Chuyển khoản', 'Tiền mặt', 'Ví điện
 /** Dịch vụ cộng thêm: danh sách { id, name, price, qty } */
 export function ExtrasEditor({ value = [], onChange }) {
   const set = (id, patch) => onChange(value.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  const add = (x) => onChange([...value, { id: uid(), name: '', price: null, qty: 1, ...x }]);
+  const [focusId, setFocusId] = useState(null);
+  const add = (x) => { const id = uid(); setFocusId(id); onChange([...value, { id, name: '', price: null, qty: 1, ...x }]); };
   const used = new Set(value.map((x) => x.name));
   return (
     <div className="extras">
@@ -17,17 +19,18 @@ export function ExtrasEditor({ value = [], onChange }) {
         <div key={x.id} className="extra-row">
           <input className="input sm extra-name" value={x.name} placeholder="Tên dịch vụ" onChange={(e) => set(x.id, { name: e.target.value })} />
           <div className="extra-line">
-            <MoneyInput value={x.price} onChange={(v) => set(x.id, { price: v })} placeholder="Đơn giá" />
+            <MoneyInput value={x.price} onChange={(v) => set(x.id, { price: v })} placeholder="Đơn giá" invalid={!(x.price > 0)} autoFocus={x.id === focusId && !!x.name} />
             <span className="extra-x">×</span>
             <Stepper value={x.qty || 1} min={1} max={99} onChange={(q) => set(x.id, { qty: q })} />
             <button type="button" className="icon-btn sm danger" aria-label="Xoá dịch vụ" onClick={() => onChange(value.filter((y) => y.id !== x.id))}><Trash2 size={16} /></button>
           </div>
+          {!(x.price > 0) && <small className="extra-hint">Nhập đơn giá hoặc xoá dòng (chưa có giá thì không được lưu)</small>}
           {x.price > 0 && (x.qty || 1) > 1 && <small className="extra-sum">= {fmtVND(x.price * (x.qty || 1))}</small>}
         </div>
       ))}
       <div className="chip-row extra-suggest">
         {EXTRA_SUGGEST.filter((s) => !used.has(s.name)).map((s) => (
-          <button key={s.name} type="button" className="mini-chip" onClick={() => add({ name: s.name, price: s.price })}><Plus size={12} /> {s.name}</button>
+          <button key={s.name} type="button" className="mini-chip" onClick={() => add({ name: s.name })}><Plus size={12} /> {s.name}</button>
         ))}
         <button type="button" className="mini-chip" onClick={() => add({})}><Plus size={12} /> Dịch vụ khác</button>
       </div>
