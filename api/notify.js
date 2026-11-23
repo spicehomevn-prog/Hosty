@@ -9,12 +9,18 @@ import {
   vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue,
 } from './_notify.js';
 
-function cronAllowed(req) {
+/** Kiểm tra cron ngoài (cron-job.org…): nhận "Bearer <CRON_SECRET>" hoặc chỉ "<CRON_SECRET>", bỏ khoảng trắng / dấu < > thừa.
+ *  Trả '' nếu hợp lệ, hoặc lý do bị từ chối (không bao giờ chứa giá trị bí mật). */
+function cronProblem(req) {
   const secret = envClean(process.env.CRON_SECRET);
-  if (secret.length < 16) return false;
-  const got = Buffer.from(String(req.headers?.authorization || ''));
-  const want = Buffer.from(`Bearer ${secret}`);
-  return got.length === want.length && timingSafeEqual(got, want);
+  if (!secret) return 'Máy chủ chưa có biến CRON_SECRET (thêm trên Vercel rồi Redeploy)';
+  if (secret.length < 16) return 'CRON_SECRET trên Vercel quá ngắn (cần ít nhất 16 ký tự)';
+  const raw = String(req.headers?.authorization || '').trim();
+  if (!raw) return 'Thiếu header Authorization (cron-job.org: Advanced → Headers)';
+  const got = Buffer.from(raw.replace(/^bearer\s+/i, '').trim().replace(/^<(.*)>$/, '$1'));
+  const want = Buffer.from(secret);
+  if (got.length !== want.length || !timingSafeEqual(got, want)) return 'Header Authorization không khớp CRON_SECRET (giá trị đúng: Bearer + dấu cách + CRON_SECRET)';
+  return '';
 }
 
 async function requireWs(req, ws) {
@@ -29,7 +35,8 @@ export default route(async (req, res) => {
   const q = query(req);
 
   if (req.method === 'GET' && q.get('cron') === 'push') {
-    if (!cronAllowed(req)) throw new HttpError(401, 'Không có quyền');
+    const why = cronProblem(req);
+    if (why) throw new HttpError(401, why);
     return send(res, 200, { ok: true, ...(await pushDue()) });
   }
 
