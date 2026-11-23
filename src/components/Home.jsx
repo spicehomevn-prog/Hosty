@@ -187,11 +187,11 @@ function FinanceTiles({ state, bookings, idx, api }) {
         </button>
         <button className={`hero due pink ${doneVis ? 'done' : ''}`} onClick={() => (due.length ? setOpen(true) : api.goto('finance'))}>
           <ProgressRing pct={col.pct} done={col.done} onShown={setDoneVis} />
-          <span className="hero-label">{col.done ? 'Đã thu đủ' : 'Còn phải thu'}</span>
+          <span className="hero-label">{col.done ? 'Đã thu đủ tháng này' : 'Còn phải thu'}</span>
           <b className="hero-num">{col.done ? <>0 <small>₫</small></> : <>{tenths(nDue)} <small>{du.u}</small></>}</b>
           <span className="hero-sub">
             {col.done
-              ? (col.count ? `${col.count} khách · tháng này` : 'Không có khoản cần thu')
+              ? (col.count ? `${col.count} khách · tháng này` : 'Không có khoản tháng này')
               : `Đã thu ${col.pct}% · ${col.dueCount} khách${late ? ` · ${late} đã trả phòng` : ''}`}
           </span>
           <span className="hero-deco" aria-hidden="true" />
