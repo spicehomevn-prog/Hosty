@@ -50,6 +50,26 @@ const PREFS = [
   { k: 'task', label: 'Nhắc task', hint: 'Theo giờ và "Nhắc trước" đặt trong từng task' },
 ];
 
+const hm = (t) => new Date(t).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+const dmTs = (t) => new Date(t).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+
+/** Tình trạng gửi của máy chủ (chủ hệ thống / admin): tổng quan hôm nay + lỗi gần nhất */
+function RunStatus({ run }) {
+  const d = run.daily;
+  const nowVN = new Date(Date.now() + 7 * 3600e3).getUTCHours();
+  let line;
+  if (d?.sent) line = <span className="ok">Tổng quan hôm nay: đã gửi lúc {hm(d.at)} tới {d.sent} người{d.failed ? ` · ${d.failed} người lỗi` : ''}</span>;
+  else if (d?.failed) line = <span className="bad">Tổng quan hôm nay chưa gửi được: {d.errors?.[0] || 'lỗi không rõ'}</span>;
+  else if (nowVN < 8) line = <span>Tổng quan hôm nay: sẽ gửi lúc 8:00</span>;
+  else line = <span className="bad">Tổng quan hôm nay: chưa gửi{run.at ? ` · máy chủ chạy lần cuối ${hm(run.at)}` : ' · máy chủ chưa chạy lượt nào'}</span>;
+  return (
+    <div className="rm-run">
+      {line}
+      {run.lastError && <span className="bad">Lỗi gần nhất ({dmTs(run.lastError.at)} {hm(run.lastError.at)}): {run.lastError.text}</span>}
+    </div>
+  );
+}
+
 /** Thông báo đẩy (bật trên từng máy) + chọn loại thông báo muốn nhận */
 export function RemindersPanel({ n }) {
   const s = useSession();
@@ -78,6 +98,7 @@ export function RemindersPanel({ n }) {
             <p className="rm-state ok"><CheckCircle2 size={15} /><span>Đang bật trên máy này</span></p>
             <div className="row gap8 wrap">
               <button className="btn tiny" onClick={n.testPush} disabled={!!busy}><Spin on={busy === 'test'} /> Gửi thử</button>
+              <button className="btn tiny" onClick={n.sendDaily} disabled={!!busy}><Spin on={busy === 'daily'} /> Gửi tổng quan ngay</button>
               <button className="btn tiny danger" onClick={n.disablePush} disabled={!!busy}><Spin on={busy === 'push'} /> Tắt</button>
             </div>
           </>
@@ -101,6 +122,7 @@ export function RemindersPanel({ n }) {
             ))}
           </div>
         )}
+        {pushOn && info?.run && <RunStatus run={info.run} />}
         {owner && info?.push && !info.push.cron && <p className="rm-note">Chủ hệ thống: máy chủ chưa có CRON_SECRET nên chưa gửi được lời nhắc theo giờ (xem README, mục Nhắc hẹn).</p>}
       </div>
       {err && (

@@ -156,6 +156,11 @@ export function useNotify() {
     if (cur) { await post({ action: 'push-unsub', endpoint: cur.endpoint }).catch(() => {}); await cur.unsubscribe(); }
   });
   const testPush = run('test', () => post({ action: 'push-test' }));
+  const sendDaily = run('daily', async () => {
+    const r = await post({ action: 'push-daily-now' });
+    setNote(`Đã gửi tổng quan: ${r.body}`);
+    return r;
+  });
   const setPref = (k, v) => {
     setInfo((i) => (i ? { ...i, push: { ...i.push, prefs: { ...(i.push?.prefs || {}), [k]: v } } } : i));
     post({ action: 'push-prefs', prefs: { [k]: v } }).catch((e) => { setErr(e.message); load(); });
@@ -164,6 +169,6 @@ export function useNotify() {
   return {
     demo, info, err, busy, load, step, failStep, diag, note, perm,
     pushOn: !!sub && (info?.push?.devices || 0) > 0,
-    enablePush, disablePush, testPush, setPref,
+    enablePush, disablePush, testPush, setPref, sendDaily,
   };
 }

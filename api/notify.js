@@ -6,8 +6,10 @@ import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
 import { requireUser, canAccess, loadWorkspaces, envClean } from './_auth.js';
 import {
-  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue,
+  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun,
 } from './_notify.js';
+
+const dailyTry = new Map(); // giới hạn nút "Gửi tổng quan ngay" (theo phiên máy chủ)
 
 /** Kiểm tra cron ngoài (cron-job.org…): nhận "Bearer <CRON_SECRET>" hoặc chỉ "<CRON_SECRET>", bỏ khoảng trắng / dấu < > thừa.
  *  Trả '' nếu hợp lệ, hoặc lý do bị từ chối (không bao giờ chứa giá trị bí mật). */
@@ -37,17 +39,30 @@ export default route(async (req, res) => {
   if (req.method === 'GET' && q.get('cron') === 'push') {
     const why = cronProblem(req);
     if (why) throw new HttpError(401, why);
-    const tasks = await pushDue();
-    let stays = { sent: 0 };
-    try { stays = await stayDue(); } catch (e) { console.error('stayDue', e.message); stays = { sent: 0, error: String(e.message).slice(0, 120) }; }
-    return send(res, 200, { ok: true, sent: (tasks.sent || 0) + (stays.sent || 0), tasks, stays });
+    const at = Date.now();
+    const errors = [];
+    let tasks = { sent: 0 }; let stays = { sent: 0, daily: {} };
+    // chạy riêng từng phần: phần này lỗi không làm mất phần kia; lỗi được ghi lại thay vì nuốt im lặng
+    try { tasks = await pushDue(at); } catch (e) { console.error('pushDue', e); errors.push(`Nhắc task: ${String(e.message).slice(0, 120)}`); }
+    try { stays = await stayDue(at); } catch (e) { console.error('stayDue', e); errors.push(`Tổng quan / nhận–trả phòng: ${String(e.message).slice(0, 120)}`); }
+    errors.push(...(stays.errors || []));
+    const sent = (tasks.sent || 0) + (stays.sent || 0);
+    await saveRun({ at, sent, notices: (tasks.reminders || 0) + (stays.notices || 0), errors: errors.slice(0, 5) }, stays.daily || {});
+    return send(res, 200, { ok: !errors.length, sent, tasks: { sent: tasks.sent || 0, reminders: tasks.reminders || 0 }, stays: { sent: stays.sent || 0, notices: stays.notices || 0, daily: stays.daily || {} }, errors });
   }
 
   if (req.method === 'GET') {
     const ws = q.get('ws');
     const user = await requireWs(req, ws);
-    const [push, v] = await Promise.all([pushInfo(user.id, ws), vapidKeys()]);
-    return send(res, 200, { push: { ...push, publicKey: v.publicKey } });
+    const [push, v, run] = await Promise.all([pushInfo(user.id, ws), vapidKeys(), user.role === 'member' ? null : loadRun()]);
+    // tóm tắt lượt chạy cho chủ hệ thống / admin: tổng quan hôm nay + lỗi gần nhất
+    let runInfo = null;
+    if (run) {
+      const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+      const lastErr = (run.runs || []).find((r) => r.errors?.length);
+      runInfo = { at: run.at || 0, daily: run.daily?.[`${ws}|${today}`] || null, lastError: lastErr ? { at: lastErr.at, text: lastErr.errors[0] } : null };
+    }
+    return send(res, 200, { push: { ...push, publicKey: v.publicKey }, run: runInfo });
   }
 
   if (req.method === 'POST') {
@@ -57,6 +72,12 @@ export default route(async (req, res) => {
     switch (action) {
       case 'push-sub': return send(res, 200, { devices: await pushSubscribe(user.id, ws, body.sub, req.headers?.['user-agent']) });
       case 'push-prefs': return send(res, 200, { prefs: await pushSetPrefs(user.id, body.prefs) });
+      case 'push-daily-now': {
+        const last = dailyTry.get(user.id) || 0;
+        if (Date.now() - last < 60000) throw new HttpError(429, 'Vừa gửi xong, thử lại sau 1 phút');
+        dailyTry.set(user.id, Date.now());
+        return send(res, 200, await dailyNow(user, ws));
+      }
       case 'push-unsub': await pushUnsubscribe(user.id, String(body.endpoint || '')); return send(res, 200, { ok: true });
       case 'push-test': {
         const r = await pushSend(user.id, ws, { title: '🔔 Hostexa', body: 'Thông báo thử: máy này sẽ nhận lời nhắc task.', tag: 'test', url: '/?tab=tasks' });

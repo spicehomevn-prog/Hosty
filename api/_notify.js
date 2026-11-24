@@ -123,21 +123,41 @@ export async function pushSend(uid, ws, payload, pref = null) {
   const { default: webpush } = await import('web-push');
   const v = await vapidKeys();
   const subject = `mailto:${envClean(process.env.VAPID_SUBJECT) || 'no-reply@hostexa.app'}`.replace(/^mailto:mailto:/, 'mailto:');
-  const dead = []; let sent = 0;
+  const dead = []; const errors = []; let sent = 0;
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(payload), { vapidDetails: { subject, publicKey: v.publicKey, privateKey: v.privateKey }, TTL: 3600, urgency: 'high', timeout: 8000 });
       sent += 1;
     } catch (e) {
-      if (e.statusCode === 404 || e.statusCode === 410) dead.push(s.endpoint); else console.error('push', e.statusCode, String(e.body || e.message).slice(0, 120));
+      if (e.statusCode === 404 || e.statusCode === 410) dead.push(s.endpoint);
+      else {
+        const why = `${e.statusCode || e.code || 'lỗi'} ${String(e.body || e.message || '').slice(0, 80)}`.trim();
+        errors.push(why);
+        console.error('push', why);
+      }
     }
   }));
   if (dead.length) {
     const left = await updateJSON(pFile(uid), (d) => ({ ...(d || {}), subs: (d?.subs || []).filter((s) => !dead.includes(s.endpoint)) }), null);
     await setIndex('push', uid, left.subs.map((s) => s.ws));
   }
-  return { sent };
+  return { sent, errors, devices: subs.length };
 }
+
+/* ---------- Nhật ký lượt chạy (để chủ hệ thống xem trong app) ---------- */
+const LASTRUN = 'notify/lastrun.json';
+/** Ghi kết quả một lượt cron: giữ 30 lượt có việc gần nhất + trạng thái tổng quan theo ngày / cơ sở */
+export async function saveRun(entry, daily = {}) {
+  await updateJSON(LASTRUN, (d) => {
+    const prev = d || { runs: [], daily: {} };
+    const busy = entry.errors?.length || entry.sent || entry.notices;
+    const runs = busy ? [entry, ...(prev.runs || [])].slice(0, 30) : prev.runs || [];
+    const cut = new Date(entry.at - 7 * 864e5).toISOString().slice(0, 10);
+    const dly = Object.fromEntries(Object.entries({ ...(prev.daily || {}), ...daily }).filter(([k]) => k.split('|')[1] >= cut));
+    return { at: entry.at, last: entry, runs, daily: dly };
+  }, { runs: [], daily: {} }).catch((e) => console.error('lastrun', e.message));
+}
+export async function loadRun() { return (await getJSON(LASTRUN))?.data || null; }
 
 const remindText = (m) => (m === 0 ? 'Đến giờ' : `Còn ${REMINDS.find((r) => r.v === m)?.label || `${m} phút`}`);
 /** Thời điểm nhắc (ms, UTC) của 1 lần task: giờ làm (cả ngày = 08:00) giờ VN trừ số phút nhắc trước */
@@ -188,6 +208,7 @@ export async function pushDue(now = Date.now()) {
 /* =================== TỔNG QUAN 8:00 + TRẢ / NHẬN PHÒNG TRƯỚC 1 GIỜ =================== */
 const FEED_AGE = 60 * 60e3; // lịch sàn tải lại tối đa 1 lần / giờ
 const BEFORE = 60; // phút báo trước giờ trả / nhận phòng
+const DAILY_UNTIL = '10:00'; // hạn chót gửi bù tổng quan buổi sáng
 const canMoney = (u) => u?.role === 'owner' || u?.role === 'admin';
 
 /** Đặt phòng hiện có của cơ sở (cùng cách tính với app: ẩn bản sao do đặt phòng trực tiếp, bỏ lịch khoá) */
@@ -204,16 +225,18 @@ export async function stayDue(now = Date.now(), { collect = false } = {}) {
   const idx = await loadIndex();
   const byWs = new Map();
   for (const [uid, list] of Object.entries(idx.push || {})) for (const w of list) byWs.set(w, [...(byWs.get(w) || []), uid]);
-  if (!byWs.size) return { sent: 0 };
+  if (!byWs.size) return { sent: 0, errors: [], daily: {} };
   const users = await validUsers();
   const { workspaces } = await loadWorkspaces();
   const multi = new Map(); // uid -> số cơ sở đang nhận (để ghi tên cơ sở khi > 1)
   for (const uids of byWs.values()) for (const u of uids) multi.set(u, (multi.get(u) || 0) + 1);
   const sentLog = (await getJSON(SENT))?.data || {};
   const fresh = {}; let sent = 0;
+  const errors = []; const daily = {};
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
   const inWindow = (at) => at <= now && at > now - WINDOW;
-  const dailyNow = inWindow(fireAt(today, '08:00', 0));
+  // tổng quan: gửi từ 08:00, gửi bù tới 10:00 nếu lượt trước lỗi / trễ (chống trùng theo ngày + người)
+  const dailyNow = now >= fireAt(today, '08:00', 0) && now < fireAt(today, DAILY_UNTIL, 0);
 
   for (const [ws, uidsAll] of byWs) {
     const uids = uidsAll.filter((u) => userOk(users.get(u), ws));
@@ -226,30 +249,23 @@ export async function stayDue(now = Date.now(), { collect = false } = {}) {
     for (const m of data.manual || []) if (m.start === today || m.end === today) { times.add(m.checkIn || '14:00'); times.add(m.checkOut || '12:00'); }
     if (!dailyNow && ![...times].some((t) => /^\d{2}:\d{2}$/.test(t) && inWindow(fireAt(today, t, BEFORE)))) continue;
     const pending = [];
-    const bookings = await wsBookings(data);
+    let bookings;
+    try { bookings = await wsBookings(data); } catch (e) {
+      errors.push(`Đọc lịch ${ws}: ${String(e.message).slice(0, 80)}`);
+      if (dailyNow) daily[`${ws}|${today}`] = { at: now, sent: 0, failed: uids.length, skipped: 0, errors: [`đọc lịch: ${String(e.message).slice(0, 60)}`] };
+      continue;
+    }
     const rooms = roomNames(data);
     const fin = (await getJSON(`fin/${ws}.json`))?.data?.data || {};
     const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
     const wsName = workspaces.find((w) => w.id === ws)?.name || data.property?.name || '';
 
     if (dailyNow) {
-      const outs = bookings.filter((b) => b.end === today);
-      const ins = bookings.filter((b) => b.start === today);
-      const dues = bookings.filter((b) => b.source === 'manual' && b.start <= today && b.end >= today && dueOf(b) > 0);
-      const dueSum = dues.reduce((a, b) => a + dueOf(b), 0);
       for (const uid of uids) {
         const k = `${ws}:daily:${today}:${uid}`;
         if (sentLog[k] || fresh[k]) continue;
-        const u = users.get(uid);
-        const money = canMoney(u) && dues.length;
-        let body;
-        if (!outs.length && !ins.length && !money) body = 'Hôm nay không có lượt nhận / trả phòng nào.';
-        else {
-          const parts = [`${outs.length} lượt trả phòng`, `${ins.length} lượt nhận phòng`];
-          if (canMoney(u)) parts.push(`${dues.length} khoản phải thu tiền phòng${dues.length ? ` (${fmtShort(dueSum)})` : ''}`);
-          body = `Hôm nay có ${parts.slice(0, -1).join(', ')} và ${parts[parts.length - 1]}.`;
-        }
-        pending.push({ k, uid, pref: 'daily', payload: { title: `☀️ Chào buổi sáng${u?.name ? `, ${u.name}` : ''}${multi.get(uid) > 1 && wsName ? ` · ${wsName}` : ''}`, body, tag: `daily-${ws}-${today}`, url: '/?tab=home' } });
+        const payload = dailyPayload({ u: users.get(uid), bookings, today, dueOf, wsName: multi.get(uid) > 1 ? wsName : '', tag: `daily-${ws}-${today}` });
+        pending.push({ k, uid, pref: 'daily', daily: true, payload });
       }
     }
 
@@ -277,15 +293,58 @@ export async function stayDue(now = Date.now(), { collect = false } = {}) {
       }
     }
 
+    const dk = `${ws}|${today}`;
     for (const it of pending) {
-      fresh[it.k] = now;
       if (collect) log.push({ uid: it.uid, ...it.payload });
-      sent += (await pushSend(it.uid, ws, it.payload, it.pref)).sent;
+      let r;
+      try { r = await pushSend(it.uid, ws, it.payload, it.pref); } catch (e) { r = { sent: 0, errors: [String(e.message).slice(0, 80)], devices: 1 }; }
+      sent += r.sent;
+      // chỉ đánh dấu "đã gửi" khi tới được ít nhất 1 máy, hoặc người đó tắt loại này / không còn máy nào -> lượt sau còn thử lại
+      if (r.sent > 0 || r.off || !r.devices) fresh[it.k] = now;
+      if (r.errors?.length) errors.push(`${it.payload.title}: ${r.errors[0]}`);
+      if (it.daily) {
+        const st = daily[dk] || { at: now, sent: 0, failed: 0, skipped: 0, errors: [] };
+        if (r.sent) st.sent += 1; else if (r.off || !r.devices) st.skipped += 1; else { st.failed += 1; st.errors = [...st.errors, ...(r.errors || [])].slice(0, 3); }
+        st.at = now;
+        daily[dk] = st;
+      }
     }
   }
   if (Object.keys(fresh).length) {
     const cut = now - 3 * 864e5;
     await updateJSON(SENT, (d) => Object.fromEntries(Object.entries({ ...(d || {}), ...fresh }).filter(([, t]) => t > cut)), {});
   }
-  return { sent, notices: Object.keys(fresh).length, ...(collect ? { log } : {}) };
+  return { sent, notices: Object.keys(fresh).length, errors, daily, ...(collect ? { log } : {}) };
+}
+
+/** Nội dung thông báo tổng quan buổi sáng cho 1 người */
+function dailyPayload({ u, bookings, today, dueOf, wsName = '', tag }) {
+  const outs = bookings.filter((b) => b.end === today);
+  const ins = bookings.filter((b) => b.start === today);
+  const dues = bookings.filter((b) => b.source === 'manual' && b.start <= today && b.end >= today && dueOf(b) > 0);
+  const dueSum = dues.reduce((a, b) => a + dueOf(b), 0);
+  const money = canMoney(u) && dues.length;
+  let body;
+  if (!outs.length && !ins.length && !money) body = 'Hôm nay không có lượt nhận / trả phòng nào.';
+  else {
+    const parts = [`${outs.length} lượt trả phòng`, `${ins.length} lượt nhận phòng`];
+    if (canMoney(u)) parts.push(`${dues.length} khoản phải thu tiền phòng${dues.length ? ` (${fmtShort(dueSum)})` : ''}`);
+    body = `Hôm nay có ${parts.slice(0, -1).join(', ')} và ${parts[parts.length - 1]}.`;
+  }
+  return { title: `☀️ Chào buổi sáng${u?.name ? `, ${u.name}` : ''}${wsName ? ` · ${wsName}` : ''}`, body, tag, url: '/?tab=home' };
+}
+
+/** Gửi ngay bản tổng quan hôm nay cho 1 người (nút "Gửi tổng quan ngay" để kiểm tra) */
+export async function dailyNow(user, ws, now = Date.now()) {
+  const data = (await getJSON(wsFile(ws)))?.data?.data;
+  if (!data) throw new HttpError(404, 'Cơ sở chưa có dữ liệu');
+  const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
+  const bookings = await wsBookings(data);
+  const fin = canMoney(user) ? (await getJSON(`fin/${ws}.json`))?.data?.data || {} : {};
+  const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
+  const payload = dailyPayload({ u: user, bookings, today, dueOf, tag: `daily-test-${ws}` });
+  const r = await pushSend(user.id, ws, payload);
+  if (!r.devices) throw new HttpError(400, 'Máy này chưa bật thông báo');
+  if (!r.sent) throw new HttpError(502, `Không gửi được: ${r.errors?.[0] || 'không rõ lỗi'}`);
+  return { sent: r.sent, title: payload.title, body: payload.body };
 }

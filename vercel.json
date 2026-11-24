@@ -8,6 +8,9 @@
   "functions": {
     "api/finance.js": {
       "maxDuration": 300
+    },
+    "api/notify.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
