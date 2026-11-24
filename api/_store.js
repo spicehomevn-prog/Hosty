@@ -204,9 +204,11 @@ export async function delJSON(name) {
 export async function updateJSON(name, fn, fallback) {
   for (let i = 0; i < 5; i++) {
     const cur = await getJSON(name);
+    // chụp nội dung TRƯỚC khi fn chạy (nhiều hàm sửa thẳng vào object rồi trả lại chính nó)
+    const before = cur ? JSON.stringify(cur.data) : null;
     const next = await fn(cur ? cur.data : structuredClone(fallback));
     // không đổi gì -> không ghi (tiết kiệm thao tác)
-    if (cur && next != null && JSON.stringify(next) === JSON.stringify(cur.data)) return next;
+    if (cur && next != null && JSON.stringify(next) === before) return next;
     try {
       await putJSON(name, next, cur ? { ifMatch: cur.etag } : { create: true });
       return next;
