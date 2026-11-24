@@ -89,7 +89,6 @@ export default function Tasks({ api }) {
           );
         })}
       </div>
-      {canEdit && <button className="fab" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={24} /></button>}
     </div>
   );
 }
