@@ -6,6 +6,8 @@ import { getBookings, allRooms } from '../lib/derive.js';
 import { readRows, detect, toBookings, guessRoom, FIELD_LABEL } from '../lib/report.js';
 import { fmtVND } from '../lib/money.js';
 import { planReportImport } from '../lib/fin.js';
+import { DirectImport } from './DirectImport.jsx';
+import { DIRECT } from '../lib/directPrices.js';
 import { dm } from '../lib/dates.js';
 import { Sheet, Field, MoneyInput, toast } from './ui.jsx';
 
@@ -16,12 +18,12 @@ const GUIDE = {
 };
 const MAP_FIELDS = ['checkin', 'checkout', 'nights', 'amount', 'fee', 'code', 'listing', 'guest', 'status'];
 
-export function ImportReport({ onClose }) {
+export function ImportReport({ onClose, month }) {
   const { state, user } = useStore();
   const { fin, dispatch } = useFinance();
   const fileRef = useRef(null);
-  const platforms = ['Airbnb', 'Booking.com', 'Agoda', ...new Set(state.calendars.map((c) => c.platform).filter((p) => !['Airbnb', 'Booking.com', 'Agoda'].includes(p)))];
-  const [platform, setPlatform] = useState(platforms[0]);
+  const platforms = [DIRECT, 'Airbnb', 'Booking.com', 'Agoda', ...new Set(state.calendars.map((c) => c.platform).filter((p) => p && ![DIRECT, 'Airbnb', 'Booking.com', 'Agoda'].includes(p)))];
+  const [platform, setPlatform] = useState(platforms[1]);
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState(null);
   const [det, setDet] = useState(null);
@@ -72,16 +74,21 @@ export function ImportReport({ onClose }) {
 
   const total = parsed?.bookings.reduce((a, b) => a + b.amount, 0) || 0;
   const skippedN = parsed ? parsed.skipped.cancelled + parsed.skipped.other + parsed.skipped.invalid : 0;
+  const chips = (
+    <Field label="Kênh">
+      <div className="chip-row">
+        {platforms.map((p) => (
+          <button key={p} type="button" className={`mini-chip ${platform === p ? 'on' : ''}`} style={{ '--pc': platformColor(p) }} onClick={() => { setPlatform(p); setRows(null); setDet(null); setFile(null); }}>{p}</button>
+        ))}
+      </div>
+    </Field>
+  );
+  // kênh Trực tiếp: form Excel mẫu theo tháng -> điền -> tải lên
+  if (platform === DIRECT) return <DirectImport month={month || new Date().toISOString().slice(0, 7)} chips={chips} onClose={onClose} />;
   return (
     <Sheet open onClose={onClose} title="Nhập file báo cáo từ sàn"
       footer={parsed ? <button className="btn primary block" disabled={!parsed.bookings.length || (foreign && !rate)} onClick={run}>Nhập {parsed.bookings.length} đặt phòng</button> : null}>
-      <Field label="Sàn">
-        <div className="chip-row">
-          {platforms.map((p) => (
-            <button key={p} type="button" className={`mini-chip ${platform === p ? 'on' : ''}`} style={{ '--pc': platformColor(p) }} onClick={() => { setPlatform(p); setRows(null); setDet(null); setFile(null); }}>{p}</button>
-          ))}
-        </div>
-      </Field>
+      {chips}
       {GUIDE[platform] && <p className="fin-note">{GUIDE[platform]}</p>}
       <button className="drop" onClick={() => fileRef.current?.click()}>
         <Upload size={22} />
