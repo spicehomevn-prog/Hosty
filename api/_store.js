@@ -16,6 +16,9 @@ export class ConflictError extends Error {
   constructor() { super('conflict'); this.name = 'ConflictError'; }
 }
 
+/** Chế độ truy cập blob đang dùng ('private' an toàn hơn; 'public' = ai biết đường dẫn đều tải được) */
+export const blobAccess = () => access;
+
 export function storeMode() {
   if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) return 'blob';
   if (process.env.HOSTY_LOCAL_STORE) return 'local';

@@ -3,7 +3,7 @@
 // - Tài khoản cơ sở (admin / member): lưu trong hosty/accounts.json, do owner tạo.
 import { scrypt as _scrypt, randomBytes, createHmac, createHash, timingSafeEqual, randomInt } from 'node:crypto';
 import { promisify } from 'node:util';
-import { getJSON } from './_store.js';
+import { getJSON, updateJSON } from './_store.js';
 import { normPhone } from '../src/lib/plan.js';
 import { HttpError } from './_http.js';
 
@@ -113,13 +113,46 @@ export const publicAccount = (a) => ({
 const OWNER_USER = (o) => ({ id: 'owner', username: o.username, name: 'Chủ hệ thống', role: 'owner', ws: null });
 
 /** Đăng nhập: trả về { token, user } hoặc ném lỗi 401 */
+/* ---------- Chống dò mật khẩu: sai 5 lần trong 15 phút -> khoá tên đăng nhập đó 15 phút ---------- */
+const FAILS = 'security/login-fails.json';
+const LOCK_AFTER = 5;
+const LOCK_MS = 15 * 60 * 1000;
+const failKey = (u) => createHash('sha256').update(`login:${secret()}:${u}`).digest('hex').slice(0, 20);
+async function failState(u) {
+  const d = (await getJSON(FAILS, { etag: false }).catch(() => null))?.data || {};
+  return d[failKey(u)] || null;
+}
+async function noteFail(u) {
+  const k = failKey(u);
+  await updateJSON(FAILS, (d) => {
+    const now = Date.now();
+    const out = Object.fromEntries(Object.entries(d || {}).filter(([, e]) => now - e.at < 864e5)); // dọn mục cũ hơn 1 ngày
+    const e = out[k] && now - out[k].at < LOCK_MS ? { ...out[k] } : { n: 0 };
+    e.n += 1; e.at = now;
+    if (e.n >= LOCK_AFTER) e.until = now + LOCK_MS;
+    out[k] = e;
+    return out;
+  }, {}).catch(() => {});
+}
+async function clearFail(u) {
+  const k = failKey(u);
+  await updateJSON(FAILS, (d) => { const out = { ...(d || {}) }; delete out[k]; return out; }, {}).catch(() => {});
+}
+
+/** Đăng nhập: trả về { token, user } hoặc ném lỗi 401 / 429 */
 export async function login(username, password) {
   secret();
   // đăng nhập bằng SĐT (tài khoản dùng thử): chấp nhận +84 / dấu cách
   const u = normPhone(username) || String(username || '').trim().toLowerCase();
+  const fs = await failState(u);
+  if (fs?.until && fs.until > Date.now()) {
+    throw new HttpError(429, `Đăng nhập sai quá nhiều lần. Thử lại sau ${Math.ceil((fs.until - Date.now()) / 60000)} phút hoặc liên hệ quản trị viên.`);
+  }
+  const bad = async () => { await noteFail(u); return fail(); };
   const o = owner();
   if (o && safeEqual(u, o.username)) {
-    if (!safeEqual(password, o.password)) throw await fail();
+    if (!safeEqual(password, o.password)) throw await bad();
+    if (fs) await clearFail(u);
     return { token: sign({ uid: 'owner', tv: o.tv, exp: Date.now() + TOKEN_DAYS * 864e5 }), user: OWNER_USER(o) };
   }
   const { accounts } = await loadAccounts({ fresh: true });
@@ -127,8 +160,9 @@ export async function login(username, password) {
     throw new HttpError(503, 'Máy chủ chưa có tài khoản chủ hệ thống: thêm HOSTY_OWNER_USERNAME và HOSTY_OWNER_PASSWORD trên Vercel rồi Redeploy.');
   }
   const acc = accounts.find((a) => a.username === u);
-  if (!acc || !(await checkPassword(String(password || ''), acc.salt, acc.passHash))) throw await fail();
+  if (!acc || !(await checkPassword(String(password || ''), acc.salt, acc.passHash))) throw await bad();
   if (acc.disabled) throw new HttpError(403, 'Tài khoản đã bị khoá. Liên hệ quản trị viên.');
+  if (fs) await clearFail(u);
   return { token: sign({ uid: acc.id, tv: acc.tokenVersion || 0, exp: Date.now() + TOKEN_DAYS * 864e5 }), user: publicAccount(acc) };
 }
 async function fail() {

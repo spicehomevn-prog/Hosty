@@ -16,7 +16,8 @@ import { TRIAL, isTrial, trialExpired, normPhone } from '../src/lib/plan.js';
 const SIGNUPS = 'signups.json';
 const MAX_PER_IP_DAY = 3;
 const MAX_TRIALS = 200;
-const ipOf = (req) => String(req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+// Vercel tự đặt x-real-ip / x-vercel-forwarded-for bằng IP thật của khách (ghi đè giá trị khách tự gửi)
+const ipOf = (req) => String(req.headers?.['x-real-ip'] || req.headers?.['x-vercel-forwarded-for'] || req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
 const ipHash = (ip) => createHash('sha256').update(`hostexa-signup:${envClean(process.env.AUTH_SECRET)}:${ip}`).digest('hex').slice(0, 16);
 
 /** Đăng ký dùng thử: tạo cơ sở gói trial (14 ngày) + tài khoản admin đăng nhập bằng SĐT */
