@@ -271,7 +271,10 @@ export function repriceAfter(bookings, fin, roomIds, days, { all = false } = {})
     for (let d = b.start; !hit && d < b.end; d = addDays(d, 1)) if (set.has(d)) hit = true;
     if (!hit) continue;
     const est = rateEstimate(b, fin);
-    out[b.id] = est ? freezeEntry(b, est) : null;
+    if (!est) { if (e) out[b.id] = null; continue; }
+    // giá không đổi -> giữ nguyên mục cũ (vd. đổi giá Booking.com không đụng tới đặt phòng Airbnb)
+    if (e && e.amount === est.amount && (e.base ?? e.amount) === est.base && e.source === estSource(est)) continue;
+    out[b.id] = freezeEntry(b, est);
   }
   return out;
 }

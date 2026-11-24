@@ -270,7 +270,10 @@ function RatesExcel({ month }) {
     try {
       const r = parseRateSheet(await readRows(f), month, rows.map((x) => x.key), (k, d) => byKey[k]?.values?.[d]);
       const rooms = new Set(Object.keys(r.table).map((k) => byKey[k].roomId));
-      setRes({ ...r, rooms: rooms.size, file: f.name });
+      // số ô thay đổi theo từng kênh – kênh không có thay đổi giữ nguyên
+      const per = {};
+      for (const [k, t] of Object.entries(r.table)) { const c = byKey[k].plat || 'Mọi sàn'; per[c] = (per[c] || 0) + Object.keys(t).length; }
+      setRes({ ...r, rooms: rooms.size, file: f.name, per });
     } catch (ex) { setErr(ex.message || 'Không đọc được file'); }
   };
   const apply = () => {
@@ -302,7 +305,10 @@ function RatesExcel({ month }) {
           <p><b>{res.file}</b>: {res.changed} ô giá mới{res.cleared ? `, xoá ${res.cleared} ô` : ''} · {res.rooms} phòng</p>
           {res.unknown > 0 && <p className="bad">{res.unknown} dòng có mã phòng không khớp – bỏ qua</p>}
           {res.invalid > 0 && <p className="bad">{res.invalid} ô không phải số – bỏ qua</p>}
-          <p className="muted">Đặt phòng từ sàn đang tính theo bảng giá sẽ được tính lại. Giá nhập tay / file báo cáo của sàn giữ nguyên.</p>
+          {Object.keys(res.per || {}).length > 0 && (
+            <p className="imp-per">{Object.entries(res.per).map(([c, n]) => <span key={c} className="tag">{c}: {n} ô</span>)}</p>
+          )}
+          <p className="muted">Chỉ cập nhật {Object.keys(res.per || {}).length ? Object.keys(res.per).join(', ') : 'các ô có thay đổi'}; kênh khác giữ nguyên.{res.per?.['Mọi sàn'] ? ' Giá "Mọi sàn" dùng cho các sàn chưa có giá riêng.' : ''} Giá nhập tay / file báo cáo của sàn không đổi.</p>
           <div className="row gap8">
             <button className="btn tiny primary" disabled={!res.changed && !res.cleared} onClick={apply}>Áp vào bảng giá</button>
             <button className="btn tiny" onClick={() => setRes(null)}>Huỷ</button>

@@ -1359,3 +1359,4 @@ input.switch:checked::after { transform: translateX(18px); }
 .rate-plats .tiny { margin: 6px 2px 0; }
 .rate-plats .pdot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; vertical-align: middle; }
 .rate-p.inherit { color: var(--muted); opacity: .55; font-weight: 500; }
+.imp-per { display: flex; flex-wrap: wrap; gap: 6px; }
