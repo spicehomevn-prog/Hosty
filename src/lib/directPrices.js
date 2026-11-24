@@ -185,14 +185,15 @@ export async function downloadRateTemplate(rows, m, wsName = '', { ota = false }
   const [y, mo] = m.split('-');
   const g = (value, x = {}) => [{ value, ...x }];
   const guide = ota ? [
-    g(`Bảng giá các sàn – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, { fontWeight: 'bold', fontSize: 14 }),
+    g(`Bảng giá phòng – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, { fontWeight: 'bold', fontSize: 14 }),
     g('Cách dùng:', { fontWeight: 'bold' }),
-    g('1. Ở trang "Bảng giá", mỗi phòng có 1 dòng "Mọi sàn" và 1 dòng cho từng sàn (Airbnb, Booking.com…). Mỗi cột là 1 ngày, điền giá 1 đêm (nhận phòng ngày đó), ví dụ 850000.'),
+    g('1. Ở trang "Bảng giá", mỗi phòng có 1 dòng "Mọi sàn", 1 dòng cho từng sàn (Airbnb, Booking.com…) và 1 dòng "Trực tiếp". Mỗi cột là 1 ngày, điền giá 1 đêm (nhận phòng ngày đó), ví dụ 850000.'),
     g('2. Dòng "Mọi sàn" = bảng giá chung, dùng cho mọi sàn. Dòng của 1 sàn = giá riêng sàn đó, được ưu tiên hơn giá chung (chỉ cần điền những ngày giá sàn đó khác giá chung).'),
     g('3. Cột màu hồng là đêm thứ 6, thứ 7. KHÔNG sửa cột "Mã phòng" và cột "Sàn".'),
     g('4. Ô để trống = giữ nguyên giá đang có. Gõ 0 = xoá giá ngày đó.'),
-    g('5. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Các sàn → Tải file đã điền lên.'),
-    g('Bảng giá dùng để tính doanh thu đặt phòng từ các sàn khi chưa có giá thật (giá nhập tay / file báo cáo của sàn luôn được ưu tiên). Không ảnh hưởng bảng giá Trực tiếp.'),
+    g('5. Dòng "Trực tiếp" = giá kênh đặt trực tiếp: tự điền giá khi tạo đặt phòng trực tiếp, không ảnh hưởng giá các sàn.'),
+    g('6. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Tải file đã điền lên.'),
+    g('Giá các sàn dùng để tính doanh thu đặt phòng từ sàn khi chưa có giá thật (giá nhập tay / file báo cáo của sàn luôn được ưu tiên).'),
   ] : [
     g(`Bảng giá kênh Trực tiếp – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, { fontWeight: 'bold', fontSize: 14 }),
     g('Cách dùng:', { fontWeight: 'bold' }),
@@ -202,7 +203,7 @@ export async function downloadRateTemplate(rows, m, wsName = '', { ota = false }
     g('4. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Trực tiếp → Tải file lên.'),
     g('Bảng giá này chỉ dùng để điền sẵn giá khi tạo đặt phòng TRỰC TIẾP – không ảnh hưởng giá các sàn (Airbnb, Booking.com…).'),
   ];
-  const fileName = `hostexa-bang-gia-${ota ? 'cac-san' : 'truc-tiep'}-${y}-${mo}.xlsx`;
+  const fileName = `hostexa-bang-gia-${ota ? 'phong' : 'truc-tiep'}-${y}-${mo}.xlsx`;
   await writeXlsxFile([
     { data: [head, ...body], sheet: 'Bảng giá', columns: [{ width: 16 }, { width: 26 }, ...(ota ? [{ width: 13 }] : []), ...days.map(() => ({ width: 11 }))], stickyRowsCount: 1, stickyColumnsCount: ota ? 3 : 2 },
     { data: guide, sheet: 'Hướng dẫn', columns: [{ width: 120 }] },

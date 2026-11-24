@@ -29,7 +29,7 @@ function reducer(s, a) {
     // bảng giá riêng từng sàn (ưu tiên hơn bảng giá chung khi tính giá đặt phòng của sàn đó)
     case 'SET_PLATFORM_RATES': return { ...s, platformRates: setPlatformDays(s.platformRates, a.roomIds, a.platform, a.days, a.price), prices: withPrices(s.prices, a.reprice) };
     // nhập file Excel bảng giá các sàn: dòng "Mọi sàn" -> rateTable, dòng từng sàn -> platformRates
-    case 'MERGE_RATES': return { ...s, rateTable: mergeDays(s.rateTable, a.general), platformRates: mergePlatformDays(s.platformRates, a.platform), prices: withPrices(s.prices, a.reprice) };
+    case 'MERGE_RATES': return { ...s, rateTable: mergeDays(s.rateTable, a.general), platformRates: mergePlatformDays(s.platformRates, a.platform), directRates: mergeDays(s.directRates, a.direct), prices: withPrices(s.prices, a.reprice) };
     case 'SET_DAY_DISCOUNT': return { ...s, dayDiscount: setDays(s.dayDiscount, a.roomIds, a.days, a.pct), prices: withPrices(s.prices, a.reprice) };
     case 'SET_STAY_DISCOUNT': {
       const stayDiscount = { ...(s.stayDiscount || {}) };

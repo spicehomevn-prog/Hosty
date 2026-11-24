@@ -26,12 +26,11 @@ export function RateCalendar({ onClose, initialRoom }) {
   const [extra, setExtra] = useState([]);
   const [reprice, setReprice] = useState(true);
   const [mode, setMode] = useState('price'); // 'price' | 'discount'
-  // 'ota' = bảng giá chung (dùng tính giá các sàn trên lịch) · 'direct' = bảng giá riêng kênh Trực tiếp
-  const [channel, setChannel] = useState('ota');
-  const direct = channel === 'direct';
   const [pct, setPct] = useState('');
   // Các sàn: '' = Mọi sàn (bảng giá chung) · tên sàn = giá riêng sàn đó (ưu tiên hơn giá chung)
   const [plat, setPlat] = useState('');
+  // 'Trực tiếp' = bảng giá riêng kênh Trực tiếp (chỉ để điền sẵn giá đặt phòng trực tiếp, không tính giá các sàn)
+  const direct = plat === DIRECT;
   const plats = platformsOf(state, roomId);
   const onPlat = !direct && plat && plats.includes(plat) ? plat : '';
   const bookings = useMemo(() => getBookings(state), [state]);
@@ -131,14 +130,7 @@ export function RateCalendar({ onClose, initialRoom }) {
           </div>
         </div>
       )}>
-      <div className="seg wide rate-channel">
-        <button type="button" className={!direct ? 'on' : ''} onClick={() => { setChannel('ota'); setSel(new Set()); }}>Các sàn</button>
-        <button type="button" className={direct ? 'on' : ''} onClick={() => { setChannel('direct'); setMode('price'); setSel(new Set()); }}>Trực tiếp</button>
-      </div>
-      <p className="tiny muted rate-channel-note">{direct
-        ? 'Bảng giá riêng kênh Trực tiếp: tự điền giá khi tạo đặt phòng trực tiếp. Không ảnh hưởng giá các sàn trên lịch.'
-        : 'Bảng giá các sàn: giá chung cho mọi sàn hoặc giá riêng từng sàn, dùng để tính giá đặt phòng từ sàn (Airbnb, Booking.com…) khi chưa có giá thật.'}</p>
-      <RatesExcel month={month} ota={!direct} />
+      <RatesExcel month={month} />
       <div className="rate-rooms">
         {state.locations.map((loc) => (
           <div key={loc.id} className="rate-loc">
@@ -146,7 +138,7 @@ export function RateCalendar({ onClose, initialRoom }) {
             <div className="chip-row">
               {loc.rooms.map((r) => (
                 <button key={r.id} type="button" className={`mini-chip ${roomId === r.id ? 'on' : ''}`} style={{ '--pc': '#6B4FD8' }} onClick={() => { setRoomId(r.id); setExtra(extra.filter((x) => x !== r.id)); }}>
-                  {r.name}{!(direct ? fin.directRates?.[r.id] : fin.rateTable?.[r.id] || fin.platformRates?.[r.id]) && <i className="nodot" title="Chưa có bảng giá" />}
+                  {r.name}{!(fin.directRates?.[r.id] || fin.rateTable?.[r.id] || fin.platformRates?.[r.id]) && <i className="nodot" title="Chưa có bảng giá" />}
                 </button>
               ))}
             </div>
@@ -154,7 +146,7 @@ export function RateCalendar({ onClose, initialRoom }) {
         ))}
       </div>
 
-      {!direct && plats.length > 0 && (
+      {(
         <div className="rate-plats">
           <small>Giá cho sàn</small>
           <div className="chip-row">
@@ -164,8 +156,13 @@ export function RateCalendar({ onClose, initialRoom }) {
                 {p}{Object.keys(fin.platformRates?.[roomId]?.[p] || {}).length > 0 && <i className="pdot" style={{ background: platformColor(p) }} />}
               </button>
             ))}
+            <button type="button" className={`mini-chip ${direct ? 'on' : ''}`} style={{ '--pc': platformColor(DIRECT) }} onClick={() => { setPlat(DIRECT); setMode('price'); setSel(new Set()); }}>
+              {DIRECT}{Object.keys(fin.directRates?.[roomId] || {}).length > 0 && <i className="pdot" style={{ background: platformColor(DIRECT) }} />}
+            </button>
           </div>
-          <p className="tiny muted">{onPlat ? `Giá riêng ${onPlat}: ưu tiên hơn giá chung. Ngày để trống dùng giá chung (số mờ).` : 'Giá chung cho mọi sàn. Chọn 1 sàn để đặt giá riêng cho sàn đó.'}</p>
+          <p className="tiny muted">{direct
+            ? 'Giá kênh Trực tiếp: tự điền giá khi tạo đặt phòng trực tiếp. Không ảnh hưởng giá các sàn.'
+            : onPlat ? `Giá riêng ${onPlat}: ưu tiên hơn giá chung. Ngày để trống dùng giá chung (số mờ).` : 'Giá chung cho mọi sàn (Airbnb, Booking.com…), dùng tính doanh thu khi chưa có giá thật. Chọn 1 sàn để đặt giá riêng.'}</p>
         </div>
       )}
       <div className="month-nav sm">
@@ -230,6 +227,7 @@ export function RateCalendar({ onClose, initialRoom }) {
   );
 }
 
+const DIRECT = 'Trực tiếp';
 /** Sàn có lịch iCal của phòng (không có thì lấy các sàn đang dùng trong cơ sở) */
 function platformsOf(state, roomId) {
   const all = (state.calendars || []).filter((c) => c.platform && c.platform !== 'Trực tiếp');
@@ -241,7 +239,7 @@ function platformsOf(state, roomId) {
  * Form Excel bảng giá của tháng: tải mẫu -> điền -> tải lên.
  * Trực tiếp: mỗi phòng 1 dòng (directRates). Các sàn: mỗi phòng 1 dòng "Mọi sàn" (rateTable) + 1 dòng / sàn (platformRates).
  */
-function RatesExcel({ month, ota }) {
+function RatesExcel({ month }) {
   const { state } = useStore();
   const { fin, dispatch } = useFinance();
   const { workspace } = useSession();
@@ -249,19 +247,19 @@ function RatesExcel({ month, ota }) {
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
   const fileRef = useRef(null);
-  useEffect(() => { setRes(null); setErr(''); }, [ota, month]);
+  useEffect(() => { setRes(null); setErr(''); }, [month]);
   const multi = state.locations.length > 1;
   const rows = state.locations.flatMap((l) => l.rooms.flatMap((r) => {
     const name = multi ? `${r.name} · ${l.name}` : r.name;
-    if (!ota) return [{ key: r.id, roomId: r.id, name, values: fin.directRates?.[r.id] }];
     return [{ key: r.id, roomId: r.id, name, plat: '', values: fin.rateTable?.[r.id] },
-      ...platformsOf(state, r.id).map((p) => ({ key: `${r.id}:${p}`, roomId: r.id, name, plat: p, values: fin.platformRates?.[r.id]?.[p] }))];
+      ...platformsOf(state, r.id).map((p) => ({ key: `${r.id}:${p}`, roomId: r.id, name, plat: p, values: fin.platformRates?.[r.id]?.[p] })),
+      { key: `${r.id}:${DIRECT}`, roomId: r.id, name, plat: DIRECT, values: fin.directRates?.[r.id] }];
   }));
   const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
   const [y, mo] = month.split('-');
   const download = async () => {
     setBusy(true); setErr('');
-    try { const n = await downloadRateTemplate(rows, month, workspace?.name || state.property?.name || '', { ota }); toast(`Đã tải ${n}`); } catch (e) { setErr(e.message || 'Không tạo được file'); }
+    try { const n = await downloadRateTemplate(rows, month, workspace?.name || state.property?.name || '', { ota: true }); toast(`Đã tải ${n}`); } catch (e) { setErr(e.message || 'Không tạo được file'); }
     setBusy(false);
   };
   const pick = async (e) => {
@@ -276,23 +274,18 @@ function RatesExcel({ month, ota }) {
     } catch (ex) { setErr(ex.message || 'Không đọc được file'); }
   };
   const apply = () => {
-    if (!ota) {
-      dispatch({ type: 'MERGE_DIRECT_RATES', table: res.table });
-      toast(`Đã cập nhật bảng giá Trực tiếp: ${res.changed} ngày${res.cleared ? ` · xoá ${res.cleared} ngày` : ''}`);
-      setRes(null);
-      return;
-    }
-    const gen = {}; const plat = {}; const roomIds = new Set(); const days = new Set();
+    const gen = {}; const plat = {}; const dir = {}; const roomIds = new Set(); const days = new Set();
     for (const [k, t] of Object.entries(res.table)) {
       const row = byKey[k];
+      if (row.plat === DIRECT) { dir[row.roomId] = t; continue; } // bảng giá Trực tiếp: không tính lại đặt phòng các sàn
       roomIds.add(row.roomId); Object.keys(t).forEach((d) => days.add(d));
       if (row.plat) ((plat[row.roomId] ||= {})[row.plat] = t); else gen[row.roomId] = t;
     }
     const next = { ...fin, rateTable: mergeDays(fin.rateTable, gen), platformRates: mergePlatformDays(fin.platformRates, plat) };
     const re = repriceAfter(getBookings(state), next, [...roomIds], [...days]);
-    dispatch({ type: 'MERGE_RATES', general: gen, platform: plat, reprice: re });
+    dispatch({ type: 'MERGE_RATES', general: gen, platform: plat, direct: dir, reprice: re });
     const n = Object.values(re).filter(Boolean).length;
-    toast(`Đã cập nhật bảng giá các sàn: ${res.changed} ô${res.cleared ? ` · xoá ${res.cleared}` : ''}${n ? ` · tính lại ${n} đặt phòng` : ''}`);
+    toast(`Đã cập nhật bảng giá: ${res.changed} ô${res.cleared ? ` · xoá ${res.cleared}` : ''}${n ? ` · tính lại ${n} đặt phòng` : ''}`);
     setRes(null);
   };
   return (
@@ -302,16 +295,16 @@ function RatesExcel({ month, ota }) {
         <button className="btn tiny" onClick={() => fileRef.current?.click()}><Upload size={14} /> Tải file đã điền lên</button>
         <input ref={fileRef} type="file" accept=".xlsx,.csv" hidden onChange={pick} />
       </div>
-      <small>{ota ? 'Mỗi phòng 1 dòng "Mọi sàn" + 1 dòng cho từng sàn, mỗi ngày 1 cột.' : 'Mỗi phòng 1 dòng, mỗi ngày 1 cột.'} Ô trống = giữ nguyên, gõ 0 = xoá giá.</small>
+      <small>Mỗi phòng: 1 dòng "Mọi sàn", 1 dòng cho từng sàn và 1 dòng "Trực tiếp"; mỗi ngày 1 cột. Ô trống = giữ nguyên, gõ 0 = xoá giá.</small>
       {err && <p className="form-error">{err}</p>}
       {res && (
         <div className="imp-plan">
           <p><b>{res.file}</b>: {res.changed} ô giá mới{res.cleared ? `, xoá ${res.cleared} ô` : ''} · {res.rooms} phòng</p>
           {res.unknown > 0 && <p className="bad">{res.unknown} dòng có mã phòng không khớp – bỏ qua</p>}
           {res.invalid > 0 && <p className="bad">{res.invalid} ô không phải số – bỏ qua</p>}
-          {ota && <p className="muted">Đặt phòng đang tính theo bảng giá sẽ được tính lại. Giá nhập tay / file báo cáo của sàn giữ nguyên.</p>}
+          <p className="muted">Đặt phòng từ sàn đang tính theo bảng giá sẽ được tính lại. Giá nhập tay / file báo cáo của sàn giữ nguyên.</p>
           <div className="row gap8">
-            <button className="btn tiny primary" disabled={!res.changed && !res.cleared} onClick={apply}>{ota ? 'Áp vào bảng giá các sàn' : 'Áp vào bảng giá Trực tiếp'}</button>
+            <button className="btn tiny primary" disabled={!res.changed && !res.cleared} onClick={apply}>Áp vào bảng giá</button>
             <button className="btn tiny" onClick={() => setRes(null)}>Huỷ</button>
           </div>
         </div>
