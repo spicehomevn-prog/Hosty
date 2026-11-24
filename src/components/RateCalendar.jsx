@@ -2,17 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../lib/session.jsx';
 import { readRows } from '../lib/report.js';
 import { downloadRateTemplate, parseRateSheet } from '../lib/directPrices.js';
-import { ChevronLeft, ChevronRight, Trash2, Download, Upload } from '../lib/icons.jsx';
+import { ChevronLeft, ChevronRight, Trash2, Download, Upload, RefreshCw } from '../lib/icons.jsx';
 import { useStore, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { getBookings } from '../lib/derive.js';
 import { repriceAfter, setDays, setPlatformDays, mergeDays, mergePlatformDays, stayRule, WEEK_NIGHTS, MONTH_NIGHTS } from '../lib/fin.js';
 import { fmtShort, fmtVND } from '../lib/money.js';
-import { todayKey, addDays, addMonths, startOfWeek, endOfMonth, rangeKeys, monthTitle, WD_SHORT, fromKey } from '../lib/dates.js';
+import { todayKey, addDays, addMonths, startOfWeek, endOfMonth, rangeKeys, monthTitle, WD_SHORT, fromKey, timeAgo } from '../lib/dates.js';
 import { Sheet, MoneyInput, toast } from './ui.jsx';
 
 /** Bảng giá: chọn các ngày trên lịch rồi áp chung một giá một đêm cho phòng */
-export function RateCalendar({ onClose, initialRoom }) {
+export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
   const { state } = useStore();
   const { fin, dispatch } = useFinance();
   const today = todayKey();
@@ -133,6 +133,16 @@ export function RateCalendar({ onClose, initialRoom }) {
         </div>
       )}>
       <RatesExcel month={month} />
+      {onOpenOta && (
+        <button type="button" className="rate-auto" onClick={onOpenOta}>
+          <span className="rate-auto-ico"><RefreshCw size={17} /></span>
+          <span className="rate-auto-txt">
+            <b>Cập nhật tự động từ sàn</b>
+            <small>Airbnb, Booking.com, Agoda qua Apify{fin.otaRun?.at ? ` · lần gần nhất ${timeAgo(fin.otaRun.at)}` : ' · chưa cài đặt'}</small>
+          </span>
+          <ChevronRight size={18} />
+        </button>
+      )}
       <div className="rate-rooms">
         {state.locations.map((loc) => (
           <div key={loc.id} className="rate-loc">

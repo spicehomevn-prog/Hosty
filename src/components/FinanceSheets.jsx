@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Trash2, Pricing, RefreshCw, CheckCircle2, AlertCircle, Link2 } from '../lib/icons.jsx';
 import { useStore, uid, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
@@ -182,8 +182,20 @@ export function HistorySheet({ month, onClose }) {
 }
 
 /* ---------- Cài đặt tài chính: phí sàn, thuế ---------- */
-export function FinanceSettings({ onClose, onOpenRates }) {
+export function FinanceSettings({ onClose, onOpenRates, focus }) {
   const { fin, dispatch } = useFinance();
+  // mở từ Bảng giá ("Cập nhật tự động từ sàn"): cuộn tới mục Giá các sàn theo ngày (Apify)
+  useEffect(() => {
+    if (focus !== 'ota') return undefined;
+    const t = setTimeout(() => {
+      const el = document.getElementById('ota-rates');
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 1600);
+    }, 320);
+    return () => clearTimeout(t);
+  }, [focus]);
   const platforms = usePlatforms(Object.keys(DEFAULT_FEES).filter((p) => fin.settings.fees?.[p] != null && p !== 'Traveloka' && p !== 'Expedia'));
   return (
     <Sheet open onClose={onClose} title="Cài đặt tài chính">
@@ -279,7 +291,7 @@ function OtaRates() {
   const fx = src('Agoda')?.fx;
   return (
     <>
-      <h4 className="fin-h"><Link2 size={16} /> Giá các sàn theo ngày (Apify)</h4>
+      <h4 className="fin-h ota-head" id="ota-rates"><Link2 size={16} /> Giá các sàn theo ngày (Apify)</h4>
       <p className="tiny muted">
         Dán link phòng trên <b>Airbnb, Booking.com, Agoda</b>. Máy chủ lấy giá từng đêm còn trống (tháng này và tháng sau) bằng actor Hotel Rates API của Apify,
         tự chạy <b>ngày 1 hằng tháng</b>. Đặt phòng của sàn nào tính theo giá sàn đó; đêm không có giá thì dùng Bảng giá.

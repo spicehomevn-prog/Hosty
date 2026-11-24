@@ -1372,3 +1372,12 @@ input.switch:checked::after { transform: translateX(18px); }
 .fx-row { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
 .fx-row small { padding: 0 4px; line-height: 1.4; }
 .pct-input.fx-input .input { width: 104px; }
+/* Bảng giá: lối tắt "Cập nhật tự động từ sàn" -> Cài đặt tài chính / Giá các sàn (Apify) */
+.rate-auto { display: flex; align-items: center; gap: 12px; width: 100%; margin: -4px 0 14px; padding: 10px 12px; border-radius: var(--r-sm); border: 1.5px solid var(--line); background: #fff; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.rate-auto:hover { border-color: #CDBBFF; }
+.rate-auto-ico { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 11px; color: #fff; background: linear-gradient(135deg, #FF8FB8, #7C5CE6); }
+.rate-auto-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rate-auto-txt b { font-size: 14px; }
+.rate-auto-txt small { font-size: 12px; color: var(--muted); }
+.ota-head { scroll-margin-top: 12px; border-radius: 10px; transition: background .3s, box-shadow .3s; }
+.ota-head.flash { background: var(--violet-soft, #F3EEFF); box-shadow: 0 0 0 6px var(--violet-soft, #F3EEFF); }

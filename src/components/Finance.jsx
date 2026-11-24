@@ -215,8 +215,8 @@ export default function Finance({ api }) {
       {sheet?.type === 'price' && <PriceSheet b={sheet.data} onClose={() => setSheet(null)} />}
       {sheet?.type === 'expense' && <ExpenseSheet expense={sheet.data} month={month} onClose={() => setSheet(null)} />}
       {sheet?.type === 'history' && <HistorySheet month={sheet.data} onClose={() => setSheet(null)} />}
-      {sheet?.type === 'settings' && <FinanceSettings onClose={() => setSheet(null)} onOpenRates={() => open('rates')} />}
-      {sheet?.type === 'rates' && <RateCalendar onClose={() => setSheet(null)} initialRoom={sheet.data} />}
+      {sheet?.type === 'settings' && <FinanceSettings onClose={() => setSheet(null)} onOpenRates={() => open('rates')} focus={sheet.data} />}
+      {sheet?.type === 'rates' && <RateCalendar onClose={() => setSheet(null)} initialRoom={sheet.data} onOpenOta={() => open('settings', 'ota')} />}
       {sheet?.type === 'import' && <ImportReport month={month} onClose={() => setSheet(null)} />}
     </div>
   );
