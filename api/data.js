@@ -3,7 +3,7 @@
 // PUT /api/data { ws, baseVersion, data }   -> { version, updatedAt }   (409 nếu bản trên máy chủ đã đổi)
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, loadWorkspaces, wsFile, signFeed } from './_auth.js';
+import { requireUser, canAccess, wsFile, signFeed, wsExists } from './_auth.js';
 import { siteUrl } from '../site.config.js';
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'cleanNotes', 'setupDone'];
@@ -78,7 +78,7 @@ export default route(async (req, res) => {
   if (req.method === 'GET') {
     const ws = query(req).get('ws');
     if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-    const cur = await getJSON(wsFile(ws));
+    const cur = await getJSON(wsFile(ws), { etag: false });
     if (query(req).get('links')) return send(res, 200, { links: exportLinks(req, user, ws, cur?.data?.data) });
     if (!cur) return send(res, 200, { version: 0, updatedAt: 0, updatedBy: '', data: null });
     const { version, updatedAt, updatedBy, data } = cur.data;
@@ -89,8 +89,7 @@ export default route(async (req, res) => {
     const body = await readBody(req);
     const { ws } = body;
     if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-    const { workspaces } = await loadWorkspaces();
-    if (!workspaces.some((w) => w.id === ws)) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+    if (!(await wsExists(ws))) throw new HttpError(404, 'Cơ sở không còn tồn tại');
     if (!body.data || typeof body.data !== 'object' || !Array.isArray(body.data.locations)) {
       throw new HttpError(400, 'Dữ liệu không hợp lệ');
     }
@@ -116,7 +115,7 @@ export default route(async (req, res) => {
       await putJSON(wsFile(ws), doc, cur ? { ifMatch: cur.etag } : { create: true });
     } catch (e) {
       if (e instanceof ConflictError) {
-        const fresh = await getJSON(wsFile(ws));
+        const fresh = await getJSON(wsFile(ws), { etag: false });
         throw new HttpError(409, 'Dữ liệu trên máy chủ đã thay đổi', {
           version: fresh?.data.version || 0, updatedAt: fresh?.data.updatedAt || 0, updatedBy: fresh?.data.updatedBy || '', data: fresh?.data.data || null,
         });

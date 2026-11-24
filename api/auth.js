@@ -34,7 +34,7 @@ export default route(async (req, res) => {
       if (user.role === 'owner') throw new HttpError(400, 'Mật khẩu chủ hệ thống đổi trong biến môi trường HOSTY_OWNER_PASSWORD trên Vercel');
       const np = String(body.newPassword || '');
       if (np.length < 6) throw new HttpError(400, 'Mật khẩu mới cần ít nhất 6 ký tự');
-      const { accounts } = await loadAccounts();
+      const { accounts } = await loadAccounts({ fresh: true });
       const acc = accounts.find((a) => a.id === user.id);
       if (!acc || !(await checkPassword(String(body.oldPassword || ''), acc.salt, acc.passHash))) {
         throw new HttpError(400, 'Mật khẩu hiện tại không đúng');

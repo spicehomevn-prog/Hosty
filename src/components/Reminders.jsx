@@ -85,7 +85,7 @@ function RunStatus({ run }) {
   if (d?.sent) line = <span className="ok">Tổng quan hôm nay: đã gửi lúc {hm(d.at)} tới {d.sent} người{d.failed ? ` · ${d.failed} người lỗi` : ''}</span>;
   else if (d?.failed) line = <span className="bad">Tổng quan hôm nay chưa gửi được: {d.errors?.[0] || 'lỗi không rõ'}</span>;
   else if (nowVN < 8) line = <span>Tổng quan hôm nay: sẽ gửi lúc 8:00</span>;
-  else line = <span className="bad">Tổng quan hôm nay: chưa gửi{run.at ? ` · máy chủ chạy lần cuối ${hm(run.at)}` : ' · máy chủ chưa chạy lượt nào'}</span>;
+  else line = <span className="bad">Tổng quan hôm nay: chưa gửi{run.at ? ` · lần gửi gần nhất ${dmTs(run.at)} ${hm(run.at)}` : ''}</span>;
   return (
     <div className="rm-run">
       {line}

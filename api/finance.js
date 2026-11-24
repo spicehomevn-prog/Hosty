@@ -7,7 +7,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, loadWorkspaces, envClean } from './_auth.js';
+import { requireUser, canAccess, loadWorkspaces, envClean, wsExists } from './_auth.js';
 import { resolveAirbnb, runAirbnbCalendars, OtaError } from './_apify.js';
 
 export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap'];
@@ -18,8 +18,7 @@ async function requireFinance(req, ws) {
   const user = await requireUser(req);
   if (user.role !== 'owner' && user.role !== 'admin') throw new HttpError(403, 'Chỉ chủ hệ thống và admin cơ sở xem được tài chính');
   if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-  const { workspaces } = await loadWorkspaces();
-  if (!workspaces.some((w) => w.id === ws)) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+  if (!(await wsExists(ws))) throw new HttpError(404, 'Cơ sở không còn tồn tại');
   return user;
 }
 
@@ -39,7 +38,7 @@ function cronAllowed(req) {
  * ngày có giá mới thì cập nhật, ngày không còn giá (đã có khách / bị chặn) giữ giá cũ.
  */
 async function updateOta(ws, by) {
-  const cur = await getJSON(finFile(ws));
+  const cur = await getJSON(finFile(ws), { etag: false });
   const data = cur?.data?.data || {};
   const rooms = Object.entries(data.otaListings || {}).filter(([, v]) => v?.Airbnb);
   if (!rooms.length) throw new HttpError(400, 'Chưa có link Airbnb nào trong Cài đặt tài chính');
@@ -84,7 +83,7 @@ export default route(async (req, res) => {
     const { workspaces } = await loadWorkspaces();
     const done = [];
     for (const w of workspaces) {
-      const cur = await getJSON(finFile(w.id));
+      const cur = await getJSON(finFile(w.id), { etag: false, cache: true });
       if (!Object.values(cur?.data?.data?.otaListings || {}).some((v) => v?.Airbnb)) continue;
       try { await updateOta(w.id, 'Tự cập nhật hằng tháng'); done.push(w.id); } catch (e) { console.error('ota', w.id, e.message); }
     }
@@ -96,7 +95,7 @@ export default route(async (req, res) => {
     const ws = q.get('ws');
     const user = await requireFinance(req, ws);
     if (q.get('action') !== 'ota') throw new HttpError(400, 'Thao tác không hợp lệ');
-    const cur = await getJSON(finFile(ws));
+    const cur = await getJSON(finFile(ws), { etag: false });
     // chỉ giới hạn sau lần chạy thành công (lần lỗi không tốn tiền, cho thử lại ngay)
     const lastRun = cur?.data?.data?.otaRun;
     const last = lastRun?.ok ? lastRun.at || 0 : 0;
@@ -110,7 +109,7 @@ export default route(async (req, res) => {
   if (req.method === 'GET') {
     const ws = query(req).get('ws');
     await requireFinance(req, ws);
-    const cur = await getJSON(finFile(ws));
+    const cur = await getJSON(finFile(ws), { etag: false });
     const doc = cur?.data || { version: 0, updatedAt: 0, updatedBy: '', data: null };
     return send(res, 200, { version: doc.version, updatedAt: doc.updatedAt, updatedBy: doc.updatedBy, data: doc.data });
   }
@@ -131,7 +130,7 @@ export default route(async (req, res) => {
     try {
       await putJSON(finFile(ws), doc, cur ? { ifMatch: cur.etag } : { create: true });
     } catch (e) {
-      if (e instanceof ConflictError) throw conflictOf(await getJSON(finFile(ws)));
+      if (e instanceof ConflictError) throw conflictOf(await getJSON(finFile(ws), { etag: false }));
       throw e;
     }
     return send(res, 200, { version: doc.version, updatedAt: doc.updatedAt, updatedBy: doc.updatedBy });

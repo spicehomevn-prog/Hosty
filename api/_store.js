@@ -2,6 +2,10 @@
 // - Trên Vercel: Vercel Blob (biến BLOB_READ_WRITE_TOKEN tự có khi kết nối Blob store vào project).
 // - Chạy local (npm run dev) chưa có token: file trong thư mục .hosty-sync/ của máy.
 // Mọi lần ghi có thể kèm ifMatch (ETag) để không ghi đè dữ liệu mới hơn.
+// Tiết kiệm "Simple Operations" của Vercel Blob (mỗi head / mỗi lần đọc trượt cache = 1 op):
+// - getJSON(name) mặc định: head + get (2 op) – CHỈ cần khi sẽ ghi có điều kiện (cần ETag đúng).
+// - getJSON(name, { etag: false }): chỉ 1 lần get; thêm { cache: true } để dùng cache CDN (≤ 60s, phần lớn không tính op);
+//   thêm { memo: ms } để nhớ trong bộ nhớ của instance (0 op khi đọc lại trong khoảng đó).
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -17,6 +21,9 @@ export function storeMode() {
   if (process.env.HOSTY_LOCAL_STORE) return 'local';
   return null;
 }
+
+/** Bộ đếm thao tác (để đo / kiểm tra): simple = head + đọc, advanced = ghi */
+export const ops = { simple: 0, advanced: 0 };
 
 /* ---------- Local (dev) ---------- */
 const localFile = (p) => path.join(process.cwd(), '.hosty-sync', ...p.split('/'));
@@ -59,6 +66,7 @@ const isMissing = (e, mod) => (mod.BlobNotFoundError && e instanceof mod.BlobNot
 
 async function blobGetPrivate(p) {
   const mod = await import('@vercel/blob');
+  ops.simple += 2;
   // ETag phải lấy từ API (head) — đúng loại mà put({ ifMatch }) so sánh.
   // ETag trong header HTTP khi tải file (get) là của CDN, khác định dạng -> ghi có điều kiện luôn bị từ chối.
   let meta;
@@ -71,6 +79,7 @@ async function blobGetPrivate(p) {
 }
 async function blobGetPublic(p) {
   const mod = await import('@vercel/blob');
+  ops.simple += 2;
   let meta;
   try { meta = await mod.head(p, auth()); } catch (e) { if (isMissing(e, mod)) return null; throw e; }
   if (!meta) return null;
@@ -80,6 +89,7 @@ async function blobGetPublic(p) {
 }
 async function blobPut(p, obj, acc, { ifMatch, create } = {}) {
   const { put } = await import('@vercel/blob');
+  ops.advanced += 1;
   try {
     const res = await put(p, JSON.stringify(obj), {
       access: acc, addRandomSuffix: false, allowOverwrite: !create, contentType: 'application/json',
@@ -117,23 +127,76 @@ async function blobSet(p, obj, opts) {
     try { const r = await blobPut(p, obj, 'public', opts); access = 'public'; return r; } catch { throw e; }
   }
 }
+/** Đọc nhanh không cần ETag: 1 lần get theo pathname (không head). cache = cho phép cache CDN. */
+async function blobReadFast(p, cache) {
+  const mod = await import('@vercel/blob');
+  const once = async (acc) => {
+    ops.simple += 1;
+    const res = await mod.get(p, { access: acc, useCache: cache, ...auth() });
+    if (!res) return { missing: true };
+    if (res.statusCode !== 200) return null;
+    return { data: JSON.parse(await new Response(res.stream).text()), etag: null };
+  };
+  if (access !== 'public') {
+    try {
+      const r = await once('private');
+      if (r && !r.missing) { access = 'private'; return r; }
+      if (access === 'private') return null;
+    } catch (e) {
+      if (access === 'private') throw e;
+    }
+  }
+  // store public: cần bản mới nhất thì vẫn dùng cách cũ (CDN của blob public luôn cache)
+  if (!cache) return blobGetPublic(p);
+  try {
+    const r = await once('public');
+    if (r && !r.missing) access = 'public';
+    return r && !r.missing ? r : null;
+  } catch { return blobGetPublic(p); }
+}
+
 async function blobDel(p) {
   const { del } = await import('@vercel/blob');
   try { await del(p, auth()); } catch { /* noop */ }
 }
 
 /* ---------- API chung ---------- */
-export async function getJSON(name) {
+const memo = new Map(); // name -> { at, value }
+/**
+ * Đọc JSON. opts:
+ *  - etag (mặc định true): cần ETag để ghi có điều kiện -> head + get. false -> chỉ get (etag = null).
+ *  - cache: cho phép cache CDN của Vercel Blob (tối đa 60s cũ) – dùng cho file ít đổi.
+ *  - memo (ms): nhớ kết quả trong bộ nhớ instance.
+ */
+export async function getJSON(name, { etag = true, cache = false, memo: memoMs = 0 } = {}) {
   const p = ROOT + name;
-  return storeMode() === 'local' ? localGet(p) : blobGet(p);
+  if (memoMs > 0) {
+    const m = memo.get(name);
+    if (m && Date.now() - m.at < memoMs) return m.value;
+  }
+  let value;
+  if (storeMode() === 'local') {
+    ops.simple += etag ? 2 : 1;
+    value = await localGet(p);
+    if (value && !etag) value = { ...value, etag: null };
+  } else {
+    value = etag ? await blobGet(p) : await blobReadFast(p, cache);
+  }
+  if (memoMs > 0) memo.set(name, { at: Date.now(), value });
+  return value;
 }
+/** Xoá bộ nhớ đọc của một file (sau khi ghi) */
+export const forget = (name) => memo.delete(name);
 /** opts: { ifMatch: etag } chỉ ghi khi chưa ai sửa; { create: true } chỉ ghi khi chưa tồn tại */
 export async function putJSON(name, obj, opts = {}) {
   const p = ROOT + name;
+  memo.delete(name);
+  if (storeMode() === 'local') ops.advanced += 1;
   return storeMode() === 'local' ? localPut(p, obj, opts) : blobSet(p, obj, opts);
 }
 export async function delJSON(name) {
   const p = ROOT + name;
+  memo.delete(name);
   return storeMode() === 'local' ? localDel(p) : blobDel(p);
 }
 
@@ -142,6 +205,8 @@ export async function updateJSON(name, fn, fallback) {
   for (let i = 0; i < 5; i++) {
     const cur = await getJSON(name);
     const next = await fn(cur ? cur.data : structuredClone(fallback));
+    // không đổi gì -> không ghi (tiết kiệm thao tác)
+    if (cur && next != null && JSON.stringify(next) === JSON.stringify(cur.data)) return next;
     try {
       await putJSON(name, next, cur ? { ifMatch: cur.etag } : { create: true });
       return next;

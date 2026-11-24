@@ -257,7 +257,8 @@ export function StoreProvider({ scope, role, user, children }) {
   useEffect(() => {
     if (!cloud) return undefined;
     cloudSync();
-    const t = setInterval(cloudSync, CLOUD_EVERY);
+    // app ở nền (màn hình tắt / chuyển app) thì không đồng bộ định kỳ – mở lại sẽ đồng bộ ngay (onVis)
+    const t = setInterval(() => { if (document.visibilityState !== 'hidden') cloudSync(); }, CLOUD_EVERY);
     const onVis = () => {
       if (document.visibilityState === 'hidden') {
         if (!deepEqual(pickSync(stateRef.current), baseRef.current)) cloudSync();

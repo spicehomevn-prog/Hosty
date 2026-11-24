@@ -20,7 +20,7 @@ function nextUsername(accounts, base) {
 }
 
 async function createAccount({ ws, role, name, username }) {
-  const { workspaces } = await loadWorkspaces();
+  const { workspaces } = await loadWorkspaces({ fresh: true });
   const w = workspaces.find((x) => x.id === ws);
   if (!w) throw new HttpError(404, 'Không tìm thấy cơ sở');
   if (!['admin', 'member'].includes(role)) throw new HttpError(400, 'Vai trò không hợp lệ');
@@ -50,7 +50,7 @@ export default route(async (req, res) => {
   requireOwner(user);
 
   if (req.method === 'GET') {
-    const [{ workspaces }, { accounts }] = await Promise.all([loadWorkspaces(), loadAccounts()]);
+    const [{ workspaces }, { accounts }] = await Promise.all([loadWorkspaces({ fresh: true }), loadAccounts({ fresh: true })]);
     return send(res, 200, { workspaces, accounts: accounts.map(publicAccount) });
   }
   if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); throw new HttpError(405, 'Method not allowed'); }

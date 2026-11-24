@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     if (token === 'task') return sendTaskReminder(res, u.searchParams.get('d'));
     const p = verifyFeed(token);
     if (!p?.w || !p?.r) return sendText(res, 404, 'Không tìm thấy lịch');
-    const cur = await getJSON(wsFile(p.w));
+    const cur = await getJSON(wsFile(p.w), { etag: false, cache: true });
     const data = cur?.data?.data;
     const room = data?.locations?.flatMap((l) => l.rooms || []).find((r) => r.id === p.r);
     if (!room) return sendText(res, 404, 'Không tìm thấy phòng');

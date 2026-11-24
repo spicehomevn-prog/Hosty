@@ -8,7 +8,7 @@ import { emptyFin, pickFin, toFreeze, setDays } from './fin.js';
 import { getBookings } from './derive.js';
 import { addDays, todayKey, addMonths } from './dates.js';
 
-const EVERY = 15 * 60 * 1000;
+const EVERY = 30 * 60 * 1000; // đồng bộ định kỳ (khi sửa thì đồng bộ ngay)
 const DEBOUNCE = 3000;
 
 const withPrices = (prices, entries) => {
@@ -134,8 +134,11 @@ function FinanceInner({ cloud, children }) {
   useEffect(() => {
     if (!cloud) return undefined;
     sync();
-    const t = setInterval(sync, EVERY);
-    return () => clearInterval(t);
+    const t = setInterval(() => { if (document.visibilityState !== 'hidden') sync(); }, EVERY);
+    let last = Date.now();
+    const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - last > 5 * 60 * 1000) { last = Date.now(); sync(); } };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
   }, [sync]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = !!cloud && status.loaded && baseRef.current != null && !deepEqual(pickFin(fin), baseRef.current);

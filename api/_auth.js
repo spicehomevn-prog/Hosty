@@ -78,13 +78,23 @@ function verify(token) {
 }
 
 /* ---------- Dữ liệu tài khoản ---------- */
-export async function loadAccounts() {
-  const r = await getJSON(ACCOUNTS);
+// Đọc danh sách tài khoản / cơ sở: mặc định dùng bản nhớ tạm (≤ 30s trong instance + cache CDN ≤ 60s) để
+// mỗi request không tốn thêm thao tác Blob. { fresh: true } = đọc bản mới nhất (đăng nhập, khi bản nhớ tạm không khớp).
+const LIST_MEMO = 30 * 1000;
+const readList = (name, fresh) => getJSON(name, fresh ? { etag: false } : { etag: false, cache: true, memo: LIST_MEMO });
+export async function loadAccounts({ fresh = false } = {}) {
+  const r = await readList(ACCOUNTS, fresh);
   return r ? r.data : { accounts: [] };
 }
-export async function loadWorkspaces() {
-  const r = await getJSON(WORKSPACES);
+export async function loadWorkspaces({ fresh = false } = {}) {
+  const r = await readList(WORKSPACES, fresh);
   return r ? r.data : { workspaces: [] };
+}
+
+/** Cơ sở còn tồn tại không (bản nhớ tạm trước, không thấy thì đọc lại bản mới) */
+export async function wsExists(ws) {
+  if ((await loadWorkspaces()).workspaces.some((w) => w.id === ws)) return true;
+  return (await loadWorkspaces({ fresh: true })).workspaces.some((w) => w.id === ws);
 }
 
 export const publicAccount = (a) => ({
@@ -102,7 +112,7 @@ export async function login(username, password) {
     if (!safeEqual(password, o.password)) throw await fail();
     return { token: sign({ uid: 'owner', tv: o.tv, exp: Date.now() + TOKEN_DAYS * 864e5 }), user: OWNER_USER(o) };
   }
-  const { accounts } = await loadAccounts();
+  const { accounts } = await loadAccounts({ fresh: true });
   if (!o && accounts.length === 0) {
     throw new HttpError(503, 'Máy chủ chưa có tài khoản chủ hệ thống: thêm HOSTY_OWNER_USERNAME và HOSTY_OWNER_PASSWORD trên Vercel rồi Redeploy.');
   }
@@ -126,8 +136,9 @@ export async function requireUser(req) {
     if (!o || p.tv !== o.tv) throw new HttpError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại');
     return OWNER_USER(o);
   }
-  const { accounts } = await loadAccounts();
-  const acc = accounts.find((a) => a.id === p.uid);
+  let acc = (await loadAccounts()).accounts.find((a) => a.id === p.uid);
+  // bản nhớ tạm có thể cũ (vừa tạo tài khoản / vừa đổi mật khẩu) -> đọc lại bản mới trước khi từ chối
+  if (!acc || (acc.tokenVersion || 0) !== p.tv) acc = (await loadAccounts({ fresh: true })).accounts.find((a) => a.id === p.uid);
   if (!acc || (acc.tokenVersion || 0) !== p.tv) throw new HttpError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại');
   if (acc.disabled) throw new HttpError(403, 'Tài khoản đã bị khoá. Liên hệ quản trị viên.');
   return publicAccount(acc);

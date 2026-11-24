@@ -40,7 +40,7 @@ export function dec(s) {
 }
 
 /* ---------- Danh sách người nhận ---------- */
-export async function loadIndex() { return (await getJSON(INDEX))?.data || { push: {} }; }
+export async function loadIndex() { return (await getJSON(INDEX, { etag: false, cache: true }))?.data || { push: {} }; }
 async function setIndex(kind, uid, wsList) {
   await updateJSON(INDEX, (d) => {
     const next = { push: {}, ...(d || {}) };
@@ -74,12 +74,12 @@ export async function vapidKeys() {
   if (vapidCache) return vapidCache;
   const pub = envClean(process.env.VAPID_PUBLIC_KEY); const priv = envClean(process.env.VAPID_PRIVATE_KEY);
   if (pub && priv) return (vapidCache = { publicKey: pub, privateKey: priv });
-  const saved = (await getJSON(VAPID))?.data;
+  const saved = (await getJSON(VAPID, { etag: false, cache: true }))?.data;
   if (saved?.publicKey && dec(saved.privateKey)) return (vapidCache = { publicKey: saved.publicKey, privateKey: dec(saved.privateKey) });
   const { default: webpush } = await import('web-push');
   const k = webpush.generateVAPIDKeys();
   try { await putJSON(VAPID, { publicKey: k.publicKey, privateKey: enc(k.privateKey), at: Date.now() }, saved ? {} : { create: true }); } catch (e) {
-    if (e instanceof ConflictError) { vapidCache = null; const again = (await getJSON(VAPID))?.data; return (vapidCache = { publicKey: again.publicKey, privateKey: dec(again.privateKey) }); }
+    if (e instanceof ConflictError) { vapidCache = null; const again = (await getJSON(VAPID, { etag: false }))?.data; return (vapidCache = { publicKey: again.publicKey, privateKey: dec(again.privateKey) }); }
     throw e;
   }
   return (vapidCache = k);
@@ -104,7 +104,7 @@ export const PREF_KEYS = ['daily', 'checkout', 'checkin', 'task'];
 const prefsOf = (rec) => Object.fromEntries(PREF_KEYS.map((k) => [k, rec?.prefs?.[k] !== false]));
 
 export async function pushInfo(uid, ws) {
-  const rec = (await getJSON(pFile(uid)))?.data;
+  const rec = (await getJSON(pFile(uid), { etag: false }))?.data;
   const subs = rec?.subs || [];
   return { devices: subs.filter((s) => s.ws === ws).length, cron: envClean(process.env.CRON_SECRET).length >= 16, prefs: prefsOf(rec) };
 }
@@ -116,7 +116,7 @@ export async function pushSetPrefs(uid, prefs) {
 
 /** Gửi 1 thông báo tới mọi máy của uid đang bật cho ws (ws = null: mọi máy). Máy đã huỷ đăng ký thì xoá. */
 export async function pushSend(uid, ws, payload, pref = null) {
-  const rec = (await getJSON(pFile(uid)))?.data;
+  const rec = (await getJSON(pFile(uid), { etag: false }))?.data;
   if (pref && rec?.prefs?.[pref] === false) return { sent: 0, off: true };
   const subs = (rec?.subs || []).filter((s) => !ws || s.ws === ws);
   if (!subs.length) return { sent: 0 };
@@ -157,25 +157,41 @@ export async function saveRun(entry, daily = {}) {
     return { at: entry.at, last: entry, runs, daily: dly };
   }, { runs: [], daily: {} }).catch((e) => console.error('lastrun', e.message));
 }
-export async function loadRun() { return (await getJSON(LASTRUN))?.data || null; }
+export async function loadRun() { return (await getJSON(LASTRUN, { etag: false }))?.data || null; }
 
 const remindText = (m) => (m === 0 ? 'Đến giờ' : `Còn ${REMINDS.find((r) => r.v === m)?.label || `${m} phút`}`);
 /** Thời điểm nhắc (ms, UTC) của 1 lần task: giờ làm (cả ngày = 08:00) giờ VN trừ số phút nhắc trước */
 export const fireAt = (occ, time, remind) => Date.parse(`${occ}T${time || '08:00'}:00+07:00`) - Number(remind) * 60000;
 const WINDOW = 20 * 60000; // cron chạy trễ tối đa 20 phút vẫn gửi
 
+/**
+ * Dữ liệu dùng chung cho MỘT lượt cron: mỗi file chỉ đọc tối đa 1 lần, đọc không cần ETag (1 thao tác),
+ * file ít đổi dùng cache CDN. sent.json chỉ đọc khi thật sự có mục tới giờ.
+ */
+export function cronCtx() {
+  const c = new Map();
+  const once = (key, fn) => { if (!c.has(key)) c.set(key, fn()); return c.get(key); };
+  return {
+    index: () => once('index', loadIndex),
+    users: () => once('users', validUsers),
+    workspaces: () => once('wss', () => loadWorkspaces().then((r) => r.workspaces)),
+    sent: () => once('sent', () => getJSON(SENT, { etag: false }).then((r) => r?.data || {})),
+    ws: (id) => once(`ws:${id}`, () => getJSON(wsFile(id), { etag: false, cache: true }).then((r) => r?.data?.data || null)),
+    fin: (id) => once(`fin:${id}`, () => getJSON(`fin/${id}.json`, { etag: false, cache: true }).then((r) => r?.data?.data || {})),
+  };
+}
+
 /** Chạy định kỳ (5 phút / lần): gửi thông báo cho các lần task tới giờ nhắc */
-export async function pushDue(now = Date.now()) {
-  const idx = await loadIndex();
+export async function pushDue(now = Date.now(), ctx = cronCtx()) {
+  const idx = await ctx.index();
   const byWs = new Map();
   for (const [uid, list] of Object.entries(idx.push || {})) for (const w of list) byWs.set(w, [...(byWs.get(w) || []), uid]);
   if (!byWs.size) return { sent: 0 };
-  const users = await validUsers();
-  const sentLog = (await getJSON(SENT))?.data || {};
+  const users = await ctx.users();
   const fresh = {}; let sent = 0;
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
   for (const [ws, uids] of byWs) {
-    const data = (await getJSON(wsFile(ws)))?.data?.data;
+    const data = await ctx.ws(ws);
     if (!data) continue;
     const rooms = roomNames(data);
     const items = taskInstances((data.tasks || []).filter((t) => t.remind != null), addDays(today, -1), addDays(today, 2));
@@ -184,7 +200,7 @@ export async function pushDue(now = Date.now()) {
       const at = fireAt(it.occ, it.time, it.remind);
       if (at > now || at <= now - WINDOW) continue;
       const k = `${ws}:${it.id}:${it.occ}:${it.time || ''}:${it.remind}`;
-      if (sentLog[k] || fresh[k]) continue;
+      if ((await ctx.sent())[k] || fresh[k]) continue;
       fresh[k] = now;
       const room = rooms[it.roomId] || '';
       const payload = {
@@ -220,17 +236,15 @@ export async function wsBookings(data) {
 }
 
 /** Chạy mỗi 5 phút cùng nhắc task: gửi tổng quan lúc 08:00 và báo trả / nhận phòng trước 1 giờ */
-export async function stayDue(now = Date.now(), { collect = false } = {}) {
+export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx() } = {}) {
   const log = [];
-  const idx = await loadIndex();
+  const idx = await ctx.index();
   const byWs = new Map();
   for (const [uid, list] of Object.entries(idx.push || {})) for (const w of list) byWs.set(w, [...(byWs.get(w) || []), uid]);
   if (!byWs.size) return { sent: 0, errors: [], daily: {} };
-  const users = await validUsers();
-  const { workspaces } = await loadWorkspaces();
+  const users = await ctx.users();
   const multi = new Map(); // uid -> số cơ sở đang nhận (để ghi tên cơ sở khi > 1)
   for (const uids of byWs.values()) for (const u of uids) multi.set(u, (multi.get(u) || 0) + 1);
-  const sentLog = (await getJSON(SENT))?.data || {};
   const fresh = {}; let sent = 0;
   const errors = []; const daily = {};
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
@@ -241,13 +255,16 @@ export async function stayDue(now = Date.now(), { collect = false } = {}) {
   for (const [ws, uidsAll] of byWs) {
     const uids = uidsAll.filter((u) => userOk(users.get(u), ws));
     if (!uids.length) continue;
-    const data = (await getJSON(wsFile(ws)))?.data?.data;
+    const data = await ctx.ws(ws);
     if (!data) continue;
-    // chỉ tải lịch sàn khi lượt này có thể có việc: 08:00, hoặc đang trong khung "trước 1 giờ" của một giờ nhận / trả phòng
+    // chỉ tải lịch sàn khi lượt này có việc: tổng quan buổi sáng chưa gửi, hoặc đang trong khung "trước 1 giờ" của giờ nhận / trả phòng
     const times = new Set();
     for (const c of data.calendars || []) { times.add(c.checkIn || '14:00'); times.add(c.checkOut || '12:00'); }
     for (const m of data.manual || []) if (m.start === today || m.end === today) { times.add(m.checkIn || '14:00'); times.add(m.checkOut || '12:00'); }
-    if (!dailyNow && ![...times].some((t) => /^\d{2}:\d{2}$/.test(t) && inWindow(fireAt(today, t, BEFORE)))) continue;
+    const stayWin = [...times].some((t) => /^\d{2}:\d{2}$/.test(t) && inWindow(fireAt(today, t, BEFORE)));
+    const dailyTodo = dailyNow && (await Promise.all(uids.map(async (u) => !(await ctx.sent())[`${ws}:daily:${today}:${u}`]))).some(Boolean);
+    if (!dailyTodo && !stayWin) continue;
+    const sentLog = await ctx.sent();
     const pending = [];
     let bookings;
     try { bookings = await wsBookings(data); } catch (e) {
@@ -256,11 +273,11 @@ export async function stayDue(now = Date.now(), { collect = false } = {}) {
       continue;
     }
     const rooms = roomNames(data);
-    const fin = (await getJSON(`fin/${ws}.json`))?.data?.data || {};
+    const fin = await ctx.fin(ws);
     const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
-    const wsName = workspaces.find((w) => w.id === ws)?.name || data.property?.name || '';
+    const wsName = (await ctx.workspaces()).find((w) => w.id === ws)?.name || data.property?.name || '';
 
-    if (dailyNow) {
+    if (dailyTodo) {
       for (const uid of uids) {
         const k = `${ws}:daily:${today}:${uid}`;
         if (sentLog[k] || fresh[k]) continue;
@@ -336,11 +353,11 @@ function dailyPayload({ u, bookings, today, dueOf, wsName = '', tag }) {
 
 /** Gửi ngay bản tổng quan hôm nay cho 1 người (nút "Gửi tổng quan ngay" để kiểm tra) */
 export async function dailyNow(user, ws, now = Date.now()) {
-  const data = (await getJSON(wsFile(ws)))?.data?.data;
+  const data = (await getJSON(wsFile(ws), { etag: false }))?.data?.data;
   if (!data) throw new HttpError(404, 'Cơ sở chưa có dữ liệu');
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
   const bookings = await wsBookings(data);
-  const fin = canMoney(user) ? (await getJSON(`fin/${ws}.json`))?.data?.data || {} : {};
+  const fin = canMoney(user) ? (await getJSON(`fin/${ws}.json`, { etag: false }))?.data?.data || {} : {};
   const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
   const payload = dailyPayload({ u: user, bookings, today, dueOf, tag: `daily-test-${ws}` });
   const r = await pushSend(user.id, ws, payload);

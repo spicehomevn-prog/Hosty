@@ -4,9 +4,9 @@
 // GET  /api/notify?cron=push  (Authorization: Bearer CRON_SECRET) – gọi 5 phút/lần từ dịch vụ hẹn giờ ngoài (cron-job.org…)
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
-import { requireUser, canAccess, loadWorkspaces, envClean } from './_auth.js';
+import { requireUser, canAccess, envClean, wsExists } from './_auth.js';
 import {
-  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun,
+  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun, cronCtx,
 } from './_notify.js';
 
 const dailyTry = new Map(); // giới hạn nút "Gửi tổng quan ngay" (theo phiên máy chủ)
@@ -28,8 +28,7 @@ function cronProblem(req) {
 async function requireWs(req, ws) {
   const user = await requireUser(req);
   if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-  const { workspaces } = await loadWorkspaces();
-  if (!workspaces.some((w) => w.id === ws)) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+  if (!(await wsExists(ws))) throw new HttpError(404, 'Cơ sở không còn tồn tại');
   return user;
 }
 
@@ -43,11 +42,16 @@ export default route(async (req, res) => {
     const errors = [];
     let tasks = { sent: 0 }; let stays = { sent: 0, daily: {} };
     // chạy riêng từng phần: phần này lỗi không làm mất phần kia; lỗi được ghi lại thay vì nuốt im lặng
-    try { tasks = await pushDue(at); } catch (e) { console.error('pushDue', e); errors.push(`Nhắc task: ${String(e.message).slice(0, 120)}`); }
-    try { stays = await stayDue(at); } catch (e) { console.error('stayDue', e); errors.push(`Tổng quan / nhận–trả phòng: ${String(e.message).slice(0, 120)}`); }
+    const ctx = cronCtx(); // mỗi file đọc tối đa 1 lần trong lượt này
+    try { tasks = await pushDue(at, ctx); } catch (e) { console.error('pushDue', e); errors.push(`Nhắc task: ${String(e.message).slice(0, 120)}`); }
+    try { stays = await stayDue(at, { ctx }); } catch (e) { console.error('stayDue', e); errors.push(`Tổng quan / nhận–trả phòng: ${String(e.message).slice(0, 120)}`); }
     errors.push(...(stays.errors || []));
     const sent = (tasks.sent || 0) + (stays.sent || 0);
-    await saveRun({ at, sent, notices: (tasks.reminders || 0) + (stays.notices || 0), errors: errors.slice(0, 5) }, stays.daily || {});
+    // chỉ ghi nhật ký khi lượt này có việc (gửi / lỗi / trạng thái tổng quan) – tránh đọc-ghi Blob mỗi 5 phút
+    const notices = (tasks.reminders || 0) + (stays.notices || 0);
+    if (sent || notices || errors.length || Object.keys(stays.daily || {}).length) {
+      await saveRun({ at, sent, notices, errors: errors.slice(0, 5) }, stays.daily || {});
+    }
     return send(res, 200, { ok: !errors.length, sent, tasks: { sent: tasks.sent || 0, reminders: tasks.reminders || 0 }, stays: { sent: stays.sent || 0, notices: stays.notices || 0, daily: stays.daily || {} }, errors });
   }
 
