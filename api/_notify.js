@@ -252,7 +252,8 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
   const fresh = {}; let sent = 0;
   const errors = []; const daily = {};
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
-  const inWindow = (at) => at <= now && at > now - WINDOW;
+  // báo trả / nhận phòng: từ mốc "trước 1 giờ" cho tới đúng giờ đó – cron trễ / chạy thưa (15 phút) vẫn gửi bù, ghi "Còn N phút"
+  const stayOpen = (t) => now >= fireAt(today, t, BEFORE) && now < fireAt(today, t, 0);
   // tổng quan: gửi từ 08:00, gửi bù tới 10:00 nếu lượt trước lỗi / trễ (chống trùng theo ngày + người)
   const dailyNow = now >= fireAt(today, '08:00', 0) && now < fireAt(today, DAILY_UNTIL, 0);
 
@@ -267,7 +268,7 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
     const times = new Set();
     for (const c of data.calendars || []) { times.add(c.checkIn || '14:00'); times.add(c.checkOut || '12:00'); }
     for (const m of data.manual || []) if (m.start === today || m.end === today) { times.add(m.checkIn || '14:00'); times.add(m.checkOut || '12:00'); }
-    const stayWin = [...times].some((t) => /^\d{2}:\d{2}$/.test(t) && inWindow(fireAt(today, t, BEFORE)));
+    const stayWin = [...times].some((t) => /^\d{2}:\d{2}$/.test(t) && stayOpen(t));
     const dailyTodo = dailyNow && (await Promise.all(uids.map(async (u) => !(await ctx.sent())[`${ws}:daily:${today}:${u}`]))).some(Boolean);
     if (!dailyTodo && !stayWin) continue;
     const sentLog = await ctx.sent();
@@ -296,7 +297,8 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
       for (const kind of ['out', 'in']) {
         if ((kind === 'out' ? b.end : b.start) !== today) continue;
         const time = /^\d{2}:\d{2}$/.test(kind === 'out' ? b.checkOut : b.checkIn) ? (kind === 'out' ? b.checkOut : b.checkIn) : (kind === 'out' ? '12:00' : '14:00');
-        if (!inWindow(fireAt(today, time, BEFORE))) continue;
+        if (!stayOpen(time)) continue;
+        const left = Math.round((fireAt(today, time, 0) - now) / 60000);
         const room = rooms[b.roomId] || 'Phòng';
         const guest = b.source === 'manual' ? (b.guest || '') : '';
         const due = kind === 'in' ? dueOf(b) : 0;
@@ -308,7 +310,7 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
             k, uid, pref: kind === 'out' ? 'checkout' : 'checkin',
             payload: {
               title: kind === 'out' ? `🧳 ${room} trả phòng lúc ${time}` : `🔑 ${room} nhận phòng lúc ${time}`,
-              body: ['Còn 1 giờ', b.platform, guest, extra, multi.get(uid) > 1 ? wsName : ''].filter(Boolean).join(' · ').slice(0, 180),
+              body: [left >= 55 ? 'Còn 1 giờ' : `Còn ${Math.max(1, left)} phút`, b.platform, guest, extra, multi.get(uid) > 1 ? wsName : ''].filter(Boolean).join(' · ').slice(0, 180),
               tag: `${kind}-${b.id}-${today}`, url: '/?tab=home',
             },
           });

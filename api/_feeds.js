@@ -17,11 +17,19 @@ export async function eventsOf(cal, { maxAge = 0 } = {}) {
     if (cached?.data?.at && Date.now() - cached.data.at < maxAge && cached.data.full) return cached.data.events || [];
   }
   try {
-    const events = parseICS(await fetchIcs(cal.url)).map((e) => ({ uid: e.uid || '', start: e.start, end: e.end, summary: String(e.summary || '').slice(0, 120) }));
-    const sig = JSON.stringify(events);
+    const fetched = parseICS(await fetchIcs(cal.url)).map((e) => ({ uid: e.uid || '', start: e.start, end: e.end, summary: String(e.summary || '').slice(0, 120) }));
+    const sig = JSON.stringify(fetched);
+    let events = fetched;
     // ghi đệm khi nội dung đổi, hoặc bản đệm đã quá 1 giờ (để lượt đọc theo maxAge vẫn thấy còn mới)
     const prev = lastSaved.get(cal.id);
-    if (!prev || prev.sig !== sig || Date.now() - prev.at > 3600e3) {
+    const write = !prev || prev.sig !== sig || Date.now() - prev.at > 3600e3;
+    if (write || cached) {
+      // giữ lại khách đang ở mà sàn đã bỏ khỏi iCal (có sàn bỏ đặt phòng đã nhận phòng / vào ngày trả phòng)
+      // -> vẫn báo được "trả phòng" hôm nay. Chỉ giữ tới hết ngày trả phòng.
+      const old = cached || await getJSON(cacheName, { etag: false }).catch(() => null);
+      events = keepStays(fetched, old?.data?.events);
+    }
+    if (write) {
       lastSaved.set(cal.id, { sig, at: Date.now() });
       putJSON(cacheName, { at: Date.now(), full: true, events }).catch(() => {});
     }
@@ -30,4 +38,15 @@ export async function eventsOf(cal, { maxAge = 0 } = {}) {
     const c = cached || await getJSON(cacheName, { etag: false }).catch(() => null);
     return c?.data?.events || [];
   }
+}
+
+/** Gộp: sự kiện mới tải + khách đang ở (đã nhận phòng, chưa qua ngày trả) có trong bản đệm cũ nhưng sàn đã bỏ */
+export function keepStays(fresh, old, now = Date.now()) {
+  if (!Array.isArray(old) || !old.length) return fresh;
+  const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
+  const uids = new Set(fresh.map((e) => e.uid).filter(Boolean));
+  const keys = new Set(fresh.map((e) => `${e.start}|${e.end}`));
+  const kept = old.filter((e) => e.start && e.end && e.start < today && e.end >= today
+    && !(e.uid && uids.has(e.uid)) && !keys.has(`${e.start}|${e.end}`));
+  return kept.length ? [...fresh, ...kept.map((e) => ({ ...e, kept: 1 }))] : fresh;
 }
