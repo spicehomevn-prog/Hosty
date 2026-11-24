@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Settings2, Upload, Plus, AlertTriangle, Revenue, Payments, Reports, Pencil, History, Users, Trash2, Pricing } from '../lib/icons.jsx';
 import { useStore, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
@@ -23,6 +23,15 @@ export default function Finance({ api }) {
   const [month, setMonth] = useState(thisMonth);
   const [sheet, setSheet] = useState(null); // {type, data}
   const [onlyMissing, setOnlyMissing] = useState(false);
+  // "Xem & nhập giá": lọc đặt phòng chưa có giá rồi cuộn xuống danh sách
+  const listRef = useRef(null);
+  const [jump, setJump] = useState(0);
+  const showMissing = () => { setOnlyMissing(true); setJump(Date.now()); };
+  useEffect(() => {
+    if (!jump) return undefined;
+    const t = setTimeout(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    return () => clearTimeout(t);
+  }, [jump]);
   const idx = useMemo(() => roomIndex(state), [state]);
   const bookings = useMemo(() => getBookings(state), [state]);
   const { items, cancelled } = useMemo(() => ledger(state, bookings, fin), [state, bookings, fin]);
@@ -73,7 +82,7 @@ export default function Finance({ api }) {
           <AlertTriangle size={18} />
           <span>{s.missing} đặt phòng chưa có giá, doanh thu đang thiếu phần này</span>
           <div className="miss-actions">
-            <button className="btn tiny" onClick={() => setOnlyMissing(true)}>Xem & nhập giá</button>
+            <button className="btn tiny" onClick={showMissing}>Xem & nhập giá</button>
             <button className="btn tiny" onClick={() => open('rates')}><Pricing size={14} /> Đặt bảng giá</button>
           </div>
         </div>
@@ -130,8 +139,8 @@ export default function Finance({ api }) {
         </>
       )}
 
-      <div className="section-row">
-        <h2 className="section-title">Đặt phòng trong tháng</h2>
+      <div className="section-row fin-list-head" ref={listRef}>
+        <h2 className="section-title">{onlyMissing ? 'Đặt phòng chưa có giá' : 'Đặt phòng trong tháng'}</h2>
         {onlyMissing ? <button className="link" onClick={() => setOnlyMissing(false)}>Xem tất cả</button> : <span className="tiny muted">{s.rows.length} lượt · {s.nights} đêm</span>}
       </div>
       {s.fromHistory && <p className="tiny muted">Tháng này dùng số tổng nhập tay; danh sách dưới đây chỉ để tham khảo.</p>}
