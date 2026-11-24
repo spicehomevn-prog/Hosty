@@ -160,12 +160,12 @@ function FinanceInner({ cloud, children }) {
     if (!status.loaded) return;
     const entries = toFreeze(getBookings(state), finRef.current);
     if (Object.keys(entries).length) dispatch({ type: 'PRICES', entries });
-  }, [state.events, state.overrides, fin.rateTable, status.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.events, state.overrides, fin.rateTable, fin.otaRates, fin.platformRates, status.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Lấy giá Airbnb qua Apify ngay (máy chủ chạy actor bằng APIFY_TOKEN, ghi vào file tài chính)
+  // Lấy giá các sàn (Airbnb, Booking.com, Agoda) qua Apify ngay – máy chủ chạy actor bằng APIFY_TOKEN, ghi vào file tài chính; tối đa 2 lần / tháng
   const runOta = useCallback(async () => {
     if (!cloud) return { ok: false, error: 'Chế độ xem thử không chạy Apify' };
-    await sync(); // lưu link Airbnb vừa nhập trước khi máy chủ đọc
+    await sync(); // lưu link vừa nhập trước khi máy chủ đọc
     try {
       const r = await api(`/api/finance?ws=${cloud.ws}&action=ota`, { token: cloud.token, method: 'POST' });
       await sync();
@@ -196,16 +196,35 @@ export function demoFinance(state) {
     }
     fin.rateTable[roomId] = days;
   }
-  // Giá Airbnb lấy qua Apify (mẫu) cho Phòng Đồi Thông
-  fin.otaListings = { rA1: { Airbnb: 'https://www.airbnb.com/rooms/50000001' } };
+  // Giá các sàn lấy qua Apify (mẫu) cho Phòng Đồi Thông: Airbnb, Booking.com (trang chung với Phòng Sương Mai), Agoda
+  fin.otaListings = {
+    rA1: { Airbnb: 'https://www.airbnb.com/rooms/50000001', 'Booking.com': 'https://www.booking.com/hotel/vn/may-homestay-da-lat.html', Agoda: 'https://www.agoda.com/may-homestay/hotel/da-lat-vn.html?hotelId=60000001', AgodaRoom: 'Phòng Deluxe Giường Đôi' },
+    rA2: { 'Booking.com': 'https://www.booking.com/hotel/vn/may-homestay-da-lat.html' },
+  };
   const air = {};
   for (let i = -25; i <= 45; i++) {
     const d = addDays(t, i);
     const wd = new Date(`${d}T00:00:00`).getDay();
     air[d] = [539203, 571307, 571307, 571307, 571307, 596146, 596146][wd];
   }
-  fin.otaRates = { rA1: { Airbnb: air } };
-  fin.otaRun = { at: Date.now() - 864e5 * 3, by: 'Tự cập nhật hằng tháng', ok: true, error: '', rooms: { rA1: { id: '50000001', ok: true, error: '', priced: 38, available: 38 } } };
+  const bk = {}; const ag = {};
+  for (let i = -25; i <= 45; i++) {
+    const d = addDays(t, i);
+    const wd = new Date(`${d}T00:00:00`).getDay();
+    bk[d] = wd === 5 || wd === 6 ? 1150000 : 890000;
+    ag[d] = wd === 5 || wd === 6 ? 1100000 : 870000;
+  }
+  fin.otaRates = { rA1: { Airbnb: air, 'Booking.com': bk, Agoda: ag }, rA2: { 'Booking.com': bk } };
+  const rooms1 = { rA1: { id: '50000001', ok: true, error: '', priced: 38, available: 38 } };
+  fin.otaRun = {
+    at: Date.now() - 864e5 * 3, by: 'Tự cập nhật hằng tháng', ok: true, error: '', rooms: rooms1,
+    sources: {
+      Airbnb: { ok: true, error: '', cost: 0.06, rooms: rooms1 },
+      'Booking.com': { ok: true, error: '', cost: 0.018, rooms: { rA1: { id: 'vn/may-homestay-da-lat', ok: true, error: '', priced: 52, available: 52 }, rA2: { id: 'vn/may-homestay-da-lat', ok: true, error: '', priced: 52, available: 52 } } },
+      Agoda: { ok: true, error: '', cost: 0.54, nights: 30, fx: { rate: 25400, auto: true }, rooms: { rA1: { id: '60000001', ok: true, error: '', priced: 30, available: 30 } }, roomTypes: { 60000001: ['Phòng Deluxe Giường Đôi', 'Phòng Gia Đình', 'Phòng Tiêu Chuẩn'] } },
+    },
+  };
+  fin.otaManual = { month: t.slice(0, 7), runs: [Date.now() - 864e5 * 2] };
   // Giảm giá: theo số đêm cho mọi phòng; giảm 15% các ngày thường tuần sau ở Phòng Đồi Thông
   fin.stayDiscount = { '*': { week: 10, month: 25 } };
   const promo = {};

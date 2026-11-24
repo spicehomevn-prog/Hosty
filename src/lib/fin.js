@@ -3,7 +3,7 @@ import { addDays, diffDays, todayKey } from './dates.js';
 import { PLATFORMS } from './platforms.js';
 import { coveredByDirect } from './derive.js';
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual'];
 export const DEFAULT_FEES = { Airbnb: 15, 'Booking.com': 15, Agoda: 18, Traveloka: 15, Expedia: 18, 'Trực tiếp': 0 };
 export const EXPENSE_GROUPS = ['Điện nước', 'Internet', 'Vật tư', 'Sửa chữa', 'Thuê nhà', 'Khác'];
 export const WEEK_NIGHTS = 7;
@@ -11,14 +11,14 @@ export const MONTH_NIGHTS = 28;
 
 export const emptyFin = () => ({
   settings: { taxOn: true, taxRate: 7, fees: { ...DEFAULT_FEES } },
-  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {}, platformRates: {},
+  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {}, platformRates: {}, otaManual: null,
 });
 export const pickFin = (f) => {
   const e = emptyFin();
   return Object.fromEntries(FIN_KEYS.map((k) => [k, f?.[k] ?? e[k]]));
 };
 
-export const SOURCE_LABEL = { ota: 'Theo giá Airbnb (Apify)', rate: 'Theo bảng giá', report: 'Theo file báo cáo của sàn', manual: 'Nhập tay' };
+export const SOURCE_LABEL = { ota: 'Theo giá sàn (Apify)', rate: 'Theo bảng giá', report: 'Theo file báo cáo của sàn', manual: 'Nhập tay' };
 export const SOURCE_SHORT = { ota: 'giá Airbnb', rate: 'bảng giá', report: 'file sàn', manual: 'nhập tay' };
 export const monthOf = (k) => k.slice(0, 7);
 export const feePct = (fin, platform) => Number(fin.settings?.fees?.[platform] ?? DEFAULT_FEES[platform] ?? 0);

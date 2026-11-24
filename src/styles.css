@@ -1360,3 +1360,15 @@ input.switch:checked::after { transform: translateX(18px); }
 .rate-plats .pdot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; vertical-align: middle; }
 .rate-p.inherit { color: var(--muted); opacity: .55; font-weight: 500; }
 .imp-per { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Giá các sàn (Apify): mỗi phòng nhiều sàn */
+.listing-row { display: flex; flex-direction: column; gap: 5px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.listing-top + .listing-row { border-top: 0; padding-top: 0; }
+.listing-plat { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.listing-plat .pdot { width: 8px; height: 8px; border-radius: 50%; }
+.listing-row .link.tiny { align-self: flex-start; font-size: 12.5px; }
+.ota-cost b { color: var(--ink); }
+.ota-left { margin-top: 6px; text-align: center; }
+.fee-item.solo small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.fx-row { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
+.fx-row small { padding: 0 4px; line-height: 1.4; }
+.pct-input.fx-input .input { width: 104px; }

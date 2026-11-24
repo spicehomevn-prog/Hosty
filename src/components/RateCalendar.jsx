@@ -33,6 +33,8 @@ export function RateCalendar({ onClose, initialRoom }) {
   const direct = plat === DIRECT;
   const plats = platformsOf(state, roomId);
   const onPlat = !direct && plat && plats.includes(plat) ? plat : '';
+  // nhãn giá sàn lấy qua Apify trên ô ngày: sàn đang chọn (Mọi sàn -> Airbnb như trước)
+  const apPlat = OTA_TAG[onPlat] ? onPlat : 'Airbnb';
   const bookings = useMemo(() => getBookings(state), [state]);
   const general = fin.rateTable?.[roomId] || {};
   const table = direct ? fin.directRates?.[roomId] || {} : onPlat ? fin.platformRates?.[roomId]?.[onPlat] || {} : general;
@@ -187,7 +189,7 @@ export function RateCalendar({ onClose, initialRoom }) {
           const p = table[d];
           const inherit = onPlat && !p ? general[d] : 0;
           const off = disc[d];
-          const air = fin.otaRates?.[roomId]?.Airbnb?.[d];
+          const air = fin.otaRates?.[roomId]?.[apPlat]?.[d];
           return (
             <button key={d} type="button" role="gridcell" aria-selected={sel.has(d)}
               className={`rate-day ${sel.has(d) ? 'sel' : ''} ${d < today ? 'past' : ''} ${d === today ? 'today' : ''} ${anchor === d ? 'anchor' : ''}`}
@@ -200,13 +202,13 @@ export function RateCalendar({ onClose, initialRoom }) {
                 </>
               ) : inherit ? <span className="rate-p inherit" title="Giá chung (Mọi sàn)">{fmtShort(inherit)}</span> : <span className={`rate-p ${p ? '' : 'none'}`}>{p ? fmtShort(p) : '—'}</span>}
               {off && !p && <span className="rate-off">−{off}%</span>}
-              {air && !off && !direct && (!onPlat || onPlat === 'Airbnb') && <span className="rate-air" title={`Giá Airbnb ${fmtVND(air)}`}>A {fmtShort(air)}</span>}
+              {air && !off && !direct && <span className="rate-air" title={`Giá ${apPlat} lấy qua Apify ${fmtVND(air)}`}>{OTA_TAG[apPlat]} {fmtShort(air)}</span>}
               {busy[d] && <span className="rate-busy" style={{ background: busy[d] }} />}
             </button>
           );
         })}
       </div>
-      <p className="tiny muted rate-legend"><span className="rate-busy inline" /> Đêm đã có khách · giá hiển thị là giá 1 đêm (nhận phòng ngày đó){Object.keys(fin.otaRates?.[roomId]?.Airbnb || {}).length ? ' · A = giá Airbnb lấy qua Apify, đặt phòng Airbnb dùng giá này' : ''}</p>
+      <p className="tiny muted rate-legend"><span className="rate-busy inline" /> Đêm đã có khách · giá hiển thị là giá 1 đêm (nhận phòng ngày đó){!direct && Object.keys(fin.otaRates?.[roomId]?.[apPlat] || {}).length ? ` · ${OTA_TAG[apPlat]} = giá ${apPlat} lấy qua Apify, đặt phòng ${apPlat} dùng giá này (trừ ngày có giá riêng tự đặt)` : ''}</p>
 
       {!direct && <StayDiscount roomId={roomId} roomName={state.locations.flatMap((l) => l.rooms).find((r) => r.id === roomId)?.name} bookings={bookings} />}
 
@@ -228,6 +230,7 @@ export function RateCalendar({ onClose, initialRoom }) {
 }
 
 const DIRECT = 'Trực tiếp';
+const OTA_TAG = { Airbnb: 'A', 'Booking.com': 'B', Agoda: 'AG' };
 /** Sàn có lịch iCal của phòng (không có thì lấy các sàn đang dùng trong cơ sở) */
 function platformsOf(state, roomId) {
   const all = (state.calendars || []).filter((c) => c.platform && c.platform !== 'Trực tiếp');
