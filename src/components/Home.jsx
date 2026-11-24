@@ -21,6 +21,7 @@ import { fmtShort, fmtVND } from '../lib/money.js';
 import { Sheet } from './ui.jsx';
 import { openUpgrade, LockBadge } from './Upgrade.jsx';
 import { platformColor } from '../lib/store.jsx';
+import { InboxButton } from './Inbox.jsx';
 
 export default function Home({ api }) {
   const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
@@ -53,6 +54,7 @@ export default function Home({ api }) {
         </div>
         <div className="row gap8">
           <button className="icon-btn" onClick={() => { sync(); cloud.syncNow(); }} disabled={syncing || cloud.status === 'syncing'} aria-label="Đồng bộ"><RefreshCw size={19} className={syncing || cloud.status === 'syncing' ? 'spin' : ''} /></button>
+          <InboxButton api={api} />
           <button className="icon-btn" onClick={() => api.goto('places')} aria-label="Cài đặt"><Settings2 size={19} /></button>
         </div>
       </header>

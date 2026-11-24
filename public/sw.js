@@ -5,6 +5,8 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  // báo cho app đang mở tải lại hộp thông báo (nút chuông)
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((all) => all.forEach((c) => c.postMessage({ type: 'push' }))));
   e.waitUntil(self.registration.showNotification(d.title || 'Hostexa', {
     body: d.body || '',
     tag: d.tag || undefined,

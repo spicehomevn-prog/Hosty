@@ -6,7 +6,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
 import { requireUser, canAccess, envClean, wsExists, requirePro } from './_auth.js';
 import {
-  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun, cronCtx,
+  vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun, cronCtx, inboxList,
 } from './_notify.js';
 
 const dailyTry = new Map(); // giới hạn nút "Gửi tổng quan ngay" (theo phiên máy chủ)
@@ -58,6 +58,10 @@ export default route(async (req, res) => {
   if (req.method === 'GET') {
     const ws = q.get('ws');
     const user = await requireWs(req, ws);
+    if (q.get('inbox')) {
+      res.setHeader('Cache-Control', 'private, no-store');
+      return send(res, 200, { items: await inboxList(user.id, ws) });
+    }
     const [push, v, run] = await Promise.all([pushInfo(user.id, ws), vapidKeys(), user.role === 'member' ? null : loadRun()]);
     // tóm tắt lượt chạy cho chủ hệ thống / admin: tổng quan hôm nay + lỗi gần nhất
     let runInfo = null;

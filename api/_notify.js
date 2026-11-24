@@ -115,7 +115,7 @@ export async function pushSetPrefs(uid, prefs) {
 }
 
 /** Gửi 1 thông báo tới mọi máy của uid đang bật cho ws (ws = null: mọi máy). Máy đã huỷ đăng ký thì xoá. */
-export async function pushSend(uid, ws, payload, pref = null) {
+export async function pushSend(uid, ws, payload, pref = null, { inbox = !!pref } = {}) {
   const rec = (await getJSON(pFile(uid), { etag: false }))?.data;
   if (pref && rec?.prefs?.[pref] === false) return { sent: 0, off: true };
   const subs = (rec?.subs || []).filter((s) => !ws || s.ws === ws);
@@ -141,7 +141,27 @@ export async function pushSend(uid, ws, payload, pref = null) {
     const left = await updateJSON(pFile(uid), (d) => ({ ...(d || {}), subs: (d?.subs || []).filter((s) => !dead.includes(s.endpoint)) }), null);
     await setIndex('push', uid, left.subs.map((s) => s.ws));
   }
+  if (sent && inbox) await inboxAdd(uid, ws, payload, pref || 'daily').catch((e) => console.error('inbox', e.message));
   return { sent, errors, devices: subs.length };
+}
+
+/* ---------- Hộp thông báo: các thông báo đã gửi tới người dùng (xem lại trong app, nút chuông) ---------- */
+const iFile = (uid) => `notify/inbox/${uid}.json`;
+const INBOX_MAX = 80;
+const INBOX_DAYS = 14;
+export async function inboxAdd(uid, ws, payload, kind, now = Date.now()) {
+  const item = { id: `${now.toString(36)}${randomBytes(3).toString('hex')}`, at: now, ws, kind, title: String(payload.title || '').slice(0, 120), body: String(payload.body || '').slice(0, 240), url: payload.url || '/' };
+  const cut = now - INBOX_DAYS * 864e5;
+  await updateJSON(iFile(uid), (d) => {
+    const items = (d?.items || []).filter((x) => x.at > cut && !(payload.tag && x.tag === payload.tag));
+    return { items: [{ ...item, ...(payload.tag ? { tag: payload.tag } : {}) }, ...items].slice(0, INBOX_MAX) };
+  }, { items: [] });
+}
+/** Thông báo của 1 người trong 1 cơ sở, mới nhất trước */
+export async function inboxList(uid, ws) {
+  const cut = Date.now() - INBOX_DAYS * 864e5;
+  const items = (await getJSON(iFile(uid), { etag: false }))?.data?.items || [];
+  return items.filter((x) => x.ws === ws && x.at > cut).map(({ tag, ...x }) => x); // eslint-disable-line no-unused-vars
 }
 
 /* ---------- Nhật ký lượt chạy (để chủ hệ thống xem trong app) ---------- */
@@ -368,7 +388,7 @@ export async function dailyNow(user, ws, now = Date.now()) {
   const fin = canMoney(user) ? (await getJSON(`fin/${ws}.json`, { etag: false }))?.data?.data || {} : {};
   const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
   const payload = dailyPayload({ u: user, bookings, today, dueOf, tag: `daily-test-${ws}` });
-  const r = await pushSend(user.id, ws, payload);
+  const r = await pushSend(user.id, ws, payload, null, { inbox: true });
   if (!r.devices) throw new HttpError(400, 'Máy này chưa bật thông báo');
   if (!r.sent) throw new HttpError(502, `Không gửi được: ${r.errors?.[0] || 'không rõ lỗi'}`);
   return { sent: r.sent, title: payload.title, body: payload.body };
