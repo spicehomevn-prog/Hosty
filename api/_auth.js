@@ -4,6 +4,7 @@
 import { scrypt as _scrypt, randomBytes, createHmac, createHash, timingSafeEqual, randomInt } from 'node:crypto';
 import { promisify } from 'node:util';
 import { getJSON } from './_store.js';
+import { normPhone } from '../src/lib/plan.js';
 import { HttpError } from './_http.js';
 
 const scrypt = promisify(_scrypt);
@@ -91,10 +92,18 @@ export async function loadWorkspaces({ fresh = false } = {}) {
   return r ? r.data : { workspaces: [] };
 }
 
-/** Cơ sở còn tồn tại không (bản nhớ tạm trước, không thấy thì đọc lại bản mới) */
-export async function wsExists(ws) {
-  if ((await loadWorkspaces()).workspaces.some((w) => w.id === ws)) return true;
-  return (await loadWorkspaces({ fresh: true })).workspaces.some((w) => w.id === ws);
+/** Thông tin cơ sở (bản nhớ tạm trước, không thấy thì đọc lại bản mới); null nếu không còn */
+export async function getWorkspace(ws) {
+  return (await loadWorkspaces()).workspaces.find((w) => w.id === ws)
+    || (await loadWorkspaces({ fresh: true })).workspaces.find((w) => w.id === ws) || null;
+}
+export const wsExists = async (ws) => !!(await getWorkspace(ws));
+/** Chặn tính năng Pro với cơ sở dùng thử */
+export async function requirePro(ws, feature = 'Tính năng này') {
+  const w = await getWorkspace(ws);
+  if (!w) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+  if (w.plan === 'trial') throw new HttpError(403, `${feature} chỉ có ở gói Pro – nâng cấp tài khoản Pro để kích hoạt`, { pro: true });
+  return w;
 }
 
 export const publicAccount = (a) => ({
@@ -106,7 +115,8 @@ const OWNER_USER = (o) => ({ id: 'owner', username: o.username, name: 'Chủ h�
 /** Đăng nhập: trả về { token, user } hoặc ném lỗi 401 */
 export async function login(username, password) {
   secret();
-  const u = String(username || '').trim().toLowerCase();
+  // đăng nhập bằng SĐT (tài khoản dùng thử): chấp nhận +84 / dấu cách
+  const u = normPhone(username) || String(username || '').trim().toLowerCase();
   const o = owner();
   if (o && safeEqual(u, o.username)) {
     if (!safeEqual(password, o.password)) throw await fail();

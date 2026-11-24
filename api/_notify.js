@@ -175,6 +175,8 @@ export function cronCtx() {
     index: () => once('index', loadIndex),
     users: () => once('users', validUsers),
     workspaces: () => once('wss', () => loadWorkspaces().then((r) => r.workspaces)),
+    /** cơ sở gói dùng thử (không có thông báo đẩy) */
+    trial: () => once('trial', () => loadWorkspaces().then((r) => new Set(r.workspaces.filter((w) => w.plan === 'trial').map((w) => w.id)))),
     sent: () => once('sent', () => getJSON(SENT, { etag: false }).then((r) => r?.data || {})),
     ws: (id) => once(`ws:${id}`, () => getJSON(wsFile(id), { etag: false, cache: true }).then((r) => r?.data?.data || null)),
     fin: (id) => once(`fin:${id}`, () => getJSON(`fin/${id}.json`, { etag: false, cache: true }).then((r) => r?.data?.data || {})),
@@ -190,7 +192,9 @@ export async function pushDue(now = Date.now(), ctx = cronCtx()) {
   const users = await ctx.users();
   const fresh = {}; let sent = 0;
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
+  const trial = await ctx.trial();
   for (const [ws, uids] of byWs) {
+    if (trial.has(ws)) continue;
     const data = await ctx.ws(ws);
     if (!data) continue;
     const rooms = roomNames(data);
@@ -252,7 +256,9 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
   // tổng quan: gửi từ 08:00, gửi bù tới 10:00 nếu lượt trước lỗi / trễ (chống trùng theo ngày + người)
   const dailyNow = now >= fireAt(today, '08:00', 0) && now < fireAt(today, DAILY_UNTIL, 0);
 
+  const trial = await ctx.trial();
   for (const [ws, uidsAll] of byWs) {
+    if (trial.has(ws)) continue;
     const uids = uidsAll.filter((u) => userOk(users.get(u), ws));
     if (!uids.length) continue;
     const data = await ctx.ws(ws);

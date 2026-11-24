@@ -1258,3 +1258,49 @@ input.switch:checked::after { transform: translateX(18px); }
 .rm-run { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; background: rgba(255,255,255,.75); border-radius: 10px; padding: 8px 10px; line-height: 1.4; }
 .rm-run .ok { color: #1E8A5A; font-weight: 600; }
 .rm-run .bad { color: #C2412D; }
+
+/* ---------- Gói dùng thử / Pro ---------- */
+.lock-badge { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--plum, #241A3B); color: #fff; box-shadow: 0 0 0 2px #fff; }
+.nav-ico { position: relative; }
+.nav-lock { position: absolute; right: -6px; top: -6px; width: 18px; height: 18px; }
+.create-tile { position: relative; }
+.create-tile.locked { opacity: .75; }
+.tile-lock { position: absolute; right: 10px; top: 10px; }
+.hero.locked { opacity: .82; filter: saturate(.6); }
+.hero.locked .hero-num { letter-spacing: .1em; }
+.hero-lock { position: absolute; right: 12px; top: 12px; z-index: 3; width: 28px; height: 28px; }
+.pro-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 4px 0 14px; }
+.pro-head b { font-size: 19px; }
+.pro-head p { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.45; }
+.pro-lock { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, #7C5CE6, #E0608F); box-shadow: 0 14px 30px -12px rgba(124,92,230,.7); }
+.pro-lock.sm { width: 36px; height: 36px; border-radius: 12px; flex: none; }
+.pro-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.pro-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--violet-soft); }
+.pro-item.on { box-shadow: 0 0 0 2px #7C5CE6 inset; }
+.pro-item > span:nth-child(2) { flex: 1; min-width: 0; }
+.pro-item b { display: block; font-size: 14.5px; }
+.pro-item small { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.pro-ico { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #fff; color: #7C5CE6; flex: none; }
+.pro-ok { color: #1E8A5A; flex: none; }
+.locked-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1.5px dashed #CDBDF5; background: #FAF7FF; cursor: pointer; margin: 4px 0 12px; font: inherit; color: inherit; }
+.locked-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.locked-row b { display: block; font-size: 14.5px; }
+.locked-row small { display: block; font-size: 12.5px; color: var(--ink-2); }
+.pro-pill { flex: none; padding: 3px 10px; border-radius: 999px; background: linear-gradient(135deg, #7C5CE6, #E0608F); color: #fff; font-weight: 700; font-size: 12px; }
+.trial-limit { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 12px; border: 0; background: #FFF1DC; color: #8A5200; font: inherit; font-size: 13px; cursor: pointer; margin: 8px 0; }
+.trial-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 0; background: linear-gradient(135deg, #EFE6FF, #FFE6F0); color: var(--violet-ink); font: inherit; font-size: 13.5px; cursor: pointer; }
+.trial-pill.bad { background: #FFE4E0; color: #B42318; }
+.trial-members { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.75); }
+.tm-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tm-row b { display: block; font-size: 14px; }
+.tm-row small { font-size: 12px; color: var(--ink-2); }
+.tm-created { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: #E6F7F0; font-size: 13px; }
+.expired-bar { position: sticky; top: 0; z-index: 50; width: 100%; border: 0; padding: 10px 16px; background: #B42318; color: #fff; font: inherit; font-size: 14px; text-align: center; cursor: pointer; }
+.signup-btn { margin-top: 14px; background: linear-gradient(135deg, #7C5CE6, #E0608F); color: #fff; border: 0; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 14px 30px -14px rgba(124,92,230,.8); }
+.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0 10px; font-size: 13px; }
+.plan-tag { padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+.plan-row.pro .plan-tag { background: linear-gradient(135deg, #7C5CE6, #E0608F); color: #fff; }
+.plan-row.trial .plan-tag { background: #FFF1DC; color: #8A5200; }
+.plan-row.bad .plan-tag { background: #FFE4E0; color: #B42318; }
+.plan-contact { color: var(--ink-2); }
+.account-card .trial-members .btn.tiny.primary { background: var(--plum, #241A3B); color: #fff; }

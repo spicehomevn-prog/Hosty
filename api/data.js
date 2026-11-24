@@ -3,7 +3,8 @@
 // PUT /api/data { ws, baseVersion, data }   -> { version, updatedAt }   (409 nếu bản trên máy chủ đã đổi)
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, wsFile, signFeed, wsExists } from './_auth.js';
+import { requireUser, canAccess, wsFile, signFeed, getWorkspace } from './_auth.js';
+import { isTrial, trialExpired, trialLimitError } from '../src/lib/plan.js';
 import { siteUrl } from '../site.config.js';
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'cleanNotes', 'setupDone'];
@@ -89,7 +90,9 @@ export default route(async (req, res) => {
     const body = await readBody(req);
     const { ws } = body;
     if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-    if (!(await wsExists(ws))) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+    const wsRec = await getWorkspace(ws);
+    if (!wsRec) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+    if (trialExpired(wsRec)) throw new HttpError(403, 'Hết hạn dùng thử – dữ liệu chỉ xem. Nâng cấp tài khoản Pro để tiếp tục', { expired: true });
     if (!body.data || typeof body.data !== 'object' || !Array.isArray(body.data.locations)) {
       throw new HttpError(400, 'Dữ liệu không hợp lệ');
     }
@@ -104,6 +107,11 @@ export default route(async (req, res) => {
     if (Number(body.baseVersion || 0) !== curVersion) throw conflict();
     // máy chạy bản app cũ không gửi các khoá mới -> giữ nguyên giá trị đang có trên máy chủ
     const data = { ...pick(cur?.data?.data || {}), ...incoming };
+    // gói dùng thử: tối đa 1 địa điểm, 5 phòng
+    if (isTrial(wsRec)) {
+      const limit = trialLimitError(data.locations);
+      if (limit) throw new HttpError(400, `${limit} – nâng cấp tài khoản Pro để thêm`, { pro: true });
+    }
 
     if (user.role === 'member') {
       if (!cur) throw new HttpError(403, 'Cơ sở chưa được admin thiết lập');

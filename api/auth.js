@@ -2,11 +2,70 @@
 // POST /api/auth {action:'change-password', oldPassword, newPassword} -> { token }
 // GET  /api/auth                                               -> { user, workspaces }
 // GET  /api/auth?members=1&ws=ID                               -> { members: [{id, name, username, role}] }
+// POST /api/auth {action:'signup', wsName, name, phone, password}  -> { token, user, workspaces }   (đăng ký dùng thử, không cần đăng nhập)
+// POST /api/auth {action:'add-member', ws, name} / {action:'remove-member', ws, id}  (admin cơ sở dùng thử, tối đa 1 member)
+import { createHash } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
 import { updateJSON } from './_store.js';
 import {
-  login, requireUser, workspacesFor, canAccess, loadAccounts, hashPassword, checkPassword, ACCOUNTS,
+  login, requireUser, workspacesFor, canAccess, loadAccounts, loadWorkspaces, hashPassword, checkPassword, ACCOUNTS, envClean,
 } from './_auth.js';
+import { createAccount, createWorkspace } from './_accounts.js';
+import { TRIAL, isTrial, trialExpired, normPhone } from '../src/lib/plan.js';
+
+const SIGNUPS = 'signups.json';
+const MAX_PER_IP_DAY = 3;
+const MAX_TRIALS = 200;
+const ipOf = (req) => String(req.headers?.['x-forwarded-for'] || req.headers?.['x-real-ip'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+const ipHash = (ip) => createHash('sha256').update(`hostexa-signup:${envClean(process.env.AUTH_SECRET)}:${ip}`).digest('hex').slice(0, 16);
+
+/** Đăng ký dùng thử: tạo cơ sở gói trial (14 ngày) + tài khoản admin đăng nhập bằng SĐT */
+async function signup(req, b) {
+  const wsName = String(b.wsName || '').trim().slice(0, 60);
+  const name = String(b.name || '').trim().slice(0, 60);
+  const phone = normPhone(b.phone);
+  const password = String(b.password || '');
+  if (!wsName) throw new HttpError(400, 'Vui lòng nhập tên cơ sở');
+  if (!name) throw new HttpError(400, 'Vui lòng nhập họ tên');
+  if (!phone) throw new HttpError(400, 'Số điện thoại không hợp lệ');
+  if (password.length < 6) throw new HttpError(400, 'Mật khẩu cần ít nhất 6 ký tự');
+  const { accounts } = await loadAccounts({ fresh: true });
+  if (accounts.some((a) => a.username === phone)) throw new HttpError(409, 'Số điện thoại này đã có tài khoản – hãy đăng nhập');
+  const { workspaces } = await loadWorkspaces({ fresh: true });
+  if (workspaces.filter(isTrial).length >= MAX_TRIALS) throw new HttpError(503, 'Đã đủ số tài khoản dùng thử, vui lòng liên hệ để được hỗ trợ');
+  // chống spam: tối đa 3 lần đăng ký / IP / ngày (lưu dạng băm, không lưu IP thật)
+  const h = ipHash(ipOf(req));
+  const now = Date.now();
+  await updateJSON(SIGNUPS, (d) => {
+    const list = (d?.list || []).filter((x) => now - x.at < 90 * 864e5);
+    if (list.filter((x) => x.ip === h && now - x.at < 864e5).length >= MAX_PER_IP_DAY) throw new HttpError(429, 'Bạn đã đăng ký quá nhiều lần hôm nay, thử lại sau');
+    list.push({ at: now, ip: h, phone });
+    return { list };
+  }, { list: [] });
+  const ws = await createWorkspace({ name: wsName, extra: { plan: 'trial', trialEnds: now + TRIAL.days * 864e5, contact: { name, phone }, signupAt: now } });
+  await createAccount({ ws: ws.id, role: 'admin', name, username: phone, password });
+  const r = await login(phone, password);
+  return { token: r.token, user: r.user, workspaces: await workspacesFor(r.user) };
+}
+
+/** Admin cơ sở dùng thử tự quản lý nhân viên dọn phòng (tối đa TRIAL.maxMembers) */
+async function trialAdmin(req, b) {
+  const user = await requireUser(req);
+  if (user.role !== 'admin' || !canAccess(user, b.ws)) throw new HttpError(403, 'Chỉ admin cơ sở được thực hiện');
+  const ws = (await loadWorkspaces({ fresh: true })).workspaces.find((w) => w.id === b.ws);
+  if (!ws) throw new HttpError(404, 'Không tìm thấy cơ sở');
+  if (!isTrial(ws)) throw new HttpError(403, 'Cơ sở gói Pro: liên hệ chủ hệ thống để thêm tài khoản');
+  if (trialExpired(ws)) throw new HttpError(403, 'Hết hạn dùng thử – nâng cấp Pro để tiếp tục');
+  const { accounts } = await loadAccounts({ fresh: true });
+  const members = accounts.filter((a) => a.ws === ws.id && a.role === 'member');
+  if (b.action === 'add-member') {
+    if (members.length >= TRIAL.maxMembers) throw new HttpError(400, `Gói dùng thử tối đa ${TRIAL.maxMembers} nhân viên – nâng cấp Pro để thêm`);
+    return createAccount({ ws: ws.id, role: 'member', name: String(b.name || '').trim().slice(0, 60) || 'Nhân viên dọn phòng' });
+  }
+  if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
+  await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.filter((a) => a.id !== b.id) }), { accounts: [] });
+  return { ok: true };
+}
 
 export default route(async (req, res) => {
   if (req.method === 'GET') {
@@ -25,6 +84,8 @@ export default route(async (req, res) => {
 
   if (req.method === 'POST') {
     const body = await readBody(req);
+    if (body.action === 'signup') return send(res, 200, await signup(req, body));
+    if (body.action === 'add-member' || body.action === 'remove-member') return send(res, 200, await trialAdmin(req, body));
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
       return send(res, 200, { token, user, workspaces: await workspacesFor(user) });

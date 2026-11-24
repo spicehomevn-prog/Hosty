@@ -4,6 +4,7 @@ import { useNotify, isIOS, isAndroid, isStandalone, isInApp, pushSupported, brow
 import { useSession } from '../lib/session.jsx';
 import { icsUrl, googleUrl } from '../lib/tasks.js';
 import { Sheet } from './ui.jsx';
+import { LockedRow } from './Upgrade.jsx';
 
 // Android: trang web / biểu tượng ngoài màn hình chính nhận thông báo QUA TRÌNH DUYỆT đã mở / tạo ra nó
 // (Chrome, Samsung Internet…) – không có app Hostexa riêng trong Cài đặt điện thoại.
@@ -163,12 +164,15 @@ export function RemindersPanel({ n }) {
 /** Thẻ "Nhắc hẹn" ở trang Cơ sở */
 export function RemindersCard() {
   const n = useNotify();
+  const { plan } = useSession();
+  if (plan.trial) return <LockedRow feature="push" title="Thông báo đẩy" sub="Tổng quan 8:00, báo trả / nhận phòng, nhắc task trên điện thoại" />;
   return <RemindersPanel n={n} />;
 }
 
 /** Khối nhắc hẹn trong form task */
 export function TaskReminderBox({ f, roomName, summary }) {
   const n = useNotify();
+  const trial = useSession().plan.trial;
   const [open, setOpen] = useState(false);
   const assigned = !!f.assignee;
   // iPhone mở từ biểu tượng: tệp .ics không mở được trong app -> chuyển sang Safari
@@ -177,6 +181,7 @@ export function TaskReminderBox({ f, roomName, summary }) {
     <div className="remind-box">
       <b><Bell size={16} /> Nhắc hẹn</b>
       <small>{summary}</small>
+      {trial && <LockedRow feature="push" title="Thông báo đẩy trên điện thoại" sub="Nhắc tự động đúng giờ – tính năng Pro" />}
       {!n.demo && (
         <div className="rm-mini">
           <span className={n.pushOn ? 'on' : ''}><Bell size={14} /> Thông báo máy này: {n.pushOn ? 'đang bật' : 'chưa bật'}</span>

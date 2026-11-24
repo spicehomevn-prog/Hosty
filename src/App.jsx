@@ -20,6 +20,7 @@ import { ExpenseSheet } from './components/FinanceSheets.jsx';
 import { Sheet, Toaster } from './components/ui.jsx';
 import { LogoMark } from './components/Logo.jsx';
 import { Intro, LoadingRing } from './components/Intro.jsx';
+import { UpgradeHost, openUpgrade, LockBadge } from './components/Upgrade.jsx';
 
 // màn chào chỉ chạy 1 lần mỗi lần mở app (không chạy lại khi đăng nhập / đổi cơ sở)
 let introPlayed = false;
@@ -51,13 +52,13 @@ export default function App() {
     const user = s.session.demo ? { id: 'demo', name: 'Khách xem thử' } : s.user;
     body = (
       <StoreProvider key={scope.cacheKey} scope={scope} role={s.role} user={user}>
-        <FinanceProvider enabled={can(s.role, 'finance')} cloud={scope.cloud}>
+        <FinanceProvider enabled={can(s.role, 'finance') && !s.plan.trial} cloud={scope.cloud}>
           <Workspace />
         </FinanceProvider>
       </StoreProvider>
     );
   }
-  return <>{body}<Toaster />{intro && <Intro name={s.session?.demo ? '' : s.user?.name} onDone={() => setIntro(false)} />}</>;
+  return <>{body}<Toaster /><UpgradeHost />{intro && <Intro name={s.session?.demo ? '' : s.user?.name} onDone={() => setIntro(false)} />}</>;
 }
 
 function Splash({ cloud, onLogout }) {
@@ -159,14 +160,21 @@ function Workspace() {
     goto: setTab,
   };
   const canCreate = can(role, 'booking');
+  // gói dùng thử: Tài chính hiện nhưng khoá
+  const finLocked = s.plan.trial && can(role, 'finance');
 
   return (
     <div className="app">
+      {s.plan.expired && (
+        <button className="expired-bar" onClick={() => openUpgrade(null)}>
+          Hết hạn dùng thử – dữ liệu chỉ xem. <b>Nâng cấp Pro</b>
+        </button>
+      )}
       <main key={tab} className={`page page-${tab}`}>
         {tab === 'home' && <Home api={api} />}
         {tab === 'calendar' && <CalendarView api={api} focus={calFocus} />}
         {tab === 'tasks' && <Tasks api={api} />}
-        {tab === 'finance' && can(role, 'finance') && <Finance api={api} />}
+        {tab === 'finance' && can(role, 'finance') && !finLocked && <Finance api={api} />}
         {tab === 'places' && <Places api={api} />}
       </main>
 
@@ -180,8 +188,8 @@ function Workspace() {
         )}
         {canCreate && <button className="nav-plus" data-flip="plus" onClick={() => setCreateOpen(true)} aria-label="Tạo mới"><Plus size={22} /></button>}
         {TABS.filter((t) => !t.perm || can(role, t.perm)).map(({ id, label, icon: Icon }) => (
-          <button key={id} data-flip={id} className={`nav-item ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)} aria-label={label} aria-current={tab === id ? 'page' : undefined}>
-            <span className="nav-ico"><Icon size={19} /></span>
+          <button key={id} data-flip={id} className={`nav-item ${tab === id ? 'active' : ''}`} onClick={() => (id === 'finance' && finLocked ? openUpgrade('finance') : setTab(id))} aria-label={label} aria-current={tab === id ? 'page' : undefined}>
+            <span className="nav-ico"><Icon size={19} />{id === 'finance' && finLocked && <LockBadge className="nav-lock" />}</span>
             {tab === id && <span className="nav-label">{label}</span>}
           </button>
         ))}
@@ -200,8 +208,9 @@ function Workspace() {
               <span className="tile-ico"><NotebookPen size={22} /></span><b>Ghi chú</b><small>Cho hôm nay</small>
             </button>
             {can(role, 'finance') && (
-              <button className="create-tile blue" onClick={() => { setCreateOpen(false); api.newExpense(); }}>
-                <span className="tile-ico"><Payments size={22} /></span><b>Chi phí</b><small>Lương, điện nước…</small>
+              <button className={`create-tile blue ${finLocked ? 'locked' : ''}`} onClick={() => { setCreateOpen(false); if (finLocked) openUpgrade('finance'); else api.newExpense(); }}>
+                {finLocked && <LockBadge className="tile-lock" />}
+                <span className="tile-ico"><Payments size={22} /></span><b>Chi phí</b><small>{finLocked ? 'Tính năng Pro' : 'Lương, điện nước…'}</small>
               </button>
             )}
           </div>
@@ -210,7 +219,7 @@ function Workspace() {
 
       {booking && <BookingSheet {...booking} onClose={() => setBooking(null)} />}
       {task && <TaskSheet task={task} onClose={() => setTask(null)} />}
-      {expense && can(role, 'finance') && <ExpenseSheet expense={expense} onClose={() => setExpense(null)} />}
+      {expense && can(role, 'finance') && !finLocked && <ExpenseSheet expense={expense} onClose={() => setExpense(null)} />}
     </div>
   );
 }

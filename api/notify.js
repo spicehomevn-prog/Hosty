@@ -4,7 +4,7 @@
 // GET  /api/notify?cron=push  (Authorization: Bearer CRON_SECRET) – gọi 5 phút/lần từ dịch vụ hẹn giờ ngoài (cron-job.org…)
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
-import { requireUser, canAccess, envClean, wsExists } from './_auth.js';
+import { requireUser, canAccess, envClean, wsExists, requirePro } from './_auth.js';
 import {
   vapidKeys, pushSubscribe, pushUnsubscribe, pushInfo, pushSend, pushDue, pushSetPrefs, stayDue, dailyNow, saveRun, loadRun, cronCtx,
 } from './_notify.js';
@@ -73,6 +73,7 @@ export default route(async (req, res) => {
     const body = await readBody(req);
     const { action, ws } = body;
     const user = await requireWs(req, ws);
+    if (String(action).startsWith('push-')) await requirePro(ws, 'Thông báo đẩy');
     switch (action) {
       case 'push-sub': return send(res, 200, { devices: await pushSubscribe(user.id, ws, body.sub, req.headers?.['user-agent']) });
       case 'push-prefs': return send(res, 200, { prefs: await pushSetPrefs(user.id, body.prefs) });

@@ -7,3 +7,6 @@ export const siteUrl = (env = process.env) => {
   const raw = env.SITE_URL || PRIMARY_DOMAIN;
   return (raw.startsWith('http') ? raw : `https://${raw}`).replace(/\/$/, '');
 };
+
+/** Số Zalo nhận yêu cầu nâng cấp gói Pro (để trống = chỉ hiện thông báo). Có thể ghi đè bằng env VITE_UPGRADE_ZALO lúc build. */
+export const UPGRADE_ZALO = '';

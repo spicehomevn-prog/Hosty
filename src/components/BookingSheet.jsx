@@ -11,6 +11,8 @@ import { dm as dmShort, toKey } from '../lib/dates.js';
 import { fmtVND } from '../lib/money.js';
 import { PriceSheet } from './FinanceSheets.jsx';
 import { PaymentFields } from './PaymentFields.jsx';
+import { LockedRow } from './Upgrade.jsx';
+import { useSession } from '../lib/session.jsx';
 
 export function BookingSheet({ mode, data, onClose }) {
   if (mode === 'new' || (mode === 'edit')) return <ManualForm data={data} onClose={onClose} />;
@@ -20,6 +22,8 @@ export function BookingSheet({ mode, data, onClose }) {
 function BookingDetail({ b, onClose }) {
   const { state, dispatch, role } = useStore();
   const finance = useFinance();
+  const { plan: pl, role: rl } = useSession();
+  const finLocked = pl.trial && can(rl, 'finance');
   const [edit, setEdit] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const canEdit = can(role, 'booking');
@@ -49,6 +53,7 @@ function BookingDetail({ b, onClose }) {
         <div><Moon size={16} /><span>Số đêm</span><b>{nights} đêm</b></div>
       </div>
       {finance && !b.blocked && <PriceBlock b={b} finance={finance} onEdit={() => (b.source === 'manual' ? setEdit(true) : setPriceOpen(true))} />}
+      {!finance && !b.blocked && finLocked && <LockedRow feature="finance" title="Giá & thanh toán" sub="Giá phòng, phí sàn, đặt cọc, còn phải thu" />}
       {priceOpen && <PriceSheet b={b} onClose={() => setPriceOpen(false)} />}
       {(b.summary || b.description) && (
         <div className="bk-desc">
@@ -117,6 +122,8 @@ function PayBlock({ p, b, finance }) {
 function ManualForm({ data, onClose }) {
   const { state, dispatch, user } = useStore();
   const finance = useFinance();
+  const { plan: pl, role: rl } = useSession();
+  const finLocked = pl.trial && can(rl, 'finance');
   const oldEntry = data?.id ? finance?.fin.prices?.[data.id] : null;
   const [price, setPrice] = useState(() => (oldEntry ? oldEntry.base ?? oldEntry.amount ?? null : null));
   const [discount, setDiscount] = useState(() => oldEntry?.discount || null);
@@ -175,6 +182,7 @@ function ManualForm({ data, onClose }) {
           ))}
         </div>
       </Field>
+      {!needPrice && finLocked && <LockedRow feature="finance" title="Giá & thanh toán" sub="Giá phòng, giảm giá, dịch vụ, đặt cọc, còn phải thu" />}
       {needPrice && (
         <>
         <Field label={<>Giá phòng (trước giảm giá) <em className="req">*</em></>} hint={!priceOk ? null : `${diffDays(f.start, f.end) > 0 ? `${diffDays(f.start, f.end)} đêm · ` : ''}${f.platform !== 'Trực tiếp' ? `phí sàn ${feePct(finance.fin, f.platform)}%` : 'không mất phí sàn'}`}>

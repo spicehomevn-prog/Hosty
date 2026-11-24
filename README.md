@@ -57,6 +57,14 @@ Máy chủ tự đọc lịch iCal của các sàn (tối đa 1 lần/giờ) đ�
 
 Ngoài ra trong form task vẫn có **Thêm tay vào lịch** (.ics cho iPhone, link Google Calendar) – thêm một lần, không tự cập nhật.
 
+## Gói dùng thử & Pro
+- Màn đăng nhập có nút **Đăng ký tài khoản dùng thử miễn phí**: khách nhập tên cơ sở, họ tên, SĐT, mật khẩu → hệ thống tự tạo cơ sở gói **dùng thử 14 ngày** + tài khoản admin (đăng nhập bằng SĐT). Chống spam: tối đa 3 lần đăng ký / IP / ngày, tối đa 200 cơ sở dùng thử.
+- Gói dùng thử: **không có** Tài chính, Thông báo đẩy, Cập nhật giá phòng; tối đa **5 phòng, 1 địa điểm, 1 nhân viên dọn phòng** (admin tự thêm ở Cơ sở → Tài khoản). Giao diện vẫn hiện đủ, có biểu tượng khoá → bấm sẽ hiện hộp *Nâng cấp tài khoản Pro*. Máy chủ cũng chặn các API tương ứng.
+- Hết 14 ngày: dữ liệu **chỉ xem** cho tới khi nâng cấp.
+- Chủ hệ thống nâng cấp trong **Quản lý tài khoản** (Nâng cấp Pro / Gia hạn 14 ngày / Về dùng thử), xem tên + SĐT người đăng ký. Cơ sở cũ (tạo trước khi có tính năng này) là **Pro**.
+- Số Zalo nhận yêu cầu nâng cấp: `UPGRADE_ZALO` trong `site.config.js` (hoặc biến `VITE_UPGRADE_ZALO` lúc build).
+- Chế độ xem thử với dữ liệu mẫu vẫn còn qua đường dẫn `/?demo` (để làm video, ảnh hướng dẫn).
+
 ## Quy trình sử dụng
 1. Chủ hệ thống đăng nhập → **Tạo cơ sở mới** → Hostexa tự tạo tài khoản `<cơ sở>-admin` và hiện mật khẩu → bấm **Copy để gửi** qua Zalo.
 2. Admin cơ sở đăng nhập → trả lời 4 câu hỏi thiết lập phòng & lịch iCal.

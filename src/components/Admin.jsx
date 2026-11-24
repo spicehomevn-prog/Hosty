@@ -4,6 +4,7 @@ import { useSession } from '../lib/session.jsx';
 import { ROLE_LABEL } from '../lib/perm.js';
 import { Sheet, toast } from './ui.jsx';
 import { CredentialsSheet } from './Credentials.jsx';
+import { isTrial, trialExpired, trialDaysLeft, TRIAL } from '../lib/plan.js';
 
 const TONES = ['violet', 'yellow', 'pink', 'blue'];
 
@@ -43,6 +44,23 @@ function AccountRow({ a, ws, act }) {
 }
 
 /** Quản lý cơ sở & tài khoản — chỉ chủ hệ thống */
+/** Gói của cơ sở: Pro / Dùng thử (còn X ngày / hết hạn) + người đăng ký + nút đổi gói */
+function PlanRow({ w, act, busy }) {
+  const trial = isTrial(w);
+  const exp = trialExpired(w);
+  return (
+    <div className={`plan-row ${trial ? (exp ? 'bad' : 'trial') : 'pro'}`}>
+      <span className="plan-tag">{trial ? (exp ? 'Dùng thử · hết hạn' : `Dùng thử · còn ${trialDaysLeft(w)} ngày`) : 'Pro'}</span>
+      {w.contact && <span className="plan-contact">{w.contact.name} · <a href={`tel:${w.contact.phone}`}>{w.contact.phone}</a>{w.signupAt ? ` · đăng ký ${new Date(w.signupAt).toLocaleDateString('vi-VN')}` : ''}</span>}
+      <span className="row gap8 wrap">
+        {trial && <button className="btn tiny primary" disabled={busy} onClick={() => act('set-plan', { id: w.id, plan: 'pro' })}>Nâng cấp Pro</button>}
+        {trial && <button className="btn tiny" disabled={busy} onClick={() => act('extend-trial', { id: w.id, days: TRIAL.days })}>Gia hạn {TRIAL.days} ngày</button>}
+        {!trial && <button className="btn tiny" disabled={busy} onClick={() => { if (confirm(`Chuyển "${w.name}" về gói dùng thử (${TRIAL.days} ngày, khoá Tài chính, Thông báo đẩy, giới hạn ${TRIAL.maxRooms} phòng)?`)) act('set-plan', { id: w.id, plan: 'trial' }); }}>Về dùng thử</button>}
+      </span>
+    </div>
+  );
+}
+
 export function AdminSheet({ onClose }) {
   const { call, refresh } = useSession();
   const [data, setData] = useState(null);
@@ -64,7 +82,7 @@ export function AdminSheet({ onClose }) {
       const r = await call('/api/admin', { method: 'POST', body: { action, ...body } });
       if (showCred && r.password) setCred({ account: r.account, password: r.password, workspaceName: ws?.name || r.workspace?.name });
       await load();
-      if (action.endsWith('-ws')) refresh();
+      if (action.endsWith('-ws') || action === 'set-plan' || action === 'extend-trial') refresh();
       setBusy(false);
       return true;
     } catch (e) { toast(e.message); setBusy(false); return false; }
@@ -101,6 +119,7 @@ export function AdminSheet({ onClose }) {
                     </>
                   )}
                 </div>
+                <PlanRow w={w} act={act} busy={busy} />
                 <div className="acc-list">
                   {accs.map((a) => <AccountRow key={a.id} a={a} ws={w} act={act} />)}
                 </div>

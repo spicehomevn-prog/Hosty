@@ -19,11 +19,13 @@ import { taskInstances, isRepeating } from '../lib/tasks.js';
 import { ProgressRing } from './ProgressRing.jsx';
 import { fmtShort, fmtVND } from '../lib/money.js';
 import { Sheet } from './ui.jsx';
+import { openUpgrade, LockBadge } from './Upgrade.jsx';
 import { platformColor } from '../lib/store.jsx';
 
 export default function Home({ api }) {
   const { state, dispatch, sync, syncing, cloud, role, user } = useStore();
-  const { workspaces, selectWs } = useSession();
+  const sess = useSession();
+  const { workspaces, selectWs } = sess;
   const today = todayKey();
   const [occOpen, setOccOpen] = useState(false);
   const bookings = useMemo(() => getBookings(state), [state]);
@@ -76,7 +78,8 @@ export default function Home({ api }) {
           <span className="hero-deco" aria-hidden="true" />
         </button>
       </div>
-      <FinanceTiles state={state} bookings={bookings} idx={idx} api={api} />
+      {/* gói dùng thử: 2 ô hiện mờ, có khoá -> bấm mở hộp nâng cấp */}
+      {sess.plan.trial && can(role, 'finance') ? <LockedFinanceTiles /> : <FinanceTiles state={state} bookings={bookings} idx={idx} api={api} />}
 
       <button className="occ-card rise" style={{ '--i': 4 }} onClick={() => setOccOpen(true)} aria-haspopup="dialog">
         <div>
@@ -147,6 +150,29 @@ export default function Home({ api }) {
         ))}
       </div>
       <p className="tiny muted center">Lịch iCal tải lần cuối: {timeAgo(state.lastSync)}</p>
+    </div>
+  );
+}
+
+function LockedFinanceTiles() {
+  return (
+    <div className="hero-cards rise" style={{ '--i': 3 }}>
+      <button className="hero blue locked" onClick={() => openUpgrade('finance')}>
+        <LockBadge className="hero-lock" />
+        <span className="hero-ico"><Revenue size={18} /></span>
+        <span className="hero-label">Doanh thu tháng này</span>
+        <b className="hero-num">•••</b>
+        <span className="hero-sub">Tính năng Pro</span>
+        <span className="hero-deco" aria-hidden="true" />
+      </button>
+      <button className="hero pink locked" onClick={() => openUpgrade('finance')}>
+        <LockBadge className="hero-lock" />
+        <span className="hero-ico"><Payments size={18} /></span>
+        <span className="hero-label">Còn phải thu</span>
+        <b className="hero-num">•••</b>
+        <span className="hero-sub">Tính năng Pro</span>
+        <span className="hero-deco" aria-hidden="true" />
+      </button>
     </div>
   );
 }

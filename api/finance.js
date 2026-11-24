@@ -7,7 +7,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, loadWorkspaces, envClean, wsExists } from './_auth.js';
+import { requireUser, canAccess, loadWorkspaces, envClean, requirePro } from './_auth.js';
 import { resolveAirbnb, runAirbnbCalendars, OtaError } from './_apify.js';
 
 export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap'];
@@ -18,7 +18,7 @@ async function requireFinance(req, ws) {
   const user = await requireUser(req);
   if (user.role !== 'owner' && user.role !== 'admin') throw new HttpError(403, 'Chỉ chủ hệ thống và admin cơ sở xem được tài chính');
   if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-  if (!(await wsExists(ws))) throw new HttpError(404, 'Cơ sở không còn tồn tại');
+  await requirePro(ws, 'Tài chính'); // gói dùng thử không có Tài chính / cập nhật giá phòng
   return user;
 }
 
@@ -83,6 +83,7 @@ export default route(async (req, res) => {
     const { workspaces } = await loadWorkspaces();
     const done = [];
     for (const w of workspaces) {
+      if (w.plan === 'trial') continue;
       const cur = await getJSON(finFile(w.id), { etag: false, cache: true });
       if (!Object.values(cur?.data?.data?.otaListings || {}).some((v) => v?.Airbnb)) continue;
       try { await updateOta(w.id, 'Tự cập nhật hằng tháng'); done.push(w.id); } catch (e) { console.error('ota', w.id, e.message); }

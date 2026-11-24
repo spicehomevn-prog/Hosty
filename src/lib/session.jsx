@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { isTrial, trialExpired, trialDaysLeft } from './plan.js';
 
 const KEY = 'hosty:session';
 const DATA_PREFIX = 'hosty:data:';
@@ -82,11 +83,17 @@ export function SessionProvider({ children }) {
   useEffect(() => { refresh(); }, [session?.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(() => {
-    const role = session?.demo ? 'demo' : session?.user?.role || null;
     const workspace = session?.workspaces?.find((w) => w.id === session.ws) || null;
+    // gói của cơ sở đang mở: dùng thử -> khoá tính năng Pro; hết hạn -> chỉ xem (vai trò 'viewer')
+    const plan = { trial: isTrial(workspace), expired: trialExpired(workspace), daysLeft: trialDaysLeft(workspace) };
+    const baseRole = session?.demo ? 'demo' : session?.user?.role || null;
+    const role = plan.expired && baseRole !== 'owner' ? 'viewer' : baseRole;
     return {
       session,
       role,
+      plan,
+      /** tính năng Pro bị khoá ở cơ sở đang mở (finance | push | rates | rooms | locations | members) */
+      locked: () => plan.trial,
       user: session?.user || null,
       token: session?.token || null,
       workspace,
@@ -95,6 +102,12 @@ export function SessionProvider({ children }) {
       logout,
       refresh,
       startDemo: () => setSession({ demo: true }),
+      signup: async (form) => {
+        const r = await api('/api/auth', { method: 'POST', body: { action: 'signup', ...form } });
+        clearCaches();
+        setSession({ token: r.token, user: r.user, workspaces: r.workspaces, ws: autoWs(r.user, r.workspaces) });
+        return r;
+      },
       selectWs: (ws) => setSession((s) => ({ ...s, ws })),
       setToken: (token) => setSession((s) => ({ ...s, token })),
       setWorkspaces: (workspaces) => setSession((s) => ({ ...s, workspaces })),

@@ -6,6 +6,65 @@ import { ROLE_LABEL } from '../lib/perm.js';
 import { timeAgo } from '../lib/dates.js';
 import { Sheet, Field, toast } from './ui.jsx';
 import { AdminSheet } from './Admin.jsx';
+import { openUpgrade } from './Upgrade.jsx';
+import { TRIAL } from '../lib/plan.js';
+import { useMembers } from '../lib/members.js';
+import { Lock, Copy, Trash2, Plus } from '../lib/icons.jsx';
+
+/** Admin cơ sở dùng thử: tự thêm / xoá tối đa TRIAL.maxMembers nhân viên dọn phòng */
+function TrialMembers() {
+  const s = useSession();
+  const members = useMembers().filter((m) => m.role === 'member');
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState(null);
+  const [err, setErr] = useState('');
+  const [list, setList] = useState(null); // danh sách sau khi thêm / xoá (khỏi chờ tải lại)
+  const shown = list || members;
+  const add = async () => {
+    if (shown.length >= TRIAL.maxMembers) { openUpgrade('members'); return; }
+    setBusy(true); setErr('');
+    try {
+      const r = await s.call('/api/auth', { method: 'POST', body: { action: 'add-member', ws: s.workspace.id, name: name.trim() } });
+      setCreated(r); setName(''); setList([...shown, r.account]);
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  const remove = async (m) => {
+    if (!confirm(`Xoá tài khoản ${m.name}? Nhân viên này sẽ không đăng nhập được nữa.`)) return;
+    try { await s.call('/api/auth', { method: 'POST', body: { action: 'remove-member', ws: s.workspace.id, id: m.id } }); setList(shown.filter((x) => x.id !== m.id)); setCreated(null); } catch (e) { setErr(e.message); }
+  };
+  const copy = async () => {
+    const t = `Tài khoản Hostexa của bạn:\nTrang: https://hostexa.vercel.app\nTên đăng nhập: ${created.account.username}\nMật khẩu: ${created.password}`;
+    try { await navigator.clipboard.writeText(t); toast('Đã copy – dán vào Zalo gửi nhân viên'); } catch { toast(t); }
+  };
+  return (
+    <div className="trial-members">
+      <div className="row-between"><b>Nhân viên dọn phòng</b><span className="tiny muted">{shown.length}/{TRIAL.maxMembers}</span></div>
+      {shown.map((m) => (
+        <div key={m.id} className="tm-row">
+          <span><b>{m.name}</b><small className="mono">{m.username}</small></span>
+          <button className="icon-btn sm danger" onClick={() => remove(m)} aria-label={`Xoá ${m.name}`}><Trash2 size={16} /></button>
+        </div>
+      ))}
+      {created && (
+        <div className="tm-created">
+          <span>Tên đăng nhập <b className="mono">{created.account.username}</b> · Mật khẩu <b className="mono">{created.password}</b></span>
+          <button className="btn tiny" onClick={copy}><Copy size={14} /> Copy gửi Zalo</button>
+        </div>
+      )}
+      {shown.length < TRIAL.maxMembers ? (
+        <div className="row gap8">
+          <input className="input sm" placeholder="Tên nhân viên" value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="btn tiny primary" onClick={add} disabled={busy}>{busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} Thêm</button>
+        </div>
+      ) : (
+        <button className="btn tiny" onClick={() => openUpgrade('members')}><Lock size={14} /> Thêm nhân viên (Pro)</button>
+      )}
+      {err && <p className="form-error">{err}</p>}
+    </div>
+  );
+}
 
 /** Dòng trạng thái đồng bộ */
 export function SyncStatus({ compact }) {
@@ -92,6 +151,12 @@ export function AccountCard() {
         <span>Cơ sở đang mở</span>
         <b>{s.workspace?.name}</b>
       </div>
+      {s.plan.trial && (
+        <button className={`trial-pill ${s.plan.expired ? 'bad' : ''}`} onClick={() => openUpgrade(null)}>
+          <Lock size={14} /> {s.plan.expired ? 'Hết hạn dùng thử – chỉ xem' : `Dùng thử · còn ${s.plan.daysLeft} ngày`} · <b>Nâng cấp Pro</b>
+        </button>
+      )}
+      {s.plan.trial && !s.plan.expired && s.user?.role === 'admin' && <TrialMembers />}
       <SyncStatus />
       <p className="tiny muted">Tự đồng bộ mỗi 15 phút, khi mở app, khi chuyển app xuống nền và ngay sau khi bạn sửa.</p>
       <div className="row gap8 wrap">

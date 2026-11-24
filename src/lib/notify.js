@@ -81,7 +81,7 @@ async function currentSub() {
 export function useNotify() {
   const s = useSession();
   const ws = s.workspace?.id;
-  const demo = s.role === 'demo';
+  const demo = s.role === 'demo' || s.plan?.trial; // gói dùng thử: không có thông báo đẩy
   const [info, setInfo] = useState(null);
   const [sub, setSub] = useState(null); // máy này đã bật thông báo
   const [err, setErr] = useState('');
