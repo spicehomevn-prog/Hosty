@@ -23,6 +23,17 @@ function reducer(s, a) {
     case 'MERGE_APPLY': return pickFin(merge3(a.snapshot, s, a.merged));
     case 'SETTINGS': return { ...s, settings: { ...s.settings, ...a.patch, fees: { ...s.settings.fees, ...(a.patch.fees || {}) } } };
     case 'SET_RATES': return { ...s, rateTable: setDays(s.rateTable, a.roomIds, a.days, a.price), prices: withPrices(s.prices, a.reprice) };
+    // bảng giá riêng kênh Trực tiếp (không ảnh hưởng giá các sàn)
+    case 'SET_DIRECT_RATES': return { ...s, directRates: setDays(s.directRates, a.roomIds, a.days, a.price) };
+    case 'MERGE_DIRECT_RATES': {
+      const directRates = { ...(s.directRates || {}) };
+      for (const [r, days] of Object.entries(a.table || {})) {
+        const t = { ...(directRates[r] || {}) };
+        for (const [d, v] of Object.entries(days)) { if (v) t[d] = v; else delete t[d]; }
+        if (Object.keys(t).length) directRates[r] = t; else delete directRates[r];
+      }
+      return { ...s, directRates };
+    }
     case 'SET_DAY_DISCOUNT': return { ...s, dayDiscount: setDays(s.dayDiscount, a.roomIds, a.days, a.pct), prices: withPrices(s.prices, a.reprice) };
     case 'SET_STAY_DISCOUNT': {
       const stayDiscount = { ...(s.stayDiscount || {}) };

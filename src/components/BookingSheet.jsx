@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, LogIn, LogOut, Moon, Ban, Revenue, Pencil } from '../lib/icons.jsx';
 import { useStore, uid, PLATFORMS, platformColor } from '../lib/store.jsx';
 import { roomIndex } from '../lib/derive.js';
@@ -6,7 +6,7 @@ import { todayKey, addDays, diffDays, longDate } from '../lib/dates.js';
 import { Sheet, Field, toast, MoneyInput, DiscountInput } from './ui.jsx';
 import { can } from '../lib/perm.js';
 import { useFinance } from '../lib/finance.jsx';
-import { bookingPrice, SOURCE_LABEL, feePct, applyDiscount } from '../lib/fin.js';
+import { bookingPrice, SOURCE_LABEL, feePct, applyDiscount, directEstimate } from '../lib/fin.js';
 import { dm as dmShort, toKey } from '../lib/dates.js';
 import { fmtVND } from '../lib/money.js';
 import { PriceSheet } from './FinanceSheets.jsx';
@@ -139,6 +139,11 @@ function ManualForm({ data, onClose }) {
   });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const needPrice = !!finance;
+  // Giá tự điền theo bảng giá Trực tiếp (Bảng giá → Trực tiếp) cho tới khi người dùng tự gõ giá
+  const [auto, setAuto] = useState(!oldEntry);
+  const est = needPrice && f.platform === 'Trực tiếp' ? directEstimate(finance.fin, f.roomId, f.start, f.end) : null;
+  useEffect(() => { if (auto) setPrice(est); }, [auto, est]);
+  const typePrice = (v) => { setAuto(false); setPrice(v); };
   const priceOk = !needPrice || (price != null && price > 0);
   const valid = f.roomId && f.start && f.end && f.end > f.start && priceOk;
   const save = () => {
@@ -186,7 +191,8 @@ function ManualForm({ data, onClose }) {
       {needPrice && (
         <>
         <Field label={<>Giá phòng (trước giảm giá) <em className="req">*</em></>} hint={!priceOk ? null : `${diffDays(f.start, f.end) > 0 ? `${diffDays(f.start, f.end)} đêm · ` : ''}${f.platform !== 'Trực tiếp' ? `phí sàn ${feePct(finance.fin, f.platform)}%` : 'không mất phí sàn'}`}>
-          <MoneyInput value={price} onChange={setPrice} placeholder="VD: 1.200.000" invalid={!priceOk} />
+          <MoneyInput value={price} onChange={typePrice} placeholder="VD: 1.200.000" invalid={!priceOk} />
+          {auto && est != null && <span className="tiny muted auto-note">Tự điền theo bảng giá Trực tiếp · sửa được</span>}
           {!priceOk && <span className="field-error">Bắt buộc nhập giá phòng để tạo đặt phòng</span>}
         </Field>
         <Field label="Giảm giá (không bắt buộc)"><DiscountInput value={discount} onChange={setDiscount} /></Field>

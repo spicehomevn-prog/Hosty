@@ -73,6 +73,7 @@ const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').rep
 const num = (v) => {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return Math.round(v);
+  if (!/\d/.test(String(v))) return NaN; // chữ không có số -> lỗi
   const s = String(v).replace(/[^\d,.-]/g, '').replace(/[.,](?=\d{3}(\D|$))/g, '').replace(',', '.');
   const n = Number(s);
   return Number.isFinite(n) ? Math.round(n) : NaN;
@@ -145,4 +146,82 @@ export function planDirect(parsed, bookings, prices = {}, by = '') {
     items.push({ ...p, b, status: 'update', entry, oldTotal: old.amount != null ? old.amount + oldEx : null, newTotal: amount + (extras ? exTotal : 0) });
   }
   return { entries, items, summary: sum };
+}
+
+/* =================== BẢNG GIÁ THEO NGÀY – KÊNH TRỰC TIẾP =================== */
+// Form: mỗi phòng 1 dòng, mỗi ngày trong tháng 1 cột (giá 1 đêm). Ghi vào fin.directRates – không đụng bảng giá các sàn.
+const WD = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const daysOf = (m) => {
+  const [y, mo] = m.split('-').map(Number);
+  const n = new Date(y, mo, 0).getDate();
+  return Array.from({ length: n }, (_, i) => `${m}-${String(i + 1).padStart(2, '0')}`);
+};
+
+/** Tải form Excel bảng giá Trực tiếp của tháng m cho danh sách phòng [{ id, name, loc }] */
+export async function downloadRateTemplate(rooms, directRates = {}, m, wsName = '') {
+  const { default: writeXlsxFile } = await import('write-excel-file/browser');
+  const days = daysOf(m);
+  const wkd = (d) => new Date(`${d}T00:00:00`).getDay();
+  const head = [
+    { value: 'Mã phòng (không sửa)', fontWeight: 'bold', color: '#FFFFFF', backgroundColor: '#241A3B' },
+    { value: 'Phòng', fontWeight: 'bold', color: '#FFFFFF', backgroundColor: '#241A3B' },
+    ...days.map((d) => ({ value: `${Number(d.slice(8))} ${WD[wkd(d)]}`, fontWeight: 'bold', color: '#FFFFFF', backgroundColor: [5, 6].includes(wkd(d)) ? '#E0608F' : '#7C5CE6', align: 'center' })),
+  ];
+  const body = rooms.map((r) => [
+    { value: r.id, type: String },
+    { value: r.loc ? `${r.name} · ${r.loc}` : r.name, type: String },
+    ...days.map((d) => {
+      const v = Number(directRates?.[r.id]?.[d]) || null;
+      return v ? { value: v, type: Number, format: '#,##0', backgroundColor: '#F6F2FF' } : { value: null, backgroundColor: '#F6F2FF' };
+    }),
+  ]);
+  const [y, mo] = m.split('-');
+  const guide = [
+    [{ value: `Bảng giá kênh Trực tiếp – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, fontWeight: 'bold', fontSize: 14 }],
+    [{ value: 'Cách dùng:', fontWeight: 'bold' }],
+    [{ value: '1. Ở trang "Bảng giá", mỗi dòng là 1 phòng, mỗi cột là 1 ngày. Điền giá 1 đêm (nhận phòng ngày đó), ví dụ 850000.' }],
+    [{ value: '2. Cột màu hồng là đêm thứ 6, thứ 7. KHÔNG sửa cột "Mã phòng".' }],
+    [{ value: '3. Ô để trống = giữ nguyên giá đang có. Gõ 0 = xoá giá ngày đó.' }],
+    [{ value: '4. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Trực tiếp → Tải file lên.' }],
+    [{ value: 'Bảng giá này chỉ dùng để điền sẵn giá khi tạo đặt phòng TRỰC TIẾP – không ảnh hưởng giá các sàn (Airbnb, Booking.com…).' }],
+  ];
+  const fileName = `hostexa-bang-gia-truc-tiep-${y}-${mo}.xlsx`;
+  await writeXlsxFile([
+    { data: [head, ...body], sheet: 'Bảng giá', columns: [{ width: 14 }, { width: 26 }, ...days.map(() => ({ width: 11 }))], stickyRowsCount: 1, stickyColumnsCount: 2 },
+    { data: guide, sheet: 'Hướng dẫn', columns: [{ width: 110 }] },
+  ]).toFile(fileName);
+  return fileName;
+}
+
+/**
+ * Đọc form bảng giá đã điền -> { table: { roomId: { day: giá | null(xoá) } }, changed, cleared, rooms, unknown, invalid }
+ * Chỉ nhận phòng có trong `roomIds`; ô trống = giữ nguyên.
+ */
+export function parseRateSheet(rows, m, roomIds, current = {}) {
+  const hi = rows.findIndex((r) => norm(r[0]).startsWith('ma phong'));
+  if (hi < 0) throw new Error('Không thấy dòng tiêu đề của form bảng giá (cột "Mã phòng"). Hãy dùng đúng form tải từ Hostexa.');
+  const days = daysOf(m);
+  // cột ngày: lấy số đầu tiên trong tiêu đề ("5 T6" -> 5)
+  const dayCol = {};
+  rows[hi].forEach((h, i) => { if (i < 2) return; const n = parseInt(String(h ?? ''), 10); if (n >= 1 && n <= days.length) dayCol[i] = days[n - 1]; });
+  if (!Object.keys(dayCol).length) throw new Error('Không thấy cột ngày trong form');
+  const valid = new Set(roomIds);
+  const table = {}; let changed = 0; let cleared = 0; let unknown = 0; let invalid = 0; const rooms = new Set();
+  for (const r of rows.slice(hi + 1)) {
+    const id = String(r[0] ?? '').trim();
+    if (!id) continue;
+    if (!valid.has(id)) { unknown += 1; continue; }
+    for (const [i, d] of Object.entries(dayCol)) {
+      const raw = r[i];
+      if (raw == null || String(raw).trim() === '') continue;
+      const v = num(raw);
+      if (Number.isNaN(v) || v < 0) { invalid += 1; continue; }
+      const old = Number(current?.[id]?.[d]) || 0;
+      if (v === old) continue;
+      (table[id] ||= {})[d] = v || null;
+      rooms.add(id);
+      if (v) changed += 1; else if (old) cleared += 1;
+    }
+  }
+  return { table, changed, cleared, rooms: rooms.size, unknown, invalid };
 }

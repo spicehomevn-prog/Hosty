@@ -1318,3 +1318,14 @@ input.switch:checked::after { transform: translateX(18px); }
 .di-month { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .di-step .btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
 .imp-plan .bad { color: #B42318; }
+
+/* Bảng giá: chọn kênh Các sàn / Trực tiếp + form Excel bảng giá Trực tiếp */
+.rate-channel { margin-bottom: 6px; }
+.rate-channel-note { margin: 0 2px 10px; line-height: 1.4; }
+.dr-excel { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--violet-soft); }
+.dr-excel > small { color: var(--muted); font-size: 12px; }
+.dr-excel .imp-plan { background: var(--card, #fff); }
+.auto-note { display: block; margin-top: 4px; color: var(--violet, #7c4dff); }
+.dr-excel .btn.tiny { background: #fff; display: inline-flex; align-items: center; gap: 6px; }
+.dr-excel .btn.tiny.primary { background: var(--nav); color: #fff; border-color: transparent; }
+.dr-excel .btn.tiny.primary:disabled { opacity: .45; }

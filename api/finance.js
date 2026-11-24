@@ -10,7 +10,7 @@ import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
 import { requireUser, canAccess, loadWorkspaces, envClean, requirePro } from './_auth.js';
 import { resolveAirbnb, runAirbnbCalendars, OtaError } from './_apify.js';
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates'];
 export const finFile = (ws) => `fin/${ws}.json`;
 const pick = (d) => Object.fromEntries(FIN_KEYS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
 
