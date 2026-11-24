@@ -49,7 +49,7 @@ export default function Tasks({ api }) {
     <div className="tasks">
       <header className="page-head rise">
         <div><h1>{canEdit ? 'Công việc' : 'Việc của tôi'}</h1><p className="sub">{current.filter((t) => !t.done).length} task chưa hoàn thành</p></div>
-        {canEdit && <button className="icon-btn" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={20} /></button>}
+        {canEdit && <button className="icon-btn add-round" onClick={() => api.newTask()} aria-label="Thêm task"><Plus size={22} /></button>}
       </header>
 
       <h2 className="section-title">Tiến độ</h2>

@@ -1306,3 +1306,6 @@ input.switch:checked::after { transform: translateX(18px); }
 .account-card .trial-members .btn.tiny.primary { background: var(--plum, #241A3B); color: #fff; }
 .signup-form { animation: fade .25s ease-out; scroll-margin-top: 16px; }
 .sheet-foot a.btn { text-decoration: none; display: flex; align-items: center; justify-content: center; }
+/* nút + tròn tím nổi (cạnh tiêu đề) */
+.icon-btn.add-round { width: 52px; height: 52px; border: 0; border-radius: 50%; background: var(--violet); color: #fff; box-shadow: 0 14px 30px -10px rgba(120, 80, 230, .7); }
+.icon-btn.add-round:hover { background: var(--violet); filter: brightness(1.08); }
