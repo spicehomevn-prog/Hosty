@@ -1304,3 +1304,5 @@ input.switch:checked::after { transform: translateX(18px); }
 .plan-row.bad .plan-tag { background: #FFE4E0; color: #B42318; }
 .plan-contact { color: var(--ink-2); }
 .account-card .trial-members .btn.tiny.primary { background: var(--plum, #241A3B); color: #fff; }
+.signup-form { animation: fade .25s ease-out; scroll-margin-top: 16px; }
+.sheet-foot a.btn { text-decoration: none; display: flex; align-items: center; justify-content: center; }

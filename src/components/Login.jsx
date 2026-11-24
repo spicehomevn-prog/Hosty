@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Sparkles, CheckCircle2, LogIn, Eye, EyeOff, Loader2, User, Lock, Building2, Bell } from '../lib/icons.jsx';
 import { TRIAL, normPhone } from '../lib/plan.js';
 import { useSession } from '../lib/session.jsx';
@@ -12,6 +12,14 @@ function Signup({ onBack }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  // hiện form ngay (không chờ hiệu ứng) và cuộn tới ô đầu tiên
+  const formRef = useRef(null);
+  useEffect(() => {
+    const el = formRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => el.querySelector('input')?.focus({ preventScroll: true }), 350);
+  }, []);
   const submit = async (e) => {
     e.preventDefault();
     if (!f.wsName.trim()) return setErr('Nhập tên cơ sở (homestay / khách sạn)');
@@ -23,7 +31,7 @@ function Signup({ onBack }) {
     try { await signup({ wsName: f.wsName.trim(), name: f.name.trim(), phone: f.phone, password: f.password }); } catch (e2) { setErr(e2.message); setBusy(false); }
   };
   return (
-    <form className="login-form rise" style={{ '--i': 11 }} onSubmit={submit}>
+    <form className="login-form signup-form" ref={formRef} onSubmit={submit}>
       <label className="field">
         <span className="field-label">Tên cơ sở</span>
         <span className="input-ico"><Building2 size={16} />
@@ -54,7 +62,7 @@ function Signup({ onBack }) {
         {busy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />} Tạo tài khoản dùng thử
       </button>
       <p className="tiny muted center">Miễn phí {TRIAL.days} ngày · tối đa {TRIAL.maxRooms} phòng, {TRIAL.maxLocations} địa điểm · không cần thẻ thanh toán</p>
-      <button type="button" className="link-btn center-btn" onClick={onBack}>Đã có tài khoản? <b>Đăng nhập</b></button>
+      <button type="button" className="link-btn center-btn" onClick={onBack}>Đã có tài khoản?{" "}<b>Đăng nhập</b></button>
     </form>
   );
 }
@@ -85,8 +93,8 @@ export default function Login() {
         <div className="wa-card yellow" style={{ '--d': '.58s' }}><Sparkles size={24} /><span>Thẻ dọn phòng</span></div>
         <div className="wa-card pink" style={{ '--d': '.71s' }}><CheckCircle2 size={24} /><span>Task mỗi ngày</span></div>
       </div>
-      <h1 className="rise" style={{ '--i': 9 }}>{mode === 'signup' ? 'Dùng thử Hostexa miễn phí' : 'Đăng nhập Hostexa'}</h1>
-      <p className="muted rise" style={{ '--i': 10 }}>{mode === 'signup' ? `Tạo tài khoản trong 1 phút, dùng ngay ${TRIAL.days} ngày.` : 'Dữ liệu tự đồng bộ giữa các máy mỗi 15 phút.'}</p>
+      <h1 className={mode === 'signup' ? '' : 'rise'} style={{ '--i': 9 }}>{mode === 'signup' ? 'Dùng thử Hostexa miễn phí' : 'Đăng nhập Hostexa'}</h1>
+      <p className={`muted ${mode === 'signup' ? '' : 'rise'}`} style={{ '--i': 10 }}>{mode === 'signup' ? `Tạo tài khoản trong 1 phút, dùng ngay ${TRIAL.days} ngày.` : 'Dữ liệu tự đồng bộ giữa các máy mỗi 15 phút.'}</p>
 
       {mode === 'signup' ? <Signup onBack={() => setMode('login')} /> : <>
       <form className="login-form rise" style={{ '--i': 11 }} onSubmit={submit}>
