@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2, Pricing, RefreshCw, CheckCircle2, AlertCircle, Link2 } from '../lib/icons.jsx';
+import { Trash2, Pricing, RefreshCw, CheckCircle2, AlertCircle, Link2, Plus } from '../lib/icons.jsx';
 import { useStore, uid, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { useSession } from '../lib/session.jsx';
@@ -250,13 +250,18 @@ function OtaRates() {
   const { fin, dispatch, runOta, status } = useFinance();
   const { role } = useSession();
   const [busy, setBusy] = useState(false);
-  const rooms = state.locations.flatMap((l) => l.rooms.map((r) => ({ ...r, loc: state.locations.length > 1 ? l.name : '' })));
+  const rooms = state.locations.flatMap((l) => l.rooms.map((r) => ({ ...r, loc: state.locations.length > 1 ? l.name : '', locId: l.id })));
   const L = fin.otaListings || {};
+  const [added, setAdded] = useState(() => new Set()); // ô sàn vừa bấm "+ Sàn" (chưa dán link)
   const run = fin.otaRun;
   const src = (p) => run?.sources?.[p] || (p === 'Airbnb' && run?.rooms ? { rooms: run.rooms, ok: run.ok } : null);
-  // ô link hiện cho sàn mà phòng có lịch iCal, hoặc đã có link
-  const platsOf = (r) => OTA.filter((o) => L[r.id]?.[o.p] || state.calendars.some((c) => c.roomId === r.id && c.platform === o.p));
-  const shown = rooms.filter((r) => platsOf(r).length);
+  // ô link hiện cho sàn mà phòng có lịch iCal, đã có link, hoặc vừa bấm "+ Sàn"
+  const platsOf = (r) => OTA.filter((o) => L[r.id]?.[o.p] || added.has(`${r.id}|${o.p}`) || state.calendars.some((c) => c.roomId === r.id && c.platform === o.p));
+  const shown = rooms;
+  const addPlat = (roomId, p) => {
+    setAdded(new Set([...added, `${roomId}|${p}`]));
+    setTimeout(() => document.getElementById(`ota-${roomId}-${p}`)?.focus(), 60);
+  };
   const today = todayKey();
   const set = (roomId, platform, value) => dispatch({ type: 'OTA_LISTING', roomId, platform, value });
   // ước tính chi phí mỗi lần chạy: Airbnb theo phòng, Booking theo trang (link chung tính 1), Agoda theo đêm còn trống ~ tới hết tháng sau
@@ -279,9 +284,11 @@ function OtaRates() {
     const parts = Object.entries(r.run?.sources || {}).map(([p, x]) => `${p} ${x.ok ? `${Object.values(x.rooms || {}).reduce((a, y) => Math.max(a, y.priced || 0), 0)} đêm` : 'lỗi'}`);
     toast(`Đã cập nhật giá các sàn${parts.length ? ` · ${parts.join(' · ')}` : ''}`);
   };
-  const copyAll = (p, link) => {
-    const targets = rooms.filter((r) => r.id && state.calendars.some((c) => c.roomId === r.id && c.platform === p) && L[r.id]?.[p] !== link);
-    targets.forEach((r) => set(r.id, p, link));
+  // chép link sang các phòng khác cùng địa điểm (1 trang Booking / Agoda chung cho cả chi nhánh)
+  const sameLoc = (r, p, link) => rooms.filter((x) => x.id !== r.id && x.locId === r.locId && L[x.id]?.[p] !== link);
+  const copyAll = (r, p, link) => {
+    const targets = sameLoc(r, p, link);
+    targets.forEach((x) => set(x.id, p, link));
     toast(targets.length ? `Đã dùng link ${p} cho ${targets.length} phòng` : 'Các phòng đã có link này');
   };
   const agodaTypes = (link) => {
@@ -298,7 +305,7 @@ function OtaRates() {
         Booking.com: giá thấp nhất của trang (chưa gồm thuế/phí) – nhiều phòng dùng chung 1 trang thì nhận chung giá. Agoda: giá đã gồm thuế, chọn được loại phòng.
       </p>
       <div className="listing-list">
-        {shown.length === 0 && <p className="tiny muted">Chưa có phòng nào có lịch Airbnb / Booking.com / Agoda.</p>}
+        {shown.length === 0 && <p className="tiny muted">Chưa có phòng nào.</p>}
         {shown.map((r) => (
           <div key={r.id} className="listing-item">
             <div className="listing-top"><b>{r.name}</b><small>{r.loc}</small></div>
@@ -306,12 +313,12 @@ function OtaRates() {
               const link = L[r.id]?.[o.p] || '';
               const rr = src(o.p)?.rooms?.[r.id];
               const future = Object.keys(fin.otaRates?.[r.id]?.[o.p] || {}).filter((d) => d >= today).length;
-              const others = o.p !== 'Airbnb' && link && rooms.some((x) => x.id !== r.id && state.calendars.some((c) => c.roomId === x.id && c.platform === o.p) && L[x.id]?.[o.p] !== link);
+              const others = o.p !== 'Airbnb' && link && sameLoc(r, o.p, link).length > 0;
               const types = o.p === 'Agoda' ? agodaTypes(link) : [];
               return (
                 <div key={o.p} className="listing-row">
                   <label className="listing-plat"><span className="pdot" style={{ background: platformColor(o.p) }} />{o.p}</label>
-                  <input className="input sm" inputMode="url" placeholder={o.ph} value={link} onChange={(e) => set(r.id, o.p, e.target.value.trim())} />
+                  <input id={`ota-${r.id}-${o.p}`} className="input sm" inputMode="url" placeholder={o.ph} value={link} onChange={(e) => { const k = `${r.id}|${o.p}`; if (!added.has(k)) setAdded(new Set([...added, k])); set(r.id, o.p, e.target.value.trim()); }} />
                   {o.p === 'Agoda' && link && (
                     <select className="input sm" value={L[r.id]?.AgodaRoom || ''} onChange={(e) => set(r.id, 'AgodaRoom', e.target.value)} aria-label="Loại phòng trên Agoda">
                       <option value="">Loại phòng: giá thấp nhất của cơ sở</option>
@@ -325,10 +332,19 @@ function OtaRates() {
                       {rr && !rr.ok ? rr.error : `Có giá ${future} đêm sắp tới${rr ? ` · lần chạy gần nhất ${rr.priced} đêm` : ''}`}
                     </small>
                   )}
-                  {others && <button className="link tiny" onClick={() => copyAll(o.p, link)}>Dùng link này cho mọi phòng có lịch {o.p}</button>}
+                  {others && <button className="link tiny" onClick={() => copyAll(r, o.p, link)}>Dùng link này cho các phòng khác{r.loc ? ` ở ${r.loc}` : ''} ({sameLoc(r, o.p, link).length})</button>}
                 </div>
               );
             })}
+            {OTA.some((o) => !platsOf(r).includes(o)) && (
+              <div className="listing-add">
+                {OTA.filter((o) => !platsOf(r).includes(o)).map((o) => (
+                  <button key={o.p} type="button" className="mini-chip" style={{ '--pc': platformColor(o.p) }} onClick={() => addPlat(r.id, o.p)}>
+                    <Plus size={13} /> {o.p}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -1381,3 +1381,5 @@ input.switch:checked::after { transform: translateX(18px); }
 .rate-auto-txt small { font-size: 12px; color: var(--muted); }
 .ota-head { scroll-margin-top: 12px; border-radius: 10px; transition: background .3s, box-shadow .3s; }
 .ota-head.flash { background: var(--violet-soft, #F3EEFF); box-shadow: 0 0 0 6px var(--violet-soft, #F3EEFF); }
+.listing-add { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.listing-add .mini-chip { display: inline-flex; align-items: center; gap: 4px; }
