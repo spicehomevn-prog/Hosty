@@ -3,7 +3,7 @@ import { addDays, diffDays, todayKey } from './dates.js';
 import { PLATFORMS } from './platforms.js';
 import { coveredByDirect } from './derive.js';
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates'];
 export const DEFAULT_FEES = { Airbnb: 15, 'Booking.com': 15, Agoda: 18, Traveloka: 15, Expedia: 18, 'Trực tiếp': 0 };
 export const EXPENSE_GROUPS = ['Điện nước', 'Internet', 'Vật tư', 'Sửa chữa', 'Thuê nhà', 'Khác'];
 export const WEEK_NIGHTS = 7;
@@ -11,7 +11,7 @@ export const MONTH_NIGHTS = 28;
 
 export const emptyFin = () => ({
   settings: { taxOn: true, taxRate: 7, fees: { ...DEFAULT_FEES } },
-  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {},
+  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {}, platformRates: {},
 });
 export const pickFin = (f) => {
   const e = emptyFin();
@@ -26,6 +26,37 @@ const feeOf = (fin, platform, amount, fee) => (fee != null && fee !== '' ? Numbe
 const clampPct = (v) => Math.min(100, Math.max(0, Number(v) || 0));
 
 /** Đặt / xoá giá trị theo ngày cho nhiều phòng: { [roomId]: { ngày: v } } (v rỗng -> xoá) */
+/** Bảng giá theo từng sàn (fin.platformRates = { [roomId]: { [sàn]: { ngày: giá } } }): đặt / xoá giá các ngày cho 1 sàn */
+export function setPlatformDays(pr, roomIds, platform, days, v) {
+  const out = { ...(pr || {}) };
+  for (const r of roomIds) {
+    const t = setDays({ x: out[r]?.[platform] }, ['x'], days, v).x;
+    const room = { ...(out[r] || {}) };
+    if (t) room[platform] = t; else delete room[platform];
+    if (Object.keys(room).length) out[r] = room; else delete out[r];
+  }
+  return out;
+}
+/** Gộp bảng {roomId: {ngày: giá | null(xoá)}} vào bảng giá theo phòng */
+export function mergeDays(table, patch) {
+  const out = { ...(table || {}) };
+  for (const [r, days] of Object.entries(patch || {})) {
+    const t = { ...(out[r] || {}) };
+    for (const [d, v] of Object.entries(days)) { if (v) t[d] = v; else delete t[d]; }
+    if (Object.keys(t).length) out[r] = t; else delete out[r];
+  }
+  return out;
+}
+/** Gộp {roomId: {sàn: {ngày: giá | null}}} vào platformRates */
+export function mergePlatformDays(pr, patch) {
+  const out = { ...(pr || {}) };
+  for (const [r, plats] of Object.entries(patch || {})) {
+    const room = mergeDays(out[r], plats);
+    if (Object.keys(room).length) out[r] = room; else delete out[r];
+  }
+  return out;
+}
+
 export function setDays(table, roomIds, days, v) {
   const out = { ...(table || {}) };
   for (const r of roomIds) {
@@ -91,13 +122,16 @@ export const otaNight = (fin, roomId, platform, day) => Number(fin.otaRates?.[ro
 export function rateEstimate(b, fin) {
   if (!b.start || !b.end) return null;
   const t = fin.rateTable?.[b.roomId] || {};
+  const pt = fin.platformRates?.[b.roomId]?.[b.platform] || {};
   const dd = fin.dayDiscount?.[b.roomId] || {};
   let base = 0; let dayOff = 0; let nights = 0; let otaNights = 0;
   for (let d = b.start; d < b.end; d = addDays(d, 1)) {
-    const o = b.platform ? otaNight(fin, b.roomId, b.platform, d) : 0;
     nights += 1;
+    // ưu tiên: giá tự đặt riêng cho sàn này > giá sàn lấy qua Apify > bảng giá chung
+    const own = b.platform ? Number(pt[d]) || 0 : 0;
+    const o = own ? 0 : (b.platform ? otaNight(fin, b.roomId, b.platform, d) : 0);
     if (o) { base += o; otaNights += 1; continue; }
-    const p = Number(t[d]);
+    const p = own || Number(t[d]);
     if (!p) return null;
     base += p;
     if (dd[d]) dayOff += Math.round((p * clampPct(dd[d])) / 100);

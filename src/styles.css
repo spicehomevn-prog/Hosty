@@ -1354,3 +1354,8 @@ input.switch:checked::after { transform: translateX(18px); }
 .inbox-empty small { color: var(--muted); font-size: 13px; line-height: 1.45; }
 .inbox-empty-ico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 18px; background: var(--violet-soft, #F3EEFF); color: #7C5CE6; }
 .fin-list-head { scroll-margin-top: 16px; }
+.rate-plats { margin: -2px 0 12px; }
+.rate-plats > small { display: block; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.rate-plats .tiny { margin: 6px 2px 0; }
+.rate-plats .pdot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; vertical-align: middle; }
+.rate-p.inherit { color: var(--muted); opacity: .55; font-weight: 500; }

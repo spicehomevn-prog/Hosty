@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useReducer, useRef, 
 import { api } from './session.jsx';
 import { useStore } from './store.jsx';
 import { merge3, deepEqual } from './merge.js';
-import { emptyFin, pickFin, toFreeze, setDays } from './fin.js';
+import { emptyFin, pickFin, toFreeze, setDays, setPlatformDays, mergeDays, mergePlatformDays } from './fin.js';
 import { getBookings } from './derive.js';
 import { addDays, todayKey, addMonths } from './dates.js';
 
@@ -25,15 +25,11 @@ function reducer(s, a) {
     case 'SET_RATES': return { ...s, rateTable: setDays(s.rateTable, a.roomIds, a.days, a.price), prices: withPrices(s.prices, a.reprice) };
     // bảng giá riêng kênh Trực tiếp (không ảnh hưởng giá các sàn)
     case 'SET_DIRECT_RATES': return { ...s, directRates: setDays(s.directRates, a.roomIds, a.days, a.price) };
-    case 'MERGE_DIRECT_RATES': {
-      const directRates = { ...(s.directRates || {}) };
-      for (const [r, days] of Object.entries(a.table || {})) {
-        const t = { ...(directRates[r] || {}) };
-        for (const [d, v] of Object.entries(days)) { if (v) t[d] = v; else delete t[d]; }
-        if (Object.keys(t).length) directRates[r] = t; else delete directRates[r];
-      }
-      return { ...s, directRates };
-    }
+    case 'MERGE_DIRECT_RATES': return { ...s, directRates: mergeDays(s.directRates, a.table) };
+    // bảng giá riêng từng sàn (ưu tiên hơn bảng giá chung khi tính giá đặt phòng của sàn đó)
+    case 'SET_PLATFORM_RATES': return { ...s, platformRates: setPlatformDays(s.platformRates, a.roomIds, a.platform, a.days, a.price), prices: withPrices(s.prices, a.reprice) };
+    // nhập file Excel bảng giá các sàn: dòng "Mọi sàn" -> rateTable, dòng từng sàn -> platformRates
+    case 'MERGE_RATES': return { ...s, rateTable: mergeDays(s.rateTable, a.general), platformRates: mergePlatformDays(s.platformRates, a.platform), prices: withPrices(s.prices, a.reprice) };
     case 'SET_DAY_DISCOUNT': return { ...s, dayDiscount: setDays(s.dayDiscount, a.roomIds, a.days, a.pct), prices: withPrices(s.prices, a.reprice) };
     case 'SET_STAY_DISCOUNT': {
       const stayDiscount = { ...(s.stayDiscount || {}) };
