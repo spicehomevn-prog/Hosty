@@ -1,29 +1,53 @@
 import { useState } from 'react';
 import { Bell, CalendarPlus, CheckCircle2, Loader2, Clock } from '../lib/icons.jsx';
-import { useNotify, isIOS, isAndroid, isStandalone, isInApp, pushSupported } from '../lib/notify.js';
+import { useNotify, isIOS, isAndroid, isStandalone, isInApp, pushSupported, browserName } from '../lib/notify.js';
 import { useSession } from '../lib/session.jsx';
 import { icsUrl, googleUrl } from '../lib/tasks.js';
 import { Sheet } from './ui.jsx';
 
-// Android: trang web / biểu tượng ngoài màn hình chính đều nhận thông báo QUA CHROME (không có app Hostexa riêng trong Cài đặt)
-const ANDROID_PERM = isAndroid()
-  ? 'Thông báo của Hostexa đi qua Chrome. Bật ở 2 chỗ: (1) Chrome → ⋮ → Cài đặt → Cài đặt trang web → Thông báo → hostexa.vercel.app → Cho phép; (2) Cài đặt điện thoại → Ứng dụng → Chrome → Thông báo → bật. Xong quay lại bấm Bật thông báo.'
-  : 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Thông báo → Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
+// Android: trang web / biểu tượng ngoài màn hình chính nhận thông báo QUA TRÌNH DUYỆT đã mở / tạo ra nó
+// (Chrome, Samsung Internet…) – không có app Hostexa riêng trong Cài đặt điện thoại.
+const BROWSER = browserName();
+const OTHER_PERM = 'Máy đang chặn thông báo của Hostexa. Mở Cài đặt của máy → Thông báo → Hostexa (hoặc cài đặt trang trong trình duyệt) để cho phép.';
 
-/** Các bước mở chặn thông báo cho đúng trang đang mở (Chrome Android) */
+/** Cách dự phòng chắc chắn trên Android: dùng Chrome và cài lại biểu tượng từ Chrome */
+const ChromeFallback = () => (
+  <p><b>Cách chắc chắn nhất:</b> mở <a href="https://hostexa.vercel.app">hostexa.vercel.app</a> bằng <b>Chrome</b> → ⋮ → <b>Thêm vào màn hình chính</b> (hoặc <b>Cài đặt ứng dụng</b>), xoá biểu tượng Hostexa cũ, rồi mở biểu tượng mới và bật thông báo.</p>
+);
+
+/** Các bước mở chặn thông báo cho đúng trình duyệt + tên miền đang mở */
 function DeniedHelp() {
   const host = location.host;
-  if (!isAndroid()) return <p className="rm-note">{ANDROID_PERM}</p>;
+  if (!isAndroid()) return <p className="rm-note">{OTHER_PERM}</p>;
+  const steps = BROWSER === 'Samsung Internet' ? (
+    <ol>
+      <li>Mở <b>Samsung Internet</b> (trình duyệt màu tím của Samsung), vào địa chỉ <b>{host}</b>.</li>
+      <li>Bấm <b>≡</b> (góc dưới phải) → <b>Cài đặt</b> → <b>Trang web và tải xuống</b> → <b>Thông báo</b> (máy cũ: <b>Quyền trang web</b> → <b>Thông báo</b>): bật <b>Cho phép thông báo</b>; nếu {host} nằm trong mục <b>Bị chặn</b> thì bấm vào → <b>Xoá</b> / <b>Cho phép</b>.</li>
+      <li>Cài đặt điện thoại → <b>Ứng dụng</b> → <b>Samsung Internet</b> → <b>Thông báo</b> → bật.</li>
+      <li>Quay lại Hostexa, bấm <b>Bật thông báo</b> → chọn <b>Cho phép</b> khi được hỏi.</li>
+    </ol>
+  ) : BROWSER === 'Chrome' ? (
+    <ol>
+      <li>Mở <b>Chrome</b>, vào đúng địa chỉ <b>{host}</b>.</li>
+      <li>Bấm biểu tượng <b>ⓘ / ổ khoá</b> cạnh thanh địa chỉ → <b>Quyền</b> (hoặc <b>Cài đặt trang web</b>) → <b>Thông báo</b> → <b>Cho phép</b>. Không thấy mục Thông báo thì bấm <b>Đặt lại quyền</b>.</li>
+      <li>Chrome → ⋮ → Cài đặt → Cài đặt trang web → <b>Thông báo</b>: công tắc trên cùng phải <b>bật</b>, và {host} không nằm trong mục <b>Bị chặn</b>.</li>
+      <li>Cài đặt điện thoại → Ứng dụng → <b>Chrome</b> → Thông báo → bật.</li>
+      <li>Quay lại Hostexa, bấm <b>Bật thông báo</b> → chọn <b>Cho phép</b> khi được hỏi.</li>
+    </ol>
+  ) : (
+    <ol>
+      <li>Mở <b>{BROWSER}</b>, vào địa chỉ <b>{host}</b>.</li>
+      <li>Bấm biểu tượng <b>ổ khoá / ⓘ</b> cạnh thanh địa chỉ (hoặc Cài đặt của trình duyệt → Quyền trang web) → <b>Thông báo</b> → <b>Cho phép</b>.</li>
+      <li>Cài đặt điện thoại → Ứng dụng → <b>{BROWSER}</b> → Thông báo → bật.</li>
+      <li>Quay lại Hostexa, bấm <b>Bật thông báo</b>.</li>
+    </ol>
+  );
   return (
     <div className="rm-note rm-steps">
-      <b>Chrome đang chặn thông báo của {host}</b>
-      <ol>
-        <li>Mở <b>Chrome</b>, vào đúng địa chỉ <b>{host}</b>.</li>
-        <li>Bấm biểu tượng <b>ⓘ / ổ khoá</b> cạnh thanh địa chỉ → <b>Quyền</b> (hoặc <b>Cài đặt trang web</b>) → <b>Thông báo</b> → <b>Cho phép</b>. Không thấy mục Thông báo thì bấm <b>Đặt lại quyền</b>.</li>
-        <li>Chrome → ⋮ → Cài đặt → Cài đặt trang web → <b>Thông báo</b>: công tắc trên cùng phải <b>bật</b>, và {host} không nằm trong mục <b>Bị chặn</b>.</li>
-        <li>Cài đặt điện thoại → Ứng dụng → <b>Chrome</b> → Thông báo → bật.</li>
-        <li>Quay lại Hostexa, bấm <b>Bật thông báo</b> → chọn <b>Cho phép</b> khi được hỏi.</li>
-      </ol>
+      <b>{BROWSER} đang chặn thông báo của {host}</b>
+      {BROWSER !== 'Chrome' && <p>Hostexa trên máy này đang chạy bằng <b>{BROWSER}</b>, nên chỉnh quyền trong Chrome sẽ không có tác dụng.</p>}
+      {steps}
+      <ChromeFallback />
       {host.startsWith('hosty-rose') && <p>Bạn đang mở bằng tên miền cũ. Nên mở <a href="https://hostexa.vercel.app">hostexa.vercel.app</a> và thêm lại biểu tượng ra màn hình chính.</p>}
     </div>
   );
@@ -34,7 +58,7 @@ function failHelp(step) {
   if (step === 'perm' || step === 'denied') return null; // DeniedHelp hiện riêng
   if (step === 'sub') {
     return isAndroid()
-      ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho Chrome (Cài đặt điện thoại → Ứng dụng → Chrome → Pin → Không hạn chế). Vẫn không được: mở hostexa.vercel.app bằng Chrome rồi bật thông báo ở đó (biểu tượng ngoài màn hình chính dùng chung với Chrome nên cũng sẽ nhận được).`
+      ? `Kiểm tra: có mạng ổn định, Dịch vụ Google Play đang bật và đã cập nhật, tắt Tiết kiệm dữ liệu / Tiết kiệm pin cho ${BROWSER} (Cài đặt điện thoại → Ứng dụng → ${BROWSER} → Pin → Không hạn chế). Vẫn không được: mở hostexa.vercel.app bằng Chrome → ⋮ → Thêm vào màn hình chính, rồi bật thông báo trong biểu tượng mới.`
       : 'Kiểm tra mạng rồi thử lại. Vẫn không được: dùng Chrome / Safari bản mới.';
   }
   if (step === 'sw') return 'Đóng hẳn Hostexa (vuốt tắt khỏi danh sách app đang mở) rồi mở lại và thử lại.';

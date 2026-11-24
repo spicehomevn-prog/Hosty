@@ -16,6 +16,17 @@ export function registerSW() {
 }
 
 /** Đang mở trong trình duyệt của Zalo / Facebook / Messenger / Instagram / Line… (không nhận được thông báo đẩy) */
+/** Trình duyệt thực sự đang chạy trang (biểu tượng ngoài màn hình chính chạy bằng trình duyệt đã tạo ra nó) */
+const BROWSERS = [
+  [/SamsungBrowser\/(\d+)/, 'Samsung Internet'], [/MiuiBrowser\/(\d+)/, 'Mi Browser'], [/HeyTapBrowser\/(\d+)/, 'Trình duyệt Oppo'],
+  [/OPR\/(\d+)/, 'Opera'], [/EdgA\/(\d+)/, 'Edge'], [/Firefox\/(\d+)/, 'Firefox'], [/coc_coc_browser\/(\d+)/i, 'Cốc Cốc'], [/Chrome\/(\d+)/, 'Chrome'],
+];
+export function browserInfo() {
+  for (const [re, name] of BROWSERS) { const m = ua().match(re); if (m) return { name, version: m[1] }; }
+  return { name: isIOS() ? 'Safari' : 'trình duyệt', version: '' };
+}
+export const browserName = () => browserInfo().name;
+
 export const isInApp = () => /Zalo|FBAN|FBAV|FB_IAB|Instagram|Line\/|; wv\)/i.test(ua());
 
 class StepError extends Error {
@@ -40,10 +51,10 @@ const sameKey = (sub, key) => {
 /** Tình trạng máy này (hiện cho người dùng chụp lại khi bật không được) */
 export async function pushDiag() {
   const out = [`Trang: ${location.host}`, `Quyền: ${typeof Notification === 'undefined' ? 'không hỗ trợ' : Notification.permission}`];
-  try { out.push(`Quyền (Chrome): ${(await withTimeout(navigator.permissions.query({ name: 'notifications' }), 2000, 'diag', '')).state}`); } catch { /* noop */ }
+  try { out.push(`Quyền (trình duyệt): ${(await withTimeout(navigator.permissions.query({ name: 'notifications' }), 2000, 'diag', '')).state}`); } catch { /* noop */ }
   out.push(`Mở từ: ${isStandalone() ? 'biểu tượng' : isInApp() ? 'app khác' : 'trình duyệt'}`);
-  const v = ua().match(/(Chrome|SamsungBrowser|Firefox|OPR|EdgA|MiuiBrowser|HeyTapBrowser)\/([\d.]+)/);
-  if (v) out.push(`${v[1]} ${v[2].split('.')[0]}`);
+  const b = browserInfo();
+  out.unshift(`${b.name}${b.version ? ` ${b.version}` : ''}`);
   const a = ua().match(/Android ([\d.]+)/);
   if (a) out.push(`Android ${a[1]}`);
   try {
@@ -116,7 +127,7 @@ export function useNotify() {
       // kể cả khi đang 'denied' vẫn thử hỏi lại: nếu người dùng vừa mở chặn trong Chrome thì hộp hỏi sẽ hiện
       if (p0 !== 'granted') p0 = await withTimeout(Notification.requestPermission(), p0 === 'denied' ? 4000 : 15000, 'perm', 'Máy không hiện hộp xin quyền thông báo.').catch((e) => { if (Notification.permission === 'denied') return 'denied'; throw e; });
       setPerm(Notification.permission);
-      if (p0 === 'denied') throw new StepError('denied', `Chrome đang chặn thông báo của ${location.host}.`);
+      if (p0 === 'denied') throw new StepError('denied', `${browserName()} đang chặn thông báo của ${location.host}.`);
       if (p0 !== 'granted') throw new StepError('perm', 'Bạn chưa cho phép thông báo.');
 
       setStep('Đang khởi động dịch vụ thông báo…');
