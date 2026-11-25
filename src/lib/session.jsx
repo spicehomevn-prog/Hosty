@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { isTrial, planId, PLANS, planExpired, planDaysLeft, planEnds } from './plan.js';
 
 const KEY = 'hosty:session';
@@ -79,8 +79,17 @@ export function SessionProvider({ children }) {
     }
   }, [session?.token, logout]);
 
-  // Cập nhật thông tin tài khoản / danh sách cơ sở mỗi khi mở app
+  // Cập nhật thông tin tài khoản / danh sách cơ sở (gói) mỗi khi mở app và khi quay lại app (tối đa 1 lần / 60 giây)
   useEffect(() => { refresh(); }, [session?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lastRefresh = useRef(0);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastRefresh.current < 60000) return;
+      lastRefresh.current = Date.now(); refresh();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [refresh]);
 
   const value = useMemo(() => {
     const workspace = session?.workspaces?.find((w) => w.id === session.ws) || null;

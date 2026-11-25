@@ -100,9 +100,11 @@ export async function getWorkspace(ws) {
 export const wsExists = async (ws) => !!(await getWorkspace(ws));
 /** Chặn tính năng không có trong gói của cơ sở (hoặc gói đã hết hạn) */
 export async function requireFeature(ws, feature) {
-  const w = await getWorkspace(ws);
+  let w = await getWorkspace(ws);
   if (!w) throw new HttpError(404, 'Cơ sở không còn tồn tại');
   const label = PRO_FEATURES[feature] || 'Tính năng này';
+  // sắp từ chối -> đọc lại bản mới nhất (chủ hệ thống vừa đổi gói thì bản nhớ tạm có thể còn cũ tới ~90 giây)
+  if (!hasFeature(w, feature) || planExpired(w)) w = (await loadWorkspaces({ fresh: true })).workspaces.find((x) => x.id === ws) || w;
   if (!hasFeature(w, feature)) {
     throw new HttpError(403, feature === 'ota'
       ? `${label} chỉ có ở tài khoản VIP`
@@ -203,8 +205,8 @@ export function canAccess(user, wsId) {
 }
 
 /** Danh sách cơ sở mà user được thấy */
-export async function workspacesFor(user) {
-  const { workspaces } = await loadWorkspaces();
+export async function workspacesFor(user, { fresh = false } = {}) {
+  const { workspaces } = await loadWorkspaces({ fresh });
   if (user.role === 'owner') return workspaces;
   // người trong cơ sở: không gửi lịch sử thanh toán / thông tin người đăng ký
   return workspaces.filter((w) => w.id === user.ws).map(({ payments, contact, ...w }) => w); // eslint-disable-line no-unused-vars

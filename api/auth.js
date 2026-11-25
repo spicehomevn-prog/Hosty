@@ -46,7 +46,7 @@ async function signup(req, b) {
   const ws = await createWorkspace({ name: wsName, extra: { plan: 'trial', trialEnds: now + TRIAL.days * 864e5, contact: { name, phone }, signupAt: now } });
   await createAccount({ ws: ws.id, role: 'admin', name, username: phone, password });
   const r = await login(phone, password);
-  return { token: r.token, user: r.user, workspaces: await workspacesFor(r.user) };
+  return { token: r.token, user: r.user, workspaces: await workspacesFor(r.user, { fresh: true }) };
 }
 
 /** Admin cơ sở tự quản lý nhân viên dọn phòng (tối đa theo gói: dùng thử 1, Cơ bản 2, Nâng cao 5, Cao cấp 10, VIP không giới hạn) */
@@ -80,7 +80,8 @@ export default route(async (req, res) => {
         .map((a) => ({ id: a.id, name: a.name, username: a.username, role: a.role }));
       return send(res, 200, { members });
     }
-    return send(res, 200, { user, workspaces: await workspacesFor(user) });
+    // đọc bản mới nhất: gói của cơ sở vừa được chủ hệ thống đổi phải hiện ngay (1 thao tác Blob mỗi lần mở app)
+    return send(res, 200, { user, workspaces: await workspacesFor(user, { fresh: true }) });
   }
 
   if (req.method === 'POST') {
@@ -89,7 +90,7 @@ export default route(async (req, res) => {
     if (body.action === 'add-member' || body.action === 'remove-member') return send(res, 200, await planAdmin(req, body));
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
-      return send(res, 200, { token, user, workspaces: await workspacesFor(user) });
+      return send(res, 200, { token, user, workspaces: await workspacesFor(user, { fresh: true }) });
     }
     if (body.action === 'change-password') {
       const user = await requireUser(req);
