@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../lib/session.jsx';
 import { readRows } from '../lib/report.js';
-import { downloadRateTemplate, parseRateSheet } from '../lib/directPrices.js';
+import { downloadRateTemplate, parseRateSheet, FORM_PLATFORMS } from '../lib/directPrices.js';
 import { ChevronLeft, ChevronRight, Trash2, Download, Upload, RefreshCw } from '../lib/icons.jsx';
 import { useStore, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
@@ -31,7 +31,7 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
   const [plat, setPlat] = useState('');
   // 'Trực tiếp' = bảng giá riêng kênh Trực tiếp (chỉ để điền sẵn giá đặt phòng trực tiếp, không tính giá các sàn)
   const direct = plat === DIRECT;
-  const plats = platformsOf(state, roomId);
+  const plats = platformsOf();
   const onPlat = !direct && plat && plats.includes(plat) ? plat : '';
   // nhãn giá sàn lấy qua Apify trên ô ngày: sàn đang chọn (Mọi sàn -> Airbnb như trước)
   const apPlat = OTA_TAG[onPlat] ? onPlat : 'Airbnb';
@@ -162,7 +162,7 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
         <div className="rate-plats">
           <small>Giá cho sàn</small>
           <div className="chip-row">
-            <button type="button" className={`mini-chip ${!onPlat ? 'on' : ''}`} style={{ '--pc': '#241A3B' }} onClick={() => { setPlat(''); setSel(new Set()); }}>Mọi sàn</button>
+            <button type="button" className={`mini-chip ${!onPlat ? 'on' : ''}`} style={{ '--pc': '#241A3B' }} onClick={() => { setPlat(''); setSel(new Set()); }}>Giá chung</button>
             {plats.map((p) => (
               <button key={p} type="button" className={`mini-chip ${onPlat === p ? 'on' : ''}`} style={{ '--pc': platformColor(p) }} onClick={() => { setPlat(p); setMode('price'); setSel(new Set()); }}>
                 {p}{Object.keys(fin.platformRates?.[roomId]?.[p] || {}).length > 0 && <i className="pdot" style={{ background: platformColor(p) }} />}
@@ -210,7 +210,7 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
                   <span className="rate-p disc" title={`Giá gốc ${fmtVND(p)}`}>{fmtShort(Math.round(p * (1 - off / 100)))}</span>
                   <span className="rate-off">−{off}%</span>
                 </>
-              ) : inherit ? <span className="rate-p inherit" title="Giá chung (Mọi sàn)">{fmtShort(inherit)}</span> : <span className={`rate-p ${p ? '' : 'none'}`}>{p ? fmtShort(p) : '—'}</span>}
+              ) : inherit ? <span className="rate-p inherit" title="Giá chung">{fmtShort(inherit)}</span> : <span className={`rate-p ${p ? '' : 'none'}`}>{p ? fmtShort(p) : '—'}</span>}
               {off && !p && <span className="rate-off">−{off}%</span>}
               {air && !off && !direct && <span className="rate-air" title={`Giá ${apPlat} lấy qua Apify ${fmtVND(air)}`}>{OTA_TAG[apPlat]} {fmtShort(air)}</span>}
               {busy[d] && <span className="rate-busy" style={{ background: busy[d] }} />}
@@ -241,11 +241,9 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
 
 const DIRECT = 'Trực tiếp';
 const OTA_TAG = { Airbnb: 'A', 'Booking.com': 'B', Agoda: 'AG' };
-/** Sàn có lịch iCal của phòng (không có thì lấy các sàn đang dùng trong cơ sở) */
-function platformsOf(state, roomId) {
-  const all = (state.calendars || []).filter((c) => c.platform && c.platform !== 'Trực tiếp');
-  const mine = [...new Set(all.filter((c) => c.roomId === roomId).map((c) => c.platform))];
-  return mine.length ? mine : [...new Set(all.map((c) => c.platform))];
+/** Các sàn đặt giá riêng được (cố định, giống form Excel) */
+function platformsOf() {
+  return FORM_PLATFORMS.filter((p) => p !== DIRECT);
 }
 
 /**
@@ -262,17 +260,18 @@ function RatesExcel({ month }) {
   const fileRef = useRef(null);
   useEffect(() => { setRes(null); setErr(''); }, [month]);
   const multi = state.locations.length > 1;
+  // mỗi phòng × từng sàn (Airbnb, Booking.com, Agoda, Tripadvisor, Trực tiếp)
   const rows = state.locations.flatMap((l) => l.rooms.flatMap((r) => {
     const name = multi ? `${r.name} · ${l.name}` : r.name;
-    return [{ key: r.id, roomId: r.id, name, plat: '', values: fin.rateTable?.[r.id] },
-      ...platformsOf(state, r.id).map((p) => ({ key: `${r.id}:${p}`, roomId: r.id, name, plat: p, values: fin.platformRates?.[r.id]?.[p] })),
-      { key: `${r.id}:${DIRECT}`, roomId: r.id, name, plat: DIRECT, values: fin.directRates?.[r.id] }];
+    return FORM_PLATFORMS.map((p) => (p === DIRECT
+      ? { key: `${r.id}:${DIRECT}`, roomId: r.id, name, plat: DIRECT, values: fin.directRates?.[r.id] }
+      : { key: `${r.id}:${p}`, roomId: r.id, name, plat: p, values: fin.platformRates?.[r.id]?.[p] }));
   }));
   const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
   const [y, mo] = month.split('-');
   const download = async () => {
     setBusy(true); setErr('');
-    try { const n = await downloadRateTemplate(rows, month, workspace?.name || state.property?.name || '', { ota: true }); toast(`Đã tải ${n}`); } catch (e) { setErr(e.message || 'Không tạo được file'); }
+    try { const n = await downloadRateTemplate(rows, month, workspace?.name || state.property?.name || '', { today: todayKey() }); toast(`Đã tải ${n}`); } catch (e) { setErr(e.message || 'Không tạo được file'); }
     setBusy(false);
   };
   const pick = async (e) => {
@@ -285,21 +284,21 @@ function RatesExcel({ month }) {
       const rooms = new Set(Object.keys(r.table).map((k) => byKey[k].roomId));
       // số ô thay đổi theo từng kênh – kênh không có thay đổi giữ nguyên
       const per = {};
-      for (const [k, t] of Object.entries(r.table)) { const c = byKey[k].plat || 'Mọi sàn'; per[c] = (per[c] || 0) + Object.keys(t).length; }
+      for (const [k, t] of Object.entries(r.table)) { const c = byKey[k].plat; per[c] = (per[c] || 0) + Object.keys(t).length; }
       setRes({ ...r, rooms: rooms.size, file: f.name, per });
     } catch (ex) { setErr(ex.message || 'Không đọc được file'); }
   };
   const apply = () => {
-    const gen = {}; const plat = {}; const dir = {}; const roomIds = new Set(); const days = new Set();
+    const plat = {}; const dir = {}; const roomIds = new Set(); const days = new Set();
     for (const [k, t] of Object.entries(res.table)) {
       const row = byKey[k];
       if (row.plat === DIRECT) { dir[row.roomId] = t; continue; } // bảng giá Trực tiếp: không tính lại đặt phòng các sàn
       roomIds.add(row.roomId); Object.keys(t).forEach((d) => days.add(d));
-      if (row.plat) ((plat[row.roomId] ||= {})[row.plat] = t); else gen[row.roomId] = t;
+      (plat[row.roomId] ||= {})[row.plat] = t;
     }
-    const next = { ...fin, rateTable: mergeDays(fin.rateTable, gen), platformRates: mergePlatformDays(fin.platformRates, plat) };
+    const next = { ...fin, platformRates: mergePlatformDays(fin.platformRates, plat) };
     const re = repriceAfter(getBookings(state), next, [...roomIds], [...days]);
-    dispatch({ type: 'MERGE_RATES', general: gen, platform: plat, direct: dir, reprice: re });
+    dispatch({ type: 'MERGE_RATES', general: {}, platform: plat, direct: dir, reprice: re });
     const n = Object.values(re).filter(Boolean).length;
     toast(`Đã cập nhật bảng giá: ${res.changed} ô${res.cleared ? ` · xoá ${res.cleared}` : ''}${n ? ` · tính lại ${n} đặt phòng` : ''}`);
     setRes(null);
@@ -311,7 +310,7 @@ function RatesExcel({ month }) {
         <button className="btn tiny" onClick={() => fileRef.current?.click()}><Upload size={14} /> Tải file đã điền lên</button>
         <input ref={fileRef} type="file" accept=".xlsx,.csv" hidden onChange={pick} />
       </div>
-      <small>Mỗi phòng: 1 dòng "Mọi sàn", 1 dòng cho từng sàn và 1 dòng "Trực tiếp"; mỗi ngày 1 cột. Ô trống = giữ nguyên, gõ 0 = xoá giá.</small>
+      <small>Mỗi phòng có dòng cho Airbnb, Booking.com, Agoda, Tripadvisor và Trực tiếp; mỗi ngày còn lại 1 cột. Ô trống = giữ nguyên, gõ 0 = xoá giá.</small>
       {err && <p className="form-error">{err}</p>}
       {res && (
         <div className="imp-plan">
@@ -321,7 +320,7 @@ function RatesExcel({ month }) {
           {Object.keys(res.per || {}).length > 0 && (
             <p className="imp-per">{Object.entries(res.per).map(([c, n]) => <span key={c} className="tag">{c}: {n} ô</span>)}</p>
           )}
-          <p className="muted">Chỉ cập nhật {Object.keys(res.per || {}).length ? Object.keys(res.per).join(', ') : 'các ô có thay đổi'}; kênh khác giữ nguyên.{res.per?.['Mọi sàn'] ? ' Giá "Mọi sàn" dùng cho các sàn chưa có giá riêng.' : ''} Giá nhập tay / file báo cáo của sàn không đổi.</p>
+          <p className="muted">Chỉ cập nhật {Object.keys(res.per || {}).length ? Object.keys(res.per).join(', ') : 'các ô có thay đổi'}; kênh khác giữ nguyên. Giá nhập tay / file báo cáo của sàn không đổi.</p>
           <div className="row gap8">
             <button className="btn tiny primary" disabled={!res.changed && !res.cleared} onClick={apply}>Áp vào bảng giá</button>
             <button className="btn tiny" onClick={() => setRes(null)}>Huỷ</button>

@@ -157,56 +157,48 @@ const daysOf = (m) => {
   return Array.from({ length: n }, (_, i) => `${m}-${String(i + 1).padStart(2, '0')}`);
 };
 
+/** Sàn có dòng trong form bảng giá (đúng thứ tự hiển thị) */
+export const FORM_PLATFORMS = ['Airbnb', 'Booking.com', 'Agoda', 'Tripadvisor', 'Trực tiếp'];
+
 /**
- * Form Excel bảng giá của tháng: mỗi dòng 1 phòng (kênh Trực tiếp) hoặc 1 phòng × 1 sàn (Các sàn), mỗi cột 1 ngày.
- * rows: [{ key, name, plat?, values: { ngày: giá } }]
+ * Form Excel bảng giá của tháng, gọn: mỗi phòng 1 dòng cho từng sàn (Airbnb, Booking.com, Agoda, Tripadvisor, Trực tiếp),
+ * mỗi cột 1 ngày CÒN LẠI của tháng (ngày đã qua không cần điền nên bỏ).
+ * rows: [{ key, name, plat, values: { ngày: giá } }]
  */
-export async function downloadRateTemplate(rows, m, wsName = '', { ota = false } = {}) {
+export async function downloadRateTemplate(rows, m, wsName = '', { today = '' } = {}) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
-  const days = daysOf(m);
+  const days = daysOf(m).filter((d) => !today || d >= today);
+  if (!days.length) throw new Error('Tháng này đã qua hết, hãy chọn tháng sau');
   const wkd = (d) => new Date(`${d}T00:00:00`).getDay();
+  const PLAT_BG = { Airbnb: '#FFE3EA', 'Booking.com': '#DCEBFF', Agoda: '#EAE1FF', Tripadvisor: '#DDF5E7', 'Trực tiếp': '#FFEFD6' };
   const H = (value, bg = '#241A3B') => ({ value, fontWeight: 'bold', color: '#FFFFFF', backgroundColor: bg });
   const head = [
-    H('Mã phòng (không sửa)'), H('Phòng'), ...(ota ? [H('Sàn')] : []),
+    H('Mã'), H('Phòng'), H('Sàn'),
     ...days.map((d) => ({ ...H(`${Number(d.slice(8))} ${WD[wkd(d)]}`, [5, 6].includes(wkd(d)) ? '#E0608F' : '#7C5CE6'), align: 'center' })),
   ];
-  const body = rows.map((r) => {
-    const bg = ota && !r.plat ? '#EFE8FF' : '#F6F2FF';
-    return [
-      { value: r.key, type: String },
-      { value: r.name, type: String },
-      ...(ota ? [{ value: r.plat || 'Mọi sàn', type: String, fontWeight: r.plat ? undefined : 'bold' }] : []),
-      ...days.map((d) => {
-        const v = Number(r.values?.[d]) || null;
-        return v ? { value: v, type: Number, format: '#,##0', backgroundColor: bg } : { value: null, backgroundColor: bg };
-      }),
-    ];
-  });
+  const body = rows.map((r) => [
+    { value: r.key, type: String, color: '#B9B2CB', fontSize: 9 },
+    { value: r.name, type: String },
+    { value: r.plat, type: String, fontWeight: 'bold', backgroundColor: PLAT_BG[r.plat] || '#F6F2FF' },
+    ...days.map((d) => {
+      const v = Number(r.values?.[d]) || null;
+      return v ? { value: v, type: Number, format: '#,##0', backgroundColor: '#FFFFFF' } : { value: null, backgroundColor: '#FFFFFF' };
+    }),
+  ]);
   const [y, mo] = m.split('-');
   const g = (value, x = {}) => [{ value, ...x }];
-  const guide = ota ? [
+  const guide = [
     g(`Bảng giá phòng – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, { fontWeight: 'bold', fontSize: 14 }),
-    g('Cách dùng:', { fontWeight: 'bold' }),
-    g('1. Ở trang "Bảng giá", mỗi phòng có 1 dòng "Mọi sàn", 1 dòng cho từng sàn (Airbnb, Booking.com…) và 1 dòng "Trực tiếp". Mỗi cột là 1 ngày, điền giá 1 đêm (nhận phòng ngày đó), ví dụ 850000.'),
-    g('2. Dòng "Mọi sàn" = bảng giá chung, dùng cho mọi sàn. Dòng của 1 sàn = giá riêng sàn đó, được ưu tiên hơn giá chung (chỉ cần điền những ngày giá sàn đó khác giá chung).'),
-    g('3. Cột màu hồng là đêm thứ 6, thứ 7. KHÔNG sửa cột "Mã phòng" và cột "Sàn".'),
-    g('4. Ô để trống = giữ nguyên giá đang có. Gõ 0 = xoá giá ngày đó.'),
-    g('5. Dòng "Trực tiếp" = giá kênh đặt trực tiếp: tự điền giá khi tạo đặt phòng trực tiếp, không ảnh hưởng giá các sàn.'),
-    g('6. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Tải file đã điền lên.'),
-    g('Giá các sàn dùng để tính doanh thu đặt phòng từ sàn khi chưa có giá thật (giá nhập tay / file báo cáo của sàn luôn được ưu tiên).'),
-  ] : [
-    g(`Bảng giá kênh Trực tiếp – tháng ${mo}/${y}${wsName ? ` – ${wsName}` : ''}`, { fontWeight: 'bold', fontSize: 14 }),
-    g('Cách dùng:', { fontWeight: 'bold' }),
-    g('1. Ở trang "Bảng giá", mỗi dòng là 1 phòng, mỗi cột là 1 ngày. Điền giá 1 đêm (nhận phòng ngày đó), ví dụ 850000.'),
-    g('2. Cột màu hồng là đêm thứ 6, thứ 7. KHÔNG sửa cột "Mã phòng".'),
-    g('3. Ô để trống = giữ nguyên giá đang có. Gõ 0 = xoá giá ngày đó.'),
-    g('4. Lưu file .xlsx, vào Hostexa → Tài chính → Bảng giá → Trực tiếp → Tải file lên.'),
-    g('Bảng giá này chỉ dùng để điền sẵn giá khi tạo đặt phòng TRỰC TIẾP – không ảnh hưởng giá các sàn (Airbnb, Booking.com…).'),
+    g('1. Mỗi phòng có 1 dòng cho từng sàn: Airbnb, Booking.com, Agoda, Tripadvisor, Trực tiếp. Mỗi cột là 1 ngày còn lại của tháng.'),
+    g('2. Điền giá 1 đêm (đêm nhận phòng ngày đó), ví dụ 850000. Chỉ điền sàn / ngày cần đặt giá.'),
+    g('3. Ô để trống = giữ nguyên giá đang có. Gõ 0 = xoá giá ngày đó. Cột màu hồng là đêm thứ 6, thứ 7.'),
+    g('4. KHÔNG sửa cột "Mã", "Phòng", "Sàn". Lưu file .xlsx rồi vào Hostexa → Tài chính → Bảng giá → Tải file đã điền lên.'),
+    g('Dòng "Trực tiếp" dùng để điền sẵn giá khi tạo đặt phòng trực tiếp. Các dòng sàn dùng để tính doanh thu đặt phòng từ sàn đó khi chưa có giá thật.'),
   ];
-  const fileName = `hostexa-bang-gia-${ota ? 'phong' : 'truc-tiep'}-${y}-${mo}.xlsx`;
+  const fileName = `hostexa-bang-gia-${y}-${mo}.xlsx`;
   await writeXlsxFile([
-    { data: [head, ...body], sheet: 'Bảng giá', columns: [{ width: 16 }, { width: 26 }, ...(ota ? [{ width: 13 }] : []), ...days.map(() => ({ width: 11 }))], stickyRowsCount: 1, stickyColumnsCount: ota ? 3 : 2 },
-    { data: guide, sheet: 'Hướng dẫn', columns: [{ width: 120 }] },
+    { data: [head, ...body], sheet: 'Bảng giá', columns: [{ width: 7 }, { width: 24 }, { width: 13 }, ...days.map(() => ({ width: 10 }))], stickyRowsCount: 1, stickyColumnsCount: 3 },
+    { data: guide, sheet: 'Hướng dẫn', columns: [{ width: 130 }] },
   ]).toFile(fileName);
   return fileName;
 }
@@ -216,12 +208,12 @@ export async function downloadRateTemplate(rows, m, wsName = '', { ota = false }
  * Chỉ nhận dòng có mã trong `keys`; ô trống = giữ nguyên. current(key, ngày) = giá đang có.
  */
 export function parseRateSheet(rows, m, keys, current = () => 0) {
-  const hi = rows.findIndex((r) => norm(r[0]).startsWith('ma phong'));
-  if (hi < 0) throw new Error('Không thấy dòng tiêu đề của form bảng giá (cột "Mã phòng"). Hãy dùng đúng form tải từ Hostexa.');
+  const hi = rows.findIndex((r) => norm(r[0]) === 'ma' || norm(r[0]).startsWith('ma phong'));
+  if (hi < 0) throw new Error('Không thấy dòng tiêu đề của form bảng giá (cột "Mã"). Hãy dùng đúng form tải từ Hostexa.');
   const days = daysOf(m);
   // cột ngày: tiêu đề bắt đầu bằng số ngày ("5 T6" -> 5); cột "Phòng" / "Sàn" bị bỏ qua
   const dayCol = {};
-  rows[hi].forEach((h, i) => { if (i < 2) return; const n = parseInt(String(h ?? ''), 10); if (n >= 1 && n <= days.length) dayCol[i] = days[n - 1]; });
+  rows[hi].forEach((h, i) => { if (i < 3) return; const n = parseInt(String(h ?? ''), 10); if (n >= 1 && n <= days.length) dayCol[i] = days[n - 1]; });
   if (!Object.keys(dayCol).length) throw new Error('Không thấy cột ngày trong form');
   const valid = new Set(keys);
   const table = {}; let changed = 0; let cleared = 0; let unknown = 0; let invalid = 0; const rooms = new Set();
