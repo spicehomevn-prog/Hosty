@@ -23,7 +23,7 @@ function BookingDetail({ b, onClose }) {
   const { state, dispatch, role } = useStore();
   const finance = useFinance();
   const { plan: pl, role: rl } = useSession();
-  const finLocked = pl.trial && can(rl, 'finance');
+  const finLocked = !pl.has('finance') && can(rl, 'finance');
   const [edit, setEdit] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const canEdit = can(role, 'booking');
@@ -123,7 +123,7 @@ function ManualForm({ data, onClose }) {
   const { state, dispatch, user } = useStore();
   const finance = useFinance();
   const { plan: pl, role: rl } = useSession();
-  const finLocked = pl.trial && can(rl, 'finance');
+  const finLocked = !pl.has('finance') && can(rl, 'finance');
   const oldEntry = data?.id ? finance?.fin.prices?.[data.id] : null;
   const [price, setPrice] = useState(() => (oldEntry ? oldEntry.base ?? oldEntry.amount ?? null : null));
   const [discount, setDiscount] = useState(() => oldEntry?.discount || null);

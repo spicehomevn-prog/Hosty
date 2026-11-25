@@ -57,7 +57,7 @@ function PlanRow({ w, act, busy }) {
   const state = exp ? 'bad' : id === 'trial' ? 'trial' : 'pro';
   const setPlan = (plan) => {
     if (plan === id && !legacy) return;
-    const txt = plan === 'trial' ? `Chuyển "${w.name}" về dùng thử (${TRIAL.days} ngày, khoá Tài chính, Thông báo đẩy, tối đa ${TRIAL.maxRooms} phòng)?`
+    const txt = plan === 'trial' ? `Chuyển "${w.name}" về dùng thử (${TRIAL.days} ngày, tối đa ${TRIAL.maxRooms} phòng, 1 địa điểm)?`
       : plan === 'vip' ? `Đặt "${w.name}" là VIP (đủ tính năng, không giới hạn, có giá tự động từ sàn)?`
         : `Đổi "${w.name}" sang gói ${PLANS[plan].name}?${!w.paidUntil ? ' Hạn dùng đầu tiên: 1 tháng.' : ''}`;
     if (confirm(txt)) act('set-plan', { id: w.id, plan });

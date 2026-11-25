@@ -81,7 +81,7 @@ export default function Home({ api }) {
         </button>
       </div>
       {/* gói dùng thử: 2 ô hiện mờ, có khoá -> bấm mở hộp nâng cấp */}
-      {sess.plan.trial && can(role, 'finance') ? <LockedFinanceTiles /> : <FinanceTiles state={state} bookings={bookings} idx={idx} api={api} />}
+      {!sess.plan.has('finance') && can(role, 'finance') ? <LockedFinanceTiles /> : <FinanceTiles state={state} bookings={bookings} idx={idx} api={api} />}
 
       <button className="occ-card rise" style={{ '--i': 4 }} onClick={() => setOccOpen(true)} aria-haspopup="dialog">
         <div>

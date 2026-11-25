@@ -52,7 +52,7 @@ export default function App() {
     const user = s.session.demo ? { id: 'demo', name: 'Khách xem thử' } : s.user;
     body = (
       <StoreProvider key={scope.cacheKey} scope={scope} role={s.role} user={user}>
-        <FinanceProvider enabled={can(s.role, 'finance') && !s.plan.trial} cloud={scope.cloud}>
+        <FinanceProvider enabled={can(s.role, 'finance') && s.plan.has('finance')} cloud={scope.cloud}>
           <Workspace />
         </FinanceProvider>
       </StoreProvider>
@@ -161,7 +161,7 @@ function Workspace() {
   };
   const canCreate = can(role, 'booking');
   // gói dùng thử: Tài chính hiện nhưng khoá
-  const finLocked = s.plan.trial && can(role, 'finance');
+  const finLocked = !s.plan.has('finance') && can(role, 'finance');
 
   return (
     <div className="app">
@@ -210,7 +210,7 @@ function Workspace() {
             {can(role, 'finance') && (
               <button className={`create-tile blue ${finLocked ? 'locked' : ''}`} onClick={() => { setCreateOpen(false); if (finLocked) openUpgrade('finance'); else api.newExpense(); }}>
                 {finLocked && <LockBadge className="tile-lock" />}
-                <span className="tile-ico"><Payments size={22} /></span><b>Chi phí</b><small>{finLocked ? 'Tính năng Pro' : 'Lương, điện nước…'}</small>
+                <span className="tile-ico"><Payments size={22} /></span><b>Chi phí</b><small>{finLocked ? 'Cần gói trả phí' : 'Lương, điện nước…'}</small>
               </button>
             )}
           </div>

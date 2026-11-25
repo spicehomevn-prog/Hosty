@@ -101,7 +101,7 @@ export function SessionProvider({ children }) {
       role,
       plan,
       /** tính năng Pro bị khoá ở cơ sở đang mở (finance | push | rates | rooms | locations | members) */
-      locked: (f) => (f ? !plan.has(f) : plan.trial),
+      locked: (f) => !plan.has(f || 'finance'),
       user: session?.user || null,
       token: session?.token || null,
       workspace,

@@ -63,14 +63,14 @@ Ngoài ra trong form task vẫn có **Thêm tay vào lịch** (.ics cho iPhone, 
 ## Gói dịch vụ
 | Gói | Phòng | Địa điểm | Nhân viên | 1 tháng | 3 tháng (−5%) | 6 tháng (−8%) |
 |---|---|---|---|---|---|---|
-| Dùng thử 14 ngày | 5 | 1 | 1 | miễn phí | | |
+| Dùng thử 14 ngày | 5 | 1 | 2 | miễn phí | | |
 | Cơ bản | 5 | 1 | 2 | 65.000 ₫ | 185.000 ₫ | 359.000 ₫ |
 | Nâng cao | 15 | không giới hạn | 5 | 129.000 ₫ | 368.000 ₫ | 712.000 ₫ |
 | Cao cấp | 30 | không giới hạn | 10 | 199.000 ₫ | 567.000 ₫ | 1.098.000 ₫ |
 | VIP | không giới hạn | không giới hạn | không giới hạn | chủ hệ thống gán | | |
 
 - Giá chưa gồm VAT, combo làm tròn tới nghìn. Bảng giá và giới hạn nằm ở `src/lib/plan.js` (dùng chung app + máy chủ).
-- Dùng thử: **không có** Tài chính, Thông báo đẩy, Bảng giá. Gói trả phí có đủ. **Giá tự động từ sàn (Apify) chỉ có ở VIP** (cơ sở riêng của chủ, ví dụ Spicehome).
+- Dùng thử: có **đủ tính năng như gói Cơ bản** (Tài chính, Thông báo đẩy, Bảng giá), chỉ giới hạn 14 ngày. **Giá tự động từ sàn (Apify) chỉ có ở VIP** (cơ sở riêng của chủ, ví dụ Spicehome).
 - Màn đăng nhập có nút **Đăng ký tài khoản dùng thử miễn phí**: khách nhập tên cơ sở, họ tên, SĐT, mật khẩu → hệ thống tự tạo cơ sở dùng thử + tài khoản admin (đăng nhập bằng SĐT). Chống spam: tối đa 3 lần đăng ký / IP / ngày, tối đa 200 cơ sở dùng thử.
 - Hết hạn (dùng thử hoặc gói trả phí): dữ liệu **chỉ xem** cho tới khi gia hạn. Máy chủ chặn ghi, tài chính, thông báo.
 - Giới hạn phòng / địa điểm chỉ chặn khi **thêm** vượt giới hạn: cơ sở cũ có sẵn nhiều phòng vẫn sửa được. Admin cơ sở tự thêm nhân viên trong giới hạn gói (Cơ sở → Tài khoản).

@@ -3,7 +3,8 @@
 // Cơ sở cũ chưa có gói hoặc gói 'pro' cũ = Cao cấp, không hạn (chủ hệ thống đổi sau).
 const INF = Infinity;
 export const PLANS = {
-  trial: { id: 'trial', name: 'Dùng thử', price: 0, maxRooms: 5, maxLocations: 1, maxMembers: 1, features: [] },
+  // dùng thử = đủ tính năng như gói Cơ bản (chỉ giới hạn 14 ngày)
+  trial: { id: 'trial', name: 'Dùng thử', price: 0, maxRooms: 5, maxLocations: 1, maxMembers: 2, features: ['finance', 'push', 'rates'] },
   basic: { id: 'basic', name: 'Cơ bản', price: 65000, maxRooms: 5, maxLocations: 1, maxMembers: 2, features: ['finance', 'push', 'rates'] },
   advanced: { id: 'advanced', name: 'Nâng cao', price: 129000, maxRooms: 15, maxLocations: INF, maxMembers: 5, features: ['finance', 'push', 'rates'] },
   premium: { id: 'premium', name: 'Cao cấp', price: 199000, maxRooms: 30, maxLocations: INF, maxMembers: 10, features: ['finance', 'push', 'rates'] },

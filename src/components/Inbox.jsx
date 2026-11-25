@@ -40,7 +40,7 @@ export function useInbox() {
   const ws = s.workspace?.id;
   const uid = s.user?.id || 'demo';
   const demo = s.role === 'demo';
-  const locked = !demo && s.plan?.trial;
+  const locked = !demo && !s.plan?.has('push');
   const key = seenKey(uid, ws);
   const [items, setItems] = useState(() => (demo ? demoItems() : null));
   const [seen, setSeen] = useState(() => (demo ? Date.now() - 90 * 60000 : readSeen(key)));

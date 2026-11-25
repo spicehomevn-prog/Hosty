@@ -165,14 +165,14 @@ export function RemindersPanel({ n }) {
 export function RemindersCard() {
   const n = useNotify();
   const { plan } = useSession();
-  if (plan.trial) return <LockedRow feature="push" title="Thông báo đẩy" sub="Tổng quan 8:00, báo trả / nhận phòng, nhắc task trên điện thoại" />;
+  if (!plan.has('push')) return <LockedRow feature="push" title="Thông báo đẩy" sub="Tổng quan 8:00, báo trả / nhận phòng, nhắc task trên điện thoại" />;
   return <RemindersPanel n={n} />;
 }
 
 /** Khối nhắc hẹn trong form task */
 export function TaskReminderBox({ f, roomName, summary }) {
   const n = useNotify();
-  const trial = useSession().plan.trial;
+  const trial = !useSession().plan.has('push');
   const [open, setOpen] = useState(false);
   const assigned = !!f.assignee;
   // iPhone mở từ biểu tượng: tệp .ics không mở được trong app -> chuyển sang Safari
