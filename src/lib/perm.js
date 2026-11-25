@@ -14,6 +14,11 @@ export function can(role, action) {
   return MEMBER.has(action);
 }
 
+/** Loại tài khoản thành viên (cùng quyền 'member'): dọn phòng hoặc nhân viên */
+export const KINDS = { cleaner: 'Dọn phòng', staff: 'Nhân viên' };
+export const kindOf = (a) => (a?.kind === 'staff' ? 'staff' : 'cleaner');
+/** Nhãn vai trò hiển thị: thành viên hiện theo loại (Dọn phòng / Nhân viên) */
+export const roleLabel = (role, kind) => (role === 'member' ? KINDS[kind === 'staff' ? 'staff' : 'cleaner'] : ROLE_LABEL[role] || role);
 export const ROLE_LABEL = { owner: 'Chủ hệ thống', admin: 'Admin cơ sở', member: 'Dọn phòng', demo: 'Xem thử', viewer: 'Chỉ xem' };
 
 /** Task mà tài khoản được thấy: member chỉ thấy task chung + task giao cho mình */

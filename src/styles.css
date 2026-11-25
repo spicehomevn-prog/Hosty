@@ -1432,3 +1432,11 @@ input.switch:checked::after { transform: translateX(18px); }
 .wk-note { margin: 4px 2px 12px; line-height: 1.45; }
 .week-back { display: inline-block; margin: 0 0 10px; font-size: 13px; }
 .rate-auto-ico.days { background: linear-gradient(135deg, #7C5CE6, #3E9BFF); }
+
+/* Loại tài khoản thành viên: Dọn phòng / Nhân viên */
+.kind-seg { display: inline-flex; align-self: flex-start; }
+.kind-seg button { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 0 12px; }
+.tm-row > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tm-add { display: flex; flex-direction: column; gap: 8px; }
+.tm-add .btn { align-self: flex-start; }
+.add-member .kind-seg { margin-bottom: 6px; flex-basis: 100%; }

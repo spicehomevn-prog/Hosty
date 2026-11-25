@@ -1,6 +1,6 @@
 import { Copy, KeyRound } from '../lib/icons.jsx';
 import { copyText } from '../lib/derive.js';
-import { ROLE_LABEL } from '../lib/perm.js';
+import { roleLabel } from '../lib/perm.js';
 import { Sheet, toast } from './ui.jsx';
 
 /** Thẻ thông tin đăng nhập (sau khi tạo tài khoản / đặt lại mật khẩu) */
@@ -12,7 +12,7 @@ export function CredentialsSheet({ data, onClose }) {
     `Link: ${location.origin}`,
     `Tài khoản: ${account.username}`,
     `Mật khẩu: ${password}`,
-    `Vai trò: ${ROLE_LABEL[account.role] || account.role}`,
+    `Vai trò: ${roleLabel(account.role, account.kind)}`,
   ].join('\n');
   return (
     <Sheet open onClose={onClose} title="Thông tin đăng nhập"
@@ -21,7 +21,7 @@ export function CredentialsSheet({ data, onClose }) {
         <span className="cred-ico"><KeyRound size={20} /></span>
         <dl>
           <dt>Cơ sở</dt><dd>{workspaceName}</dd>
-          <dt>Vai trò</dt><dd>{ROLE_LABEL[account.role]}</dd>
+          <dt>Vai trò</dt><dd>{roleLabel(account.role, account.kind)}</dd>
           <dt>Tên đăng nhập</dt><dd className="mono">{account.username}</dd>
           <dt>Mật khẩu</dt><dd className="mono">{password}</dd>
         </dl>

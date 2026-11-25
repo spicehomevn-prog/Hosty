@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, KeyRound, Lock, Unlock, Trash2, Pencil, Loader2, Check, X, ShieldCheck, Sparkles } from '../lib/icons.jsx';
+import { Plus, KeyRound, Lock, Unlock, Trash2, Pencil, Loader2, Check, X, ShieldCheck, Sparkles, UserRound } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
-import { ROLE_LABEL } from '../lib/perm.js';
+import { roleLabel, KINDS, kindOf } from '../lib/perm.js';
+
+/** Chọn loại tài khoản thành viên: Dọn phòng (cây chổi) hoặc Nhân viên (hình người) */
+export function KindPick({ value, onChange, size = 13 }) {
+  return (
+    <div className="seg kind-seg" role="radiogroup" aria-label="Loại tài khoản">
+      {Object.entries(KINDS).map(([k, label]) => (
+        <button key={k} type="button" role="radio" aria-checked={value === k} className={value === k ? 'on' : ''} onClick={() => onChange(k)}>
+          {k === 'staff' ? <UserRound size={size} /> : <Sparkles size={size} />} {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+export const KindIcon = ({ a, size = 13 }) => (a.role === 'admin' ? <ShieldCheck size={size} /> : kindOf(a) === 'staff' ? <UserRound size={size} /> : <Sparkles size={size} />);
 import { Sheet, toast } from './ui.jsx';
 import { CredentialsSheet } from './Credentials.jsx';
 import { TRIAL, PLANS, PAID, COMBOS, comboPrice, planId, planExpired, planDaysLeft, planEnds } from '../lib/plan.js';
@@ -13,21 +27,23 @@ function AccountRow({ a, ws, act }) {
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(a.name);
   const [username, setUsername] = useState(a.username);
+  const [kind, setKind] = useState(kindOf(a));
   if (edit) {
     return (
       <div className="acc-row editing">
         <input className="input sm" value={name} onChange={(e) => setName(e.target.value)} aria-label="Tên hiển thị" placeholder="Tên nhân viên" />
         <input className="input sm mono" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} aria-label="Tên đăng nhập" />
+        {a.role === 'member' && <KindPick value={kind} onChange={setKind} />}
         <div className="row gap8">
-          <button className="btn tiny" onClick={async () => { if (await act('update-account', { id: a.id, name, username })) setEdit(false); }}><Check size={14} /> Lưu</button>
-          <button className="btn tiny" onClick={() => { setEdit(false); setName(a.name); setUsername(a.username); }}><X size={14} /> Huỷ</button>
+          <button className="btn tiny" onClick={async () => { if (await act('update-account', { id: a.id, name, username, ...(a.role === 'member' ? { kind } : {}) })) setEdit(false); }}><Check size={14} /> Lưu</button>
+          <button className="btn tiny" onClick={() => { setEdit(false); setName(a.name); setUsername(a.username); setKind(kindOf(a)); }}><X size={14} /> Huỷ</button>
         </div>
       </div>
     );
   }
   return (
     <div className={`acc-row ${a.disabled ? 'disabled' : ''}`}>
-      <span className={`role-badge r-${a.role}`}>{a.role === 'admin' ? <ShieldCheck size={13} /> : <Sparkles size={13} />}{ROLE_LABEL[a.role]}</span>
+      <span className={`role-badge r-${a.role}`}><KindIcon a={a} />{roleLabel(a.role, a.kind)}</span>
       <div className="acc-main">
         <b>{a.name}</b>
         <small className="mono">{a.username}{a.disabled ? ' · đã khoá' : ''}</small>
@@ -103,6 +119,7 @@ export function AdminSheet({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [newWs, setNewWs] = useState('');
   const [memberName, setMemberName] = useState({});
+  const [memberKind, setMemberKind] = useState({});
   const [renaming, setRenaming] = useState(null);
 
   const load = useCallback(async () => {
@@ -159,9 +176,10 @@ export function AdminSheet({ onClose }) {
                 </div>
                 <form className="add-member" onSubmit={async (e) => {
                   e.preventDefault();
-                  if (await act('add-account', { ws: w.id, role: 'member', name: memberName[w.id] || '' }, { cred: true, ws: w })) setMemberName({ ...memberName, [w.id]: '' });
+                  if (await act('add-account', { ws: w.id, role: 'member', kind: memberKind[w.id] || 'cleaner', name: memberName[w.id] || '' }, { cred: true, ws: w })) setMemberName({ ...memberName, [w.id]: '' });
                 }}>
-                  <input className="input sm" placeholder="Tên nhân viên dọn phòng" value={memberName[w.id] || ''} onChange={(e) => setMemberName({ ...memberName, [w.id]: e.target.value })} aria-label="Tên nhân viên" />
+                  <KindPick value={memberKind[w.id] || 'cleaner'} onChange={(k) => setMemberKind({ ...memberKind, [w.id]: k })} />
+                  <input className="input sm" placeholder={(memberKind[w.id] || 'cleaner') === 'staff' ? 'Tên nhân viên' : 'Tên nhân viên dọn phòng'} value={memberName[w.id] || ''} onChange={(e) => setMemberName({ ...memberName, [w.id]: e.target.value })} aria-label="Tên nhân viên" />
                   <button className="btn tiny" type="submit" disabled={busy}><Plus size={14} /> Thêm member</button>
                   <button className="btn tiny" type="button" disabled={busy} onClick={() => act('add-account', { ws: w.id, role: 'admin' }, { cred: true, ws: w })}><Plus size={14} /> Admin</button>
                 </form>

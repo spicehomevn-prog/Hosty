@@ -14,7 +14,7 @@ function nextUsername(accounts, base) {
   return `${base}${Date.now()}`;
 }
 
-export async function createAccount({ ws, role, name, username, password: pw, extra = {} }) {
+export async function createAccount({ ws, role, kind, name, username, password: pw, extra = {} }) {
   const { workspaces } = await loadWorkspaces({ fresh: true });
   const w = workspaces.find((x) => x.id === ws);
   if (!w) throw new HttpError(404, 'Không tìm thấy cơ sở');
@@ -31,8 +31,8 @@ export async function createAccount({ ws, role, name, username, password: pw, ex
       u = nextUsername(d.accounts, `${w.slug}-${role}`);
     }
     created = {
-      id: newId(), username: u, name: String(name || '').trim() || (role === 'admin' ? `Admin ${w.name}` : 'Nhân viên dọn phòng'),
-      role, ws, ...h, tokenVersion: 0, disabled: false, createdAt: Date.now(), ...extra,
+      id: newId(), username: u, name: String(name || '').trim() || (role === 'admin' ? `Admin ${w.name}` : kind === 'staff' ? 'Nhân viên' : 'Nhân viên dọn phòng'),
+      role, ...(role === 'member' ? { kind: kind === 'staff' ? 'staff' : 'cleaner' } : {}), ws, ...h, tokenVersion: 0, disabled: false, createdAt: Date.now(), ...extra,
     };
     d.accounts.push(created);
     return d;

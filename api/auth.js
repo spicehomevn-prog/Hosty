@@ -61,7 +61,13 @@ async function planAdmin(req, b) {
   const members = accounts.filter((a) => a.ws === ws.id && a.role === 'member');
   if (b.action === 'add-member') {
     if (members.length >= plan.maxMembers) throw new HttpError(400, `Gói ${plan.name} tối đa ${plan.maxMembers} nhân viên – nâng cấp gói để thêm`, { pro: true });
-    return createAccount({ ws: ws.id, role: 'member', name: String(b.name || '').trim().slice(0, 60) || 'Nhân viên dọn phòng' });
+    return createAccount({ ws: ws.id, role: 'member', kind: b.kind, name: String(b.name || '').trim().slice(0, 60) });
+  }
+  if (b.action === 'set-kind') {
+    if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
+    if (!['cleaner', 'staff'].includes(b.kind)) throw new HttpError(400, 'Loại tài khoản không hợp lệ');
+    await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.map((a) => (a.id === b.id ? { ...a, kind: b.kind } : a)) }), { accounts: [] });
+    return { ok: true, kind: b.kind };
   }
   if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
   await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.filter((a) => a.id !== b.id) }), { accounts: [] });
@@ -77,7 +83,7 @@ export default route(async (req, res) => {
       if (!canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
       const { accounts } = await loadAccounts();
       const members = accounts.filter((a) => a.ws === ws && !a.disabled)
-        .map((a) => ({ id: a.id, name: a.name, username: a.username, role: a.role }));
+        .map((a) => ({ id: a.id, name: a.name, username: a.username, role: a.role, kind: a.kind === 'staff' ? 'staff' : 'cleaner' }));
       return send(res, 200, { members });
     }
     // đọc bản mới nhất: gói của cơ sở vừa được chủ hệ thống đổi phải hiện ngay (1 thao tác Blob mỗi lần mở app)
@@ -87,7 +93,7 @@ export default route(async (req, res) => {
   if (req.method === 'POST') {
     const body = await readBody(req);
     if (body.action === 'signup') return send(res, 200, await signup(req, body));
-    if (body.action === 'add-member' || body.action === 'remove-member') return send(res, 200, await planAdmin(req, body));
+    if (body.action === 'add-member' || body.action === 'remove-member' || body.action === 'set-kind') return send(res, 200, await planAdmin(req, body));
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
       return send(res, 200, { token, user, workspaces: await workspacesFor(user, { fresh: true }) });

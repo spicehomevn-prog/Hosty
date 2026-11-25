@@ -115,7 +115,7 @@ export async function requireFeature(ws, feature) {
 }
 
 export const publicAccount = (a) => ({
-  id: a.id, username: a.username, name: a.name, role: a.role, ws: a.ws, disabled: !!a.disabled, createdAt: a.createdAt,
+  id: a.id, username: a.username, name: a.name, role: a.role, kind: a.kind === 'staff' ? 'staff' : 'cleaner', ws: a.ws, disabled: !!a.disabled, createdAt: a.createdAt,
 });
 
 const OWNER_USER = (o) => ({ id: 'owner', username: o.username, name: 'Chủ hệ thống', role: 'owner', ws: null });

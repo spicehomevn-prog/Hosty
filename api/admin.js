@@ -104,7 +104,7 @@ export default route(async (req, res) => {
       return send(res, 200, { workspace: ws });
     }
     case 'add-account': {
-      const r = await createAccount({ ws: b.ws, role: b.role || 'member', name: b.name, username: b.username });
+      const r = await createAccount({ ws: b.ws, role: b.role || 'member', kind: b.kind, name: b.name, username: b.username });
       return send(res, 200, r);
     }
     case 'update-account': {
@@ -125,6 +125,7 @@ export default route(async (req, res) => {
           acc.role = b.role;
           acc.tokenVersion = (acc.tokenVersion || 0) + 1;
         }
+        if (b.kind !== undefined && ['cleaner', 'staff'].includes(b.kind) && acc.role === 'member') acc.kind = b.kind;
         if (b.disabled !== undefined && !!b.disabled !== !!acc.disabled) {
           acc.disabled = !!b.disabled;
           acc.tokenVersion = (acc.tokenVersion || 0) + 1;

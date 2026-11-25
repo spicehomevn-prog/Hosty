@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle, LogOut, KeyRound, ArrowLeftRight, Users, Loader2, CheckCircle2 } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { useStore } from '../lib/store.jsx';
-import { ROLE_LABEL } from '../lib/perm.js';
+import { roleLabel, KINDS, kindOf } from '../lib/perm.js';
 import { timeAgo } from '../lib/dates.js';
 import { Sheet, Field, toast } from './ui.jsx';
-import { AdminSheet } from './Admin.jsx';
+import { AdminSheet, KindPick } from './Admin.jsx';
 import { openUpgrade } from './Upgrade.jsx';
 import { useMembers } from '../lib/members.js';
 import { Lock, Copy, Trash2, Plus } from '../lib/icons.jsx';
@@ -16,6 +16,7 @@ function PlanMembers() {
   const max = s.plan.limits.maxMembers;
   const members = useMembers().filter((m) => m.role === 'member');
   const [name, setName] = useState('');
+  const [kind, setKind] = useState('cleaner');
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState('');
@@ -25,7 +26,7 @@ function PlanMembers() {
     if (shown.length >= max) { openUpgrade('members'); return; }
     setBusy(true); setErr('');
     try {
-      const r = await s.call('/api/auth', { method: 'POST', body: { action: 'add-member', ws: s.workspace.id, name: name.trim() } });
+      const r = await s.call('/api/auth', { method: 'POST', body: { action: 'add-member', ws: s.workspace.id, name: name.trim(), kind } });
       setCreated(r); setName(''); setList([...shown, r.account]);
     } catch (e) { setErr(e.message); }
     setBusy(false);
@@ -34,16 +35,22 @@ function PlanMembers() {
     if (!confirm(`Xoá tài khoản ${m.name}? Nhân viên này sẽ không đăng nhập được nữa.`)) return;
     try { await s.call('/api/auth', { method: 'POST', body: { action: 'remove-member', ws: s.workspace.id, id: m.id } }); setList(shown.filter((x) => x.id !== m.id)); setCreated(null); } catch (e) { setErr(e.message); }
   };
+  const setKindOf = async (m, k) => {
+    if (kindOf(m) === k) return;
+    try { await s.call('/api/auth', { method: 'POST', body: { action: 'set-kind', ws: s.workspace.id, id: m.id, kind: k } }); setList(shown.map((x) => (x.id === m.id ? { ...x, kind: k } : x))); toast(`Đã đổi thành ${KINDS[k]}`); } catch (e) { setErr(e.message); }
+  };
   const copy = async () => {
     const t = `Tài khoản Hostexa của bạn:\nTrang: https://hostexa.vercel.app\nTên đăng nhập: ${created.account.username}\nMật khẩu: ${created.password}`;
     try { await navigator.clipboard.writeText(t); toast('Đã copy – dán vào Zalo gửi nhân viên'); } catch { toast(t); }
   };
   return (
     <div className="trial-members">
-      <div className="row-between"><b>Nhân viên dọn phòng</b><span className="tiny muted">{Number.isFinite(max) ? `${shown.length}/${max}` : shown.length}</span></div>
+      <div className="row-between"><b>Nhân viên &amp; dọn phòng</b><span className="tiny muted">{Number.isFinite(max) ? `${shown.length}/${max}` : shown.length}</span></div>
       {shown.map((m) => (
         <div key={m.id} className="tm-row">
-          <span><b>{m.name}</b><small className="mono">{m.username}</small></span>
+          <span><b>{m.name}</b><small className="mono">{m.username}</small>
+            <KindPick value={kindOf(m)} size={12} onChange={(k) => setKindOf(m, k)} />
+          </span>
           <button className="icon-btn sm danger" onClick={() => remove(m)} aria-label={`Xoá ${m.name}`}><Trash2 size={16} /></button>
         </div>
       ))}
@@ -54,8 +61,9 @@ function PlanMembers() {
         </div>
       )}
       {shown.length < max ? (
-        <div className="row gap8">
-          <input className="input sm" placeholder="Tên nhân viên" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="tm-add">
+          <KindPick value={kind} onChange={setKind} />
+          <input className="input sm" placeholder={kind === 'staff' ? 'Tên nhân viên' : 'Tên nhân viên dọn phòng'} value={name} onChange={(e) => setName(e.target.value)} />
           <button className="btn tiny primary" onClick={add} disabled={busy}>{busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} Thêm</button>
         </div>
       ) : (
@@ -162,7 +170,7 @@ export function AccountCard() {
         <span className="acc-avatar">{(s.user?.name || '?').trim().slice(0, 1).toUpperCase()}</span>
         <div>
           <b>{s.user?.name}</b>
-          <small><span className="mono">{s.user?.username}</span> · {ROLE_LABEL[s.role]}</small>
+          <small><span className="mono">{s.user?.username}</span> · {roleLabel(s.role, s.user?.kind)}</small>
         </div>
       </div>
       <div className="acc-ws">

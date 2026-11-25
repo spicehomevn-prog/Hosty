@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Building2, Plus, LogOut, ChevronRight, Loader2, Users } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
-import { ROLE_LABEL } from '../lib/perm.js';
+import { roleLabel } from '../lib/perm.js';
 import { Logo } from './Logo.jsx';
 import { CredentialsSheet } from './Credentials.jsx';
 import { AdminSheet } from './Admin.jsx';
@@ -37,7 +37,7 @@ export default function WorkspacePicker() {
         <button className="icon-btn" onClick={logout} aria-label="Đăng xuất"><LogOut size={18} /></button>
       </header>
       <h1 className="rise" style={{ '--i': 1 }}>Xin chào, {user?.name}</h1>
-      <p className="sub rise" style={{ '--i': 2 }}>{ROLE_LABEL[role]} · chọn cơ sở để làm việc</p>
+      <p className="sub rise" style={{ '--i': 2 }}>{roleLabel(role, user?.kind)} · chọn cơ sở để làm việc</p>
 
       <div className="ws-list stagger" style={{ '--i': 3 }}>
         {workspaces.map((w, i) => (
