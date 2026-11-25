@@ -7,6 +7,30 @@ import { toast, Progress, Sheet, Field } from './ui.jsx';
 import { reducedMotion } from '../lib/motion.js';
 import { can } from '../lib/perm.js';
 
+/** Chia thẻ dọn phòng theo địa điểm (theo thứ tự địa điểm trong cơ sở) – [{ loc, list }] */
+export function byLocation(cards, locations) {
+  const order = new Map((locations || []).map((l, i) => [l.id, i]));
+  const m = new Map();
+  for (const c of cards) {
+    const id = c.location?.id || '';
+    if (!m.has(id)) m.set(id, { loc: c.location, list: [] });
+    m.get(id).list.push(c);
+  }
+  return [...m.values()].sort((a, b) => (order.get(a.loc?.id) ?? 99) - (order.get(b.loc?.id) ?? 99));
+}
+
+/** Thẻ dọn phòng nhóm theo địa điểm: chỉ hiện tiêu đề địa điểm khi cơ sở có từ 2 địa điểm */
+function LocGroups({ cards, multi, render }) {
+  const { state } = useStore();
+  if (!multi) return cards.map(render);
+  return byLocation(cards, state.locations).map(({ loc, list }) => (
+    <div key={loc?.id || '-'} className="loc-group">
+      <div className="loc-head"><MapPin size={14} /><b>{loc?.name || 'Khác'}</b><em>{list.length} phòng</em></div>
+      {list.map(render)}
+    </div>
+  ));
+}
+
 const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 export function CleaningCard({ c, compact, showDate, onEdit }) {
@@ -40,7 +64,6 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
         <div className="clean-title">
           <b>{c.room.name}</b>
           {showDate && <span className="clean-date">{wdShort(c.date)} {dm(c.date)}</span>}
-          {!compact && state.locations.length > 1 && <span className="clean-loc"><MapPin size={12} />{c.location.name}</span>}
         </div>
         <div className="clean-times">
           {c.custom
@@ -82,8 +105,9 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
  * Admin: sửa / dời ngày / xoá thẻ, thêm thẻ (addDate = ngày mặc định của thẻ mới).
  */
 export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, compact }) {
-  const { role } = useStore();
+  const { role, state } = useStore();
   const canEdit = can(role, 'booking');
+  const multiLoc = state.locations.length > 1;
   const [sheet, setSheet] = useState(null);
   const [openDone, setOpenDone] = useState(false);
   const todo = cards.filter((c) => !c.done);
@@ -103,10 +127,10 @@ export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, co
               <span>{wdLong(date)}, {dm(date)}</span>
               <em>{list.length} phòng</em>
             </button>
-            {list.map((c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />)}
+            <LocGroups cards={list} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />} />
           </div>
         ))
-        : todo.map((c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />)}
+        : <LocGroups cards={todo} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />} />}
       {done.length > 0 && (
         <div className={`done-group ${openDone ? 'open' : ''}`}>
           <button className="done-head" onClick={() => setOpenDone(!openDone)} aria-expanded={openDone}>
@@ -114,7 +138,7 @@ export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, co
             <b>Phòng đã dọn</b><em>{done.length}</em>
             <ChevronDown size={16} className="done-chev" />
           </button>
-          {openDone && <div className="done-list">{done.map((c) => <CleaningCard key={c.id} c={c} compact={compact} showDate={multiDay} onEdit={edit} />)}</div>}
+          {openDone && <div className="done-list"><LocGroups cards={done} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} showDate={multiDay} onEdit={edit} />} /></div>}
         </div>
       )}
       {canEdit && addDate && (

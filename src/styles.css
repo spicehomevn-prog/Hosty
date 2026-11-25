@@ -1512,3 +1512,13 @@ input.switch:checked::after { transform: translateX(18px); }
 .loc-pick-label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
 .loc-pick button { min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .loc-pick button.on { background: var(--violet-soft); border-color: var(--violet-ink); color: var(--violet-ink); }
+/* thẻ dọn phòng nhóm theo địa điểm */
+.loc-group { display: flex; flex-direction: column; gap: 8px; }
+.loc-group + .loc-group { margin-top: 8px; }
+.loc-head { display: flex; align-items: center; gap: 6px; padding: 6px 2px 0; color: var(--violet-ink); font-size: 14px; }
+.loc-head b { color: var(--ink); font-weight: 700; }
+.loc-head em { margin-left: auto; font-style: normal; color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.cl-loc + .cl-loc { margin-top: 26px; }
+.cl-loc-head { display: flex; align-items: center; gap: 8px; font-size: 22px; margin: 0 0 12px; padding: 10px 14px; border-radius: 16px; background: var(--nav); color: #fff; }
+.cl-loc-head svg { flex: none; color: #FFC67A; }
+.cl-loc-head em { margin-left: auto; font-style: normal; font-family: var(--font); font-size: 16px; font-weight: 700; opacity: .85; }

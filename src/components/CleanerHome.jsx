@@ -8,6 +8,8 @@ import { taskInstances, isRepeating } from '../lib/tasks.js';
 import { LogoMark } from './Logo.jsx';
 import { InboxButton } from './Inbox.jsx';
 import Places from './Places.jsx';
+import { byLocation } from './CleaningPanel.jsx';
+import { MapPin } from '../lib/icons.jsx';
 
 /**
  * Màn hình riêng cho tài khoản Dọn phòng: to, rõ, ít chữ, một thao tác cho mỗi việc.
@@ -147,9 +149,24 @@ function CleanList({ off, setOff }) {
         <div className="cl-empty win"><span>🎉</span><b>Xong hết rồi!</b><small>Cảm ơn bạn. Các phòng đã dọn nằm bên dưới.</small></div>
       )}
 
-      <div className="cl-cards">
-        {[...left, ...done].map((c) => <CleanCard key={c.id} c={c} day={day} isToday={isToday} multiLoc={multiLoc} onToggle={() => toggle(c)} />)}
-      </div>
+      {multiLoc ? (
+        // nhiều địa điểm: mỗi địa điểm một nhóm, phòng chưa dọn lên trước
+        byLocation(cards, state.locations).map(({ loc, list }) => {
+          const todo = list.filter((c) => !c.done);
+          return (
+            <section key={loc?.id || '-'} className="cl-loc">
+              <h2 className="cl-loc-head"><MapPin size={22} /><span>{loc?.name || 'Khác'}</span><em>{todo.length ? `còn ${todo.length}/${list.length}` : 'xong hết'}</em></h2>
+              <div className="cl-cards">
+                {[...todo, ...list.filter((c) => c.done)].map((c) => <CleanCard key={c.id} c={c} day={day} isToday={isToday} onToggle={() => toggle(c)} />)}
+              </div>
+            </section>
+          );
+        })
+      ) : (
+        <div className="cl-cards">
+          {[...left, ...done].map((c) => <CleanCard key={c.id} c={c} day={day} isToday={isToday} onToggle={() => toggle(c)} />)}
+        </div>
+      )}
 
       {undo && (
         <div className="cl-undo" role="status">
@@ -161,7 +178,7 @@ function CleanList({ off, setOff }) {
   );
 }
 
-function CleanCard({ c, day, isToday, multiLoc, onToggle }) {
+function CleanCard({ c, day, isToday, onToggle }) {
   const nextNights = c.next ? diffDays(c.next.start, c.next.end) : 0;
   // khách mới đến cùng ngày -> Gấp; còn ≤ 3 giờ nữa là khách tới -> ghi rõ
   const inMin = minutes(c.inTime);
@@ -174,7 +191,6 @@ function CleanCard({ c, day, isToday, multiLoc, onToggle }) {
       <div className="cl-card-head">
         <div>
           <h2>{c.room.name}</h2>
-          {multiLoc && <small>{c.location.name}</small>}
         </div>
         <span className={`cl-badge ${tone}`}>{badge}</span>
       </div>
