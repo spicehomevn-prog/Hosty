@@ -4,7 +4,7 @@ import { useFlipNav } from './lib/motion.js';
 import { StoreProvider, useStore, demoState } from './lib/store.jsx';
 import { useSession } from './lib/session.jsx';
 import { FinanceProvider } from './lib/finance.jsx';
-import { can } from './lib/perm.js';
+import { can, isCleaner, isStaff } from './lib/perm.js';
 import { todayKey } from './lib/dates.js';
 import Login from './components/Login.jsx';
 import WorkspacePicker from './components/WorkspacePicker.jsx';
@@ -21,6 +21,7 @@ import { Sheet, Toaster } from './components/ui.jsx';
 import { LogoMark } from './components/Logo.jsx';
 import { Intro, LoadingRing } from './components/Intro.jsx';
 import { UpgradeHost, openUpgrade, LockBadge } from './components/Upgrade.jsx';
+import CleanerApp from './components/CleanerHome.jsx';
 
 // màn chào chỉ chạy 1 lần mỗi lần mở app (không chạy lại khi đăng nhập / đổi cơ sở)
 let introPlayed = false;
@@ -52,7 +53,7 @@ export default function App() {
     const user = s.session.demo ? { id: 'demo', name: 'Khách xem thử' } : s.user;
     body = (
       <StoreProvider key={scope.cacheKey} scope={scope} role={s.role} user={user}>
-        <FinanceProvider enabled={can(s.role, 'finance') && s.plan.has('finance')} cloud={scope.cloud}>
+        <FinanceProvider enabled={can(s.role, 'finance') && s.plan.has('finance')} pricesOnly={isStaff(s.role, user) && s.plan.has('finance')} cloud={scope.cloud}>
           <Workspace />
         </FinanceProvider>
       </StoreProvider>
@@ -135,6 +136,9 @@ function Workspace() {
   if (!cloud.loaded) return <Splash cloud={cloud} onLogout={s.logout} />;
 
   if (!state.setupDone && !can(role, 'setup')) return <NotSetup />;
+
+  // Dọn phòng: màn riêng to, rõ, chỉ việc dọn phòng + việc được giao
+  if (isCleaner(role, s.user)) return <CleanerApp />;
 
   if (!state.setupDone || inSetup || editing) {
     return (

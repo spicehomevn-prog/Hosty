@@ -1440,3 +1440,75 @@ input.switch:checked::after { transform: translateX(18px); }
 .tm-add { display: flex; flex-direction: column; gap: 8px; }
 .tm-add .btn { align-self: flex-start; }
 .add-member .kind-seg { margin-bottom: 6px; flex-basis: 100%; }
+
+/* ===== Màn Dọn phòng: to, rõ, ít chữ (người ít dùng công nghệ) ===== */
+.cleaner-app { background: var(--canvas); min-height: 100vh; }
+.cl-page { padding-bottom: 140px; font-size: 18px; }
+.cl-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.cl-hello { display: flex; align-items: center; gap: 10px; }
+.cl-hello span { display: flex; flex-direction: column; line-height: 1.15; }
+.cl-hello small { color: var(--ink-2); font-size: 15px; }
+.cl-hello b { font-size: 20px; }
+.cl-top .icon-btn { width: 48px; height: 48px; }
+.cl-place { flex-basis: 100%; margin: 0; color: var(--ink-2); font-size: 16px; font-weight: 600; }
+.cl-back { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 16px 0 8px; margin-bottom: 6px; border-radius: 999px; background: var(--surface); font-weight: 700; font-size: 17px; box-shadow: var(--shadow); }
+
+.cl-days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.cl-days button { min-height: 52px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line); font-size: 17px; font-weight: 700; color: var(--ink-2); }
+.cl-days button.on { background: var(--nav); border-color: var(--nav); color: #fff; }
+.cl-date { font-size: 24px; line-height: 1.2; margin-bottom: 4px; }
+.cl-sum { font-size: 19px; margin: 0 0 16px; color: var(--ink-2); }
+.cl-sum b { font-size: 28px; color: var(--ink); font-family: var(--font-head); font-weight: 400; }
+.cl-sub { font-size: 20px; margin: 26px 0 12px; }
+
+.cl-cards, .cl-tasks { display: flex; flex-direction: column; gap: 14px; }
+.cl-card { background: var(--surface); border-radius: 22px; padding: 18px 18px 16px; border: 3px solid transparent; box-shadow: var(--shadow); }
+.cl-card.urgent { border-color: #E0457E; }
+.cl-card.today { border-color: #E6A21A; }
+.cl-card.done { border-color: #2DB386; background: #F0FBF6; }
+.cl-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.cl-card-head h2 { font-size: 26px; line-height: 1.1; }
+.cl-card-head small { display: block; color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+.cl-badge { flex: none; padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 15px; color: #fff; }
+.cl-badge.urgent { background: #C8296A; }
+.cl-badge.today { background: #A8730A; }
+.cl-badge.done { background: #1C8A65; }
+.cl-lines { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cl-lines li { display: flex; gap: 10px; align-items: baseline; font-size: 18px; color: var(--ink); }
+.cl-lines li > span { font-size: 20px; width: 26px; flex: none; }
+.cl-lines b { font-size: 20px; }
+.cl-note { display: flex; gap: 10px; align-items: flex-start; background: #FFF3C4; border: 2px solid #F3BE3E; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; color: #4A3500; }
+.cl-note svg { flex: none; margin-top: 3px; }
+.cl-note p { margin: 0; white-space: pre-line; font-size: 17px; font-weight: 600; }
+.cl-note.day { margin-bottom: 16px; }
+.cl-by { margin: 0 0 10px; color: #1C8A65; font-weight: 700; font-size: 16px; }
+.cl-done-btn { width: 100%; min-height: 60px; border-radius: 16px; background: var(--nav); color: #fff; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.cl-done-btn.is-done { background: transparent; color: var(--ink-2); border: 2px solid #B9DCCD; font-size: 16px; font-weight: 700; min-height: 52px; }
+
+.cl-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 30px 18px; background: var(--surface); border-radius: 22px; margin-bottom: 14px; }
+.cl-empty span { font-size: 46px; line-height: 1; }
+.cl-empty b { font-size: 21px; }
+.cl-empty small { color: var(--ink-2); font-size: 16px; }
+.cl-empty.win { background: #E4F7EE; }
+
+.cl-task { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); border: 2px solid transparent; }
+.cl-task.urgent { border-color: #E0457E; }
+.cl-task.done { opacity: .7; }
+.cl-task.done b { text-decoration: line-through; }
+.cl-check { flex: none; width: 48px; height: 48px; border-radius: 14px; border: 3px solid var(--ink-2); display: grid; place-items: center; background: var(--surface); }
+.cl-check.on { background: #1C8A65; border-color: #1C8A65; color: #fff; }
+.cl-task-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+.cl-task-body b { font-size: 19px; line-height: 1.25; }
+.cl-task-body small { color: var(--ink-2); font-size: 15px; }
+.cl-task-body p { margin: 4px 0 0; font-size: 16px; color: var(--ink-2); white-space: pre-line; }
+
+.cl-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px -14px rgba(34,16,63,.3); }
+.cl-nav button { min-height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 19px; font-weight: 800; color: var(--ink-2); background: var(--soft); }
+.cl-nav button.on { background: var(--nav); color: #fff; }
+.cl-undo { position: fixed; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 41; max-width: 600px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 10px 10px 16px; border-radius: 16px; background: #1C8A65; color: #fff; font-weight: 700; font-size: 17px; box-shadow: var(--shadow-lg); animation: page-in .25s; }
+.cl-undo span { display: flex; align-items: center; gap: 8px; }
+.cl-undo button { flex: none; white-space: nowrap; min-height: 48px; padding: 0 16px; border-radius: 12px; background: #fff; color: #1C8A65; font-weight: 800; font-size: 17px; }
+.loc-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.loc-pick-label { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.loc-pick button { min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.loc-pick button.on { background: var(--violet-soft); border-color: var(--violet-ink); color: var(--violet-ink); }

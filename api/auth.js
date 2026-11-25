@@ -11,6 +11,7 @@ import {
   login, requireUser, workspacesFor, canAccess, loadAccounts, loadWorkspaces, hashPassword, checkPassword, ACCOUNTS, envClean,
 } from './_auth.js';
 import { createAccount, createWorkspace } from './_accounts.js';
+import { cleanLocations } from './_scope.js';
 import { TRIAL, isTrial, planExpired, planOf, normPhone } from '../src/lib/plan.js';
 
 const SIGNUPS = 'signups.json';
@@ -52,15 +53,16 @@ async function signup(req, b) {
 /** Admin cơ sở tự quản lý nhân viên dọn phòng (tối đa theo gói: dùng thử 1, Cơ bản 2, Nâng cao 5, Cao cấp 10, VIP không giới hạn) */
 async function planAdmin(req, b) {
   const user = await requireUser(req);
-  if (user.role !== 'admin' || !canAccess(user, b.ws)) throw new HttpError(403, 'Chỉ admin cơ sở được thực hiện');
+  if ((user.role !== 'admin' && user.role !== 'owner') || !canAccess(user, b.ws)) throw new HttpError(403, 'Chỉ admin cơ sở được thực hiện');
   const ws = (await loadWorkspaces({ fresh: true })).workspaces.find((w) => w.id === b.ws);
   if (!ws) throw new HttpError(404, 'Không tìm thấy cơ sở');
   const plan = planOf(ws);
-  if (planExpired(ws)) throw new HttpError(403, `Gói ${plan.name} đã hết hạn – gia hạn để tiếp tục`);
+  const owner = user.role === 'owner'; // chủ hệ thống: không giới hạn theo gói
+  if (!owner && planExpired(ws)) throw new HttpError(403, `Gói ${plan.name} đã hết hạn – gia hạn để tiếp tục`);
   const { accounts } = await loadAccounts({ fresh: true });
   const members = accounts.filter((a) => a.ws === ws.id && a.role === 'member');
   if (b.action === 'add-member') {
-    if (members.length >= plan.maxMembers) throw new HttpError(400, `Gói ${plan.name} tối đa ${plan.maxMembers} nhân viên – nâng cấp gói để thêm`, { pro: true });
+    if (!owner && members.length >= plan.maxMembers) throw new HttpError(400, `Gói ${plan.name} tối đa ${plan.maxMembers} nhân viên – nâng cấp gói để thêm`, { pro: true });
     return createAccount({ ws: ws.id, role: 'member', kind: b.kind, name: String(b.name || '').trim().slice(0, 60) });
   }
   if (b.action === 'set-kind') {
@@ -69,6 +71,13 @@ async function planAdmin(req, b) {
     await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.map((a) => (a.id === b.id ? { ...a, kind: b.kind } : a)) }), { accounts: [] });
     return { ok: true, kind: b.kind };
   }
+  if (b.action === 'set-locations') {
+    if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
+    const locations = await cleanLocations(ws.id, b.locations);
+    await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.map((a) => (a.id === b.id ? { ...a, locations } : a)) }), { accounts: [] });
+    return { ok: true, locations };
+  }
+  if (b.action !== 'remove-member') throw new HttpError(400, 'Thao tác không hợp lệ');
   if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
   await updateJSON(ACCOUNTS, (d) => ({ ...d, accounts: d.accounts.filter((a) => a.id !== b.id) }), { accounts: [] });
   return { ok: true };
@@ -83,7 +92,7 @@ export default route(async (req, res) => {
       if (!canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
       const { accounts } = await loadAccounts();
       const members = accounts.filter((a) => a.ws === ws && !a.disabled)
-        .map((a) => ({ id: a.id, name: a.name, username: a.username, role: a.role, kind: a.kind === 'staff' ? 'staff' : 'cleaner' }));
+        .map((a) => ({ id: a.id, name: a.name, username: a.username, role: a.role, kind: a.kind === 'staff' ? 'staff' : 'cleaner', locations: Array.isArray(a.locations) ? a.locations : [] }));
       return send(res, 200, { members });
     }
     // đọc bản mới nhất: gói của cơ sở vừa được chủ hệ thống đổi phải hiện ngay (1 thao tác Blob mỗi lần mở app)
@@ -93,7 +102,7 @@ export default route(async (req, res) => {
   if (req.method === 'POST') {
     const body = await readBody(req);
     if (body.action === 'signup') return send(res, 200, await signup(req, body));
-    if (body.action === 'add-member' || body.action === 'remove-member' || body.action === 'set-kind') return send(res, 200, await planAdmin(req, body));
+    if (body.action === 'add-member' || body.action === 'remove-member' || body.action === 'set-kind' || body.action === 'set-locations') return send(res, 200, await planAdmin(req, body));
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
       return send(res, 200, { token, user, workspaces: await workspacesFor(user, { fresh: true }) });

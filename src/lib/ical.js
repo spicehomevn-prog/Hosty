@@ -58,11 +58,16 @@ export function parseICS(text) {
 export const isBlockEvent = (summary = '') =>
   /^\s*(airbnb\s*)?\(not available\)\s*$|^\s*(blocked|not available|unavailable|không khả dụng)\s*$/i.test(summary);
 
-export async function fetchCalendar(url) {
+/**
+ * Tải lịch: theo link (admin / nhân viên), hoặc theo id lịch khi tài khoản không nhận link sàn (Dọn phòng):
+ * fetchCalendar(url) | fetchCalendar({ ws, cal })
+ */
+export async function fetchCalendar(src) {
   // gửi kèm phiên đăng nhập (máy chủ chỉ tải lịch cho người đã đăng nhập)
   let token = '';
   try { token = JSON.parse(localStorage.getItem('hosty:session'))?.token || ''; } catch { /* noop */ }
-  const r = await fetch(`/api/ical?url=${encodeURIComponent(url.trim())}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  const q = typeof src === 'string' ? `url=${encodeURIComponent(src.trim())}` : `ws=${encodeURIComponent(src.ws)}&cal=${encodeURIComponent(src.cal)}`;
+  const r = await fetch(`/api/ical?${q}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   const text = await r.text();
   if (!r.ok) {
     let msg = 'Không tải được lịch';

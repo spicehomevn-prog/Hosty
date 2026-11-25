@@ -72,7 +72,8 @@ const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || null; 
 const Ctx = createContext(null);
 
 /** cloud = { token, ws } | null (xem thử) */
-export function FinanceProvider({ enabled, cloud, children }) {
+export function FinanceProvider({ enabled, pricesOnly, cloud, children }) {
+  if (pricesOnly && cloud) return <StaffPrices cloud={cloud}>{children}</StaffPrices>;
   if (!enabled) return <ForgetFinance ws={cloud?.ws}>{children}</ForgetFinance>;
   return <FinanceInner cloud={cloud}>{children}</FinanceInner>;
 }
@@ -81,6 +82,22 @@ export function FinanceProvider({ enabled, cloud, children }) {
 function ForgetFinance({ ws, children }) {
   useEffect(() => { try { if (ws) localStorage.removeItem(`hosty:fin:${ws}`); } catch { /* noop */ } }, [ws]);
   return <Ctx.Provider value={null}>{children}</Ctx.Provider>;
+}
+
+/** Nhân viên: chỉ xem giá đặt phòng của các phòng được gán (máy chủ lọc sẵn), không ghi được gì */
+const noop = () => {};
+function StaffPrices({ cloud, children }) {
+  const [value, setValue] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => api(`/api/finance?ws=${cloud.ws}&view=prices`, { token: cloud.token })
+      .then((r) => { if (alive) setValue({ fin: pickFin(r.data), dispatch: noop, readOnly: true, status: { loaded: true }, sync: noop, runOta: noop }); })
+      .catch(() => { /* gói không có Tài chính / mất mạng: không hiện giá */ });
+    load();
+    const t = setInterval(load, EVERY);
+    return () => { alive = false; clearInterval(t); };
+  }, [cloud.ws, cloud.token]);
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 function FinanceInner({ cloud, children }) {

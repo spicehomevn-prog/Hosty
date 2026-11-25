@@ -8,7 +8,10 @@ Web app (React + Vite) chạy trên Vercel. Đồng bộ lịch từ Airbnb, Boo
 - **Tài khoản 3 cấp** (không có tự đăng ký):
   - **Chủ hệ thống** – khai báo bằng biến môi trường. Tạo cơ sở, tạo / khoá / xoá tài khoản, đặt lại mật khẩu, xem mọi cơ sở.
   - **`<cơ sở>-admin`** – toàn quyền với dữ liệu cơ sở của mình: phòng, lịch iCal, giờ nhận/trả, đặt phòng, task, ghi chú.
-  - **`<cơ sở>-member`, `-member2`…** – nhân viên dọn phòng: xem lịch & thẻ dọn phòng, tick đã dọn, tick task được giao, đọc ghi chú, copy thẻ.
+  - **`<cơ sở>-member`, `-member2`…** – thành viên, chọn loại:
+    - **Dọn phòng** (cây chổi): màn riêng chữ to, chỉ thẻ dọn phòng (giờ trả / nhận phòng, số đêm, ghi chú) và việc được giao. Không có lịch phòng, giá, tên khách, số điện thoại, sàn.
+    - **Nhân viên** (hình người): xem lịch, đặt phòng, giá đặt phòng (chỉ xem), tick dọn phòng / task.
+  - Admin **gán địa điểm** cho từng thành viên (Cơ sở → Nhân viên & dọn phòng). Thành viên chỉ nhận dữ liệu, thông báo và task của địa điểm được gán; chưa gán = mọi địa điểm.
 - **Tự đồng bộ**: khi mở app, mỗi 15 phút, 20 giây sau lần sửa cuối, khi chuyển app xuống nền, khi có mạng trở lại, hoặc bấm *Đồng bộ ngay*. Hai máy sửa cùng lúc được gộp theo từng mục (task, ghi chú, phòng…), không mất dữ liệu. Mất mạng vẫn dùng được, có mạng sẽ tự đồng bộ.
 - **Thiết lập cơ sở** (admin): tên cơ sở → số địa điểm → địa chỉ + số phòng + tên phòng → link iCal của từng sàn cho từng phòng, giờ nhận/trả phòng riêng cho từng lịch.
 - **Đồng bộ ngược lên sàn**: Cơ sở → *Lấy link xuất lịch*. Mỗi phòng có link iCal riêng cho từng sàn (vd. "Dán vào Airbnb") gồm khách đặt trực tiếp + khách từ các sàn khác, đã loại khách của chính sàn đó để không chặn vòng. Dán vào mục *Nhập lịch* của sàn để sàn tự chặn ngày. Link có chữ ký bảo mật, không chứa tên/SĐT khách; đổi `AUTH_SECRET` sẽ vô hiệu mọi link cũ.
@@ -109,6 +112,7 @@ npx vercel --prod
 - `api/ical.js` – tải file iCal từ các sàn (tránh lỗi CORS).
 - `api/auth.js` – đăng nhập, đổi mật khẩu, thông tin tài khoản.
 - `api/data.js` – đọc/ghi dữ liệu cơ sở (ghi có điều kiện theo phiên bản, kiểm tra quyền member phía server).
+- `api/_scope.js` – lọc dữ liệu theo địa điểm được gán và loại thành viên (Dọn phòng không nhận tên khách / sàn / link lịch). Dùng ở `data`, `ical` (`?ws&cal=` – máy chủ tự đọc lịch), `finance` (`?view=prices` cho Nhân viên), thông báo.
 - `api/admin.js` – quản lý cơ sở & tài khoản (chỉ chủ hệ thống).
 - `api/ical-out.js` – lịch iCal xuất cho các sàn, truy cập qua `/cal/<mã>.ics`.
 - `api/finance.js` – dữ liệu tài chính (chỉ owner/admin): bảng giá, giá đặt phòng, khoản chi, số tổng tháng cũ; `POST ?action=ota` / Cron `?cron=ota` lấy giá Airbnb / Booking.com / Agoda qua Apify (`api/_apify.js`). Lưu riêng ở `fin/<cơ sở>.json`, không nằm trong dữ liệu mà member tải về.

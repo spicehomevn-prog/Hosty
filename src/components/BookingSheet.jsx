@@ -67,7 +67,9 @@ function BookingDetail({ b, onClose }) {
 
 function PriceBlock({ b, finance, onEdit }) {
   const p = bookingPrice(b, finance.fin);
+  const ro = !!finance.readOnly; // nhân viên: chỉ xem giá
   if (p.missing) {
+    if (ro) return <div className="bk-price missing"><span className="bk-price-ico"><Revenue size={20} /></span><span><b>Chưa có giá</b><small>Admin chưa nhập giá cho đặt phòng này</small></span></div>;
     return (
       <button className="bk-price missing" onClick={onEdit}>
         <span className="bk-price-ico"><Revenue size={20} /></span>
@@ -91,8 +93,8 @@ function PriceBlock({ b, finance, onEdit }) {
       </div>
       {b.source === 'manual' && p.entry && <PayBlock p={p} b={b} finance={finance} />}
       <div className="bk-price-foot">
-        <small>{SOURCE_LABEL[p.source]}{p.estimated ? ' · ước tính' : ''}</small>
-        <button className="link" onClick={onEdit}><Pencil size={14} /> Sửa giá</button>
+        <small>{SOURCE_LABEL[p.source]}{p.estimated ? ' · ước tính' : ''}{ro ? ' · chỉ xem' : ''}</small>
+        {!ro && <button className="link" onClick={onEdit}><Pencil size={14} /> Sửa giá</button>}
       </div>
     </div>
   );
@@ -112,7 +114,7 @@ function PayBlock({ p, b, finance }) {
         <span>{e.paidAt ? `Đã thu đủ ${dmShort(toKey(new Date(e.paidAt)))}` : 'Còn phải thu'}</span>
         <b>{fmtVND(e.paidAt ? 0 : p.due)}</b>
       </div>
-      {(p.due > 0 || e.paidAt) && (
+      {!finance.readOnly && (p.due > 0 || e.paidAt) && (
         <button className={`btn tiny pay-toggle ${e.paidAt ? '' : 'go'}`} onClick={toggle}>{e.paidAt ? 'Bỏ đánh dấu đã thu' : '✓ Đã thu đủ'}</button>
       )}
     </div>

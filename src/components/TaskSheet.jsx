@@ -16,11 +16,14 @@ export const PRIORITIES = [
 
 export function TaskSheet({ task, onClose }) {
   const { state, dispatch } = useStore();
-  const members = useMembers().filter((m) => m.role === 'member');
+  const allMembers = useMembers().filter((m) => m.role === 'member');
   const isNew = !task.id;
   const [f, setF] = useState({ title: '', desc: '', date: todayKey(), time: '', repeat: 'none', until: '', remind: null, roomId: '', priority: 'normal', done: false, assignee: '', ...task });
   const [autoTime, setAutoTime] = useState(false);
   const roomName = roomIndex(state)[f.roomId]?.room.name || '';
+  // task gắn phòng: chỉ giao được cho người phụ trách địa điểm của phòng đó (hoặc người đang được giao sẵn)
+  const locId = roomIndex(state)[f.roomId]?.location.id;
+  const members = allMembers.filter((m) => !locId || !m.locations?.length || m.locations.includes(locId) || m.id === f.assignee);
   const setRemind = (v) => {
     if (v != null && !f.time) { setF({ ...f, remind: v, time: '08:00' }); setAutoTime(true); } else setF({ ...f, remind: v });
   };

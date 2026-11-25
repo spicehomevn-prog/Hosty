@@ -5,6 +5,7 @@
 //   notify/push/<uid>.json   { subs: [{ endpoint, keys, ws, ua, at }], prefs: { daily, checkout, checkin, task } }
 //   notify/vapid.json        { publicKey, privateKey(enc) }   – tự tạo lần đầu nếu không có biến VAPID_*
 //   notify/sent.json         { [khoá lần nhắc]: thời điểm gửi }   – chống gửi trùng
+import { roomScope, isCleanerUser } from './_scope.js';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
 import { envClean, loadAccounts, wsFile } from './_auth.js';
@@ -62,6 +63,8 @@ const userOk = (u, ws) => !!u && (u.role === 'owner' || u.ws === ws);
 
 /** Task này nhắc tới ai: giao riêng -> người đó; chung -> mọi người */
 const forUser = (t, uid) => !t.assignee || t.assignee === uid;
+/** Phòng có trong phạm vi địa điểm được gán của người này không (admin / chưa gán = mọi phòng) */
+const scopeFn = (data, u) => { const r = roomScope(data, u); return (id) => !r || r.has(id); };
 
 function roomNames(data) {
   const m = {};
@@ -236,6 +239,7 @@ export async function pushDue(now = Date.now(), ctx = cronCtx()) {
       };
       for (const uid of uids) {
         if (!forUser(it, uid) || !userOk(users.get(uid), ws)) continue;
+        if (it.roomId && !scopeFn(data, users.get(uid))(it.roomId)) continue; // task của địa điểm không được gán
         sent += (await pushSend(uid, ws, payload, 'task')).sent;
       }
     }
@@ -310,7 +314,8 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
       for (const uid of uids) {
         const k = `${ws}:daily:${today}:${uid}`;
         if (sentLog[k] || fresh[k]) continue;
-        const payload = dailyPayload({ u: users.get(uid), bookings, today, dueOf, wsName: multi.get(uid) > 1 ? wsName : '', tag: `daily-${ws}-${today}` });
+        const mine = scopeFn(data, users.get(uid));
+        const payload = dailyPayload({ u: users.get(uid), bookings: bookings.filter((b) => mine(b.roomId)), today, dueOf, wsName: multi.get(uid) > 1 ? wsName : '', tag: `daily-${ws}-${today}` });
         pending.push({ k, uid, pref: 'daily', daily: true, payload });
       }
     }
@@ -327,12 +332,15 @@ export async function stayDue(now = Date.now(), { collect = false, ctx = cronCtx
         for (const uid of uids) {
           const k = `${ws}:${kind}:${b.id}:${today}:${uid}`;
           if (sentLog[k] || fresh[k]) continue;
+          const u = users.get(uid);
+          if (!scopeFn(data, u)(b.roomId)) continue; // phòng ngoài địa điểm được gán
+          const cleaner = isCleanerUser(u); // Dọn phòng: không ghi sàn / tên khách
           const extra = due > 0 && canMoney(users.get(uid)) ? `còn phải thu ${fmtShort(due)}` : '';
           pending.push({
             k, uid, pref: kind === 'out' ? 'checkout' : 'checkin',
             payload: {
               title: kind === 'out' ? `🧳 ${room} trả phòng lúc ${time}` : `🔑 ${room} nhận phòng lúc ${time}`,
-              body: [left >= 55 ? 'Còn 1 giờ' : `Còn ${Math.max(1, left)} phút`, b.platform, guest, extra, multi.get(uid) > 1 ? wsName : ''].filter(Boolean).join(' · ').slice(0, 180),
+              body: [left >= 55 ? 'Còn 1 giờ' : `Còn ${Math.max(1, left)} phút`, cleaner ? '' : b.platform, cleaner ? '' : guest, extra, multi.get(uid) > 1 ? wsName : ''].filter(Boolean).join(' · ').slice(0, 180),
               tag: `${kind}-${b.id}-${today}`, url: '/?tab=home',
             },
           });
@@ -386,7 +394,8 @@ export async function dailyNow(user, ws, now = Date.now()) {
   const data = (await getJSON(wsFile(ws), { etag: false }))?.data?.data;
   if (!data) throw new HttpError(404, 'Cơ sở chưa có dữ liệu');
   const today = new Date(now + 7 * 3600e3).toISOString().slice(0, 10);
-  const bookings = await wsBookings(data);
+  const mine = scopeFn(data, user);
+  const bookings = (await wsBookings(data)).filter((b) => mine(b.roomId));
   const fin = canMoney(user) ? (await getJSON(`fin/${ws}.json`, { etag: false }))?.data?.data || {} : {};
   const dueOf = (b) => (b.source === 'manual' ? balanceDue(fin.prices?.[b.id]) : 0);
   const payload = dailyPayload({ u: user, bookings, today, dueOf, tag: `daily-test-${ws}` });

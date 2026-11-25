@@ -15,6 +15,24 @@ import {
 } from './_apify.js';
 import { wsBookings } from './_notify.js';
 import { addDays } from '../src/lib/dates.js';
+import { roomScope } from './_scope.js';
+
+/** Nhân viên (kind 'staff'): chỉ xem giá đặt phòng + bảng giá của các phòng trong phạm vi – không chi phí, báo cáo, cài đặt */
+const ROOM_KEYED = ['rateTable', 'dayDiscount', 'directRates', 'platformRates', 'otaRates'];
+async function staffPrices(req, ws) {
+  const user = await requireUser(req);
+  if (user.role !== 'member' || user.kind !== 'staff') throw new HttpError(403, 'Chỉ tài khoản nhân viên dùng chế độ xem giá này');
+  if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
+  await requireFeature(ws, 'finance');
+  const [fin, wsd] = await Promise.all([getJSON(finFile(ws), { etag: false }), getJSON(wsFile(ws), { etag: false })]);
+  const f = fin?.data?.data || {};
+  const rooms = roomScope(wsd?.data?.data, user);
+  const ok = (id) => !rooms || rooms.has(id);
+  const byRoom = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => k === '*' || ok(k)));
+  const data = { settings: { fees: f.settings?.fees || {} }, prices: Object.fromEntries(Object.entries(f.prices || {}).filter(([, e]) => ok(e?.roomId))), stayDiscount: byRoom(f.stayDiscount) };
+  for (const k of ROOM_KEYED) data[k] = byRoom(f[k]);
+  return { version: fin?.data?.version || 0, data, readOnly: true };
+}
 
 export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual'];
 export const finFile = (ws) => `fin/${ws}.json`;
@@ -267,6 +285,7 @@ export default route(async (req, res) => {
 
   if (req.method === 'GET') {
     const ws = query(req).get('ws');
+    if (query(req).get('view') === 'prices') return send(res, 200, await staffPrices(req, ws));
     await requireFinance(req, ws);
     const cur = await getJSON(finFile(ws), { etag: false });
     const doc = cur?.data || { version: 0, updatedAt: 0, updatedBy: '', data: null };

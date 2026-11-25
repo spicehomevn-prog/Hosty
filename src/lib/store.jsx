@@ -284,12 +284,13 @@ export function StoreProvider({ scope, role, user, children }) {
 
   // ---- đồng bộ iCal ----
   const sync = useCallback(async (calendars) => {
-    const list = (calendars || stateRef.current.calendars).filter((c) => c.url && !c.demo);
+    // tài khoản Dọn phòng không có link sàn (hasUrl): máy chủ tự đọc lịch theo id
+    const list = (calendars || stateRef.current.calendars).filter((c) => (c.url || (c.hasUrl && cloud?.ws)) && !c.demo);
     if (!list.length) return [];
     setSyncing(true);
     const results = await Promise.all(
       list.map(async (c) => {
-        try { return { id: c.id, ok: true, events: await fetchCalendar(c.url) }; }
+        try { return { id: c.id, ok: true, events: await fetchCalendar(c.url || { ws: cloud.ws, cal: c.id }) }; }
         catch (e) { return { id: c.id, ok: false, error: e.message }; }
       }),
     );

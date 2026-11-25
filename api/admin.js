@@ -8,6 +8,7 @@ import {
   ACCOUNTS, WORKSPACES, wsFile,
 } from './_auth.js';
 import { createAccount, createWorkspace, RESERVED } from './_accounts.js';
+import { cleanLocations } from './_scope.js';
 import { TRIAL, PLANS, PAID, COMBOS, comboPrice } from '../src/lib/plan.js';
 
 /** Cộng n tháng (theo lịch, giờ VN) vào mốc ms */
@@ -109,6 +110,13 @@ export default route(async (req, res) => {
     }
     case 'update-account': {
       let acc;
+      let locations;
+      if (b.locations !== undefined) {
+        const { accounts } = await loadAccounts({ fresh: true });
+        const a = accounts.find((x) => x.id === b.id);
+        if (!a) throw new HttpError(404, 'Không tìm thấy tài khoản');
+        locations = await cleanLocations(a.ws, b.locations);
+      }
       await updateJSON(ACCOUNTS, (d) => {
         acc = d.accounts.find((a) => a.id === b.id);
         if (!acc) throw new HttpError(404, 'Không tìm thấy tài khoản');
@@ -126,6 +134,7 @@ export default route(async (req, res) => {
           acc.tokenVersion = (acc.tokenVersion || 0) + 1;
         }
         if (b.kind !== undefined && ['cleaner', 'staff'].includes(b.kind) && acc.role === 'member') acc.kind = b.kind;
+        if (locations !== undefined && acc.role === 'member') acc.locations = locations;
         if (b.disabled !== undefined && !!b.disabled !== !!acc.disabled) {
           acc.disabled = !!b.disabled;
           acc.tokenVersion = (acc.tokenVersion || 0) + 1;

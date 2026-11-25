@@ -6,6 +6,7 @@ import { getJSON, putJSON, ConflictError } from './_store.js';
 import { requireUser, canAccess, wsFile, signFeed, getWorkspace } from './_auth.js';
 import { planExpired, planOf, limitError } from '../src/lib/plan.js';
 import { siteUrl } from '../site.config.js';
+import { scopeData, applyMemberChange, isMember } from './_scope.js';
 
 export const SYNC_KEYS = ['property', 'locations', 'calendars', 'manual', 'overrides', 'notes', 'tasks', 'cleanDone', 'cleanAdj', 'cleanExtra', 'cleanNotes', 'setupDone'];
 // giá trị mặc định khi khoá chưa có (dữ liệu cũ) – để so sánh "chưa có" với "rỗng" là như nhau
@@ -83,7 +84,8 @@ export default route(async (req, res) => {
     if (query(req).get('links')) return send(res, 200, { links: exportLinks(req, user, ws, cur?.data?.data) });
     if (!cur) return send(res, 200, { version: 0, updatedAt: 0, updatedBy: '', data: null });
     const { version, updatedAt, updatedBy, data } = cur.data;
-    return send(res, 200, { version, updatedAt, updatedBy, data });
+    // thành viên chỉ nhận dữ liệu trong phạm vi địa điểm được gán (Dọn phòng: không có tên khách / sàn / link lịch)
+    return send(res, 200, { version, updatedAt, updatedBy, data: scopeData(data, user) });
   }
 
   if (req.method === 'PUT') {
@@ -102,20 +104,25 @@ export default route(async (req, res) => {
     const cur = await getJSON(wsFile(ws));
     const curVersion = cur ? cur.data.version : 0;
     const conflict = () => new HttpError(409, 'Dữ liệu trên máy chủ đã thay đổi', {
-      version: curVersion, updatedAt: cur?.data.updatedAt || 0, updatedBy: cur?.data.updatedBy || '', data: cur?.data.data || null,
+      version: curVersion, updatedAt: cur?.data.updatedAt || 0, updatedBy: cur?.data.updatedBy || '', data: scopeData(cur?.data.data || null, user),
     });
     if (Number(body.baseVersion || 0) !== curVersion) throw conflict();
     // máy chạy bản app cũ không gửi các khoá mới -> giữ nguyên giá trị đang có trên máy chủ
-    const data = { ...pick(cur?.data?.data || {}), ...incoming };
+    let data = { ...pick(cur?.data?.data || {}), ...incoming };
+    if (isMember(user)) {
+      // thành viên: kiểm tra trên bản đã lọc theo phạm vi, rồi áp phần được phép đổi lên dữ liệu đầy đủ
+      // (dữ liệu của địa điểm không được gán luôn giữ nguyên)
+      if (!cur) throw new HttpError(403, 'Cơ sở chưa được admin thiết lập');
+      const full = pick(cur.data.data || {});
+      const prev = scopeData(full, user);
+      const next = { ...prev, ...incoming };
+      checkMemberChange(prev, next, user);
+      data = applyMemberChange(full, prev, next, TASK_TICK_FIELDS);
+    }
     // giới hạn phòng / địa điểm theo gói (chỉ chặn khi thêm vượt giới hạn so với dữ liệu đang có)
     {
       const limit = limitError(wsRec, data.locations, cur?.data?.data?.locations || []);
       if (limit) throw new HttpError(400, `${limit} – nâng cấp gói để thêm`, { pro: true });
-    }
-
-    if (user.role === 'member') {
-      if (!cur) throw new HttpError(403, 'Cơ sở chưa được admin thiết lập');
-      checkMemberChange(cur.data.data || {}, data, user);
     }
 
     const doc = { version: curVersion + 1, updatedAt: Date.now(), updatedBy: user.name || user.username, data };
@@ -125,7 +132,7 @@ export default route(async (req, res) => {
       if (e instanceof ConflictError) {
         const fresh = await getJSON(wsFile(ws), { etag: false });
         throw new HttpError(409, 'Dữ liệu trên máy chủ đã thay đổi', {
-          version: fresh?.data.version || 0, updatedAt: fresh?.data.updatedAt || 0, updatedBy: fresh?.data.updatedBy || '', data: fresh?.data.data || null,
+          version: fresh?.data.version || 0, updatedAt: fresh?.data.updatedAt || 0, updatedBy: fresh?.data.updatedBy || '', data: scopeData(fresh?.data.data || null, user),
         });
       }
       throw e;

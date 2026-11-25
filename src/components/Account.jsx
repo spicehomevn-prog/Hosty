@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle, LogOut, KeyRound, ArrowLeftRight, Users, Loader2, CheckCircle2 } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { useStore } from '../lib/store.jsx';
-import { roleLabel, KINDS, kindOf } from '../lib/perm.js';
+import { roleLabel, KINDS, kindOf, assignedLocations } from '../lib/perm.js';
 import { timeAgo } from '../lib/dates.js';
 import { Sheet, Field, toast } from './ui.jsx';
 import { AdminSheet, KindPick } from './Admin.jsx';
@@ -11,8 +11,28 @@ import { useMembers } from '../lib/members.js';
 import { Lock, Copy, Trash2, Plus } from '../lib/icons.jsx';
 
 /** Admin cơ sở tự thêm / xoá nhân viên dọn phòng, tối đa theo gói (dùng thử 1, Cơ bản 2, Nâng cao 5, Cao cấp 10, VIP không giới hạn) */
+/** Chọn địa điểm được giao cho nhân viên: "Tất cả" hoặc một / nhiều địa điểm (chỉ hiện khi cơ sở có > 1 địa điểm) */
+export function LocPick({ value, locations, onChange }) {
+  const all = !value.length;
+  const toggle = (id) => {
+    const next = all ? [id] : value.includes(id) ? value.filter((x) => x !== id) : [...value, id];
+    onChange(next.length === locations.length ? [] : next);
+  };
+  return (
+    <div className="loc-pick" role="group" aria-label="Địa điểm được giao">
+      <span className="loc-pick-label">Địa điểm:</span>
+      <button type="button" className={all ? 'on' : ''} aria-pressed={all} onClick={() => onChange([])}>Tất cả</button>
+      {locations.map((l) => (
+        <button key={l.id} type="button" className={!all && value.includes(l.id) ? 'on' : ''} aria-pressed={!all && value.includes(l.id)} onClick={() => toggle(l.id)}>{l.name}</button>
+      ))}
+    </div>
+  );
+}
+
 function PlanMembers() {
   const s = useSession();
+  const { state } = useStore();
+  const locations = state.locations || [];
   const max = s.plan.limits.maxMembers;
   const members = useMembers().filter((m) => m.role === 'member');
   const [name, setName] = useState('');
@@ -39,6 +59,13 @@ function PlanMembers() {
     if (kindOf(m) === k) return;
     try { await s.call('/api/auth', { method: 'POST', body: { action: 'set-kind', ws: s.workspace.id, id: m.id, kind: k } }); setList(shown.map((x) => (x.id === m.id ? { ...x, kind: k } : x))); toast(`Đã đổi thành ${KINDS[k]}`); } catch (e) { setErr(e.message); }
   };
+  const setLocsOf = async (m, locs) => {
+    try {
+      const r = await s.call('/api/auth', { method: 'POST', body: { action: 'set-locations', ws: s.workspace.id, id: m.id, locations: locs } });
+      setList(shown.map((x) => (x.id === m.id ? { ...x, locations: r.locations } : x)));
+      toast(r.locations.length ? `${m.name}: ${r.locations.length} địa điểm` : `${m.name}: tất cả địa điểm`);
+    } catch (e) { setErr(e.message); }
+  };
   const copy = async () => {
     const t = `Tài khoản Hostexa của bạn:\nTrang: https://hostexa.vercel.app\nTên đăng nhập: ${created.account.username}\nMật khẩu: ${created.password}`;
     try { await navigator.clipboard.writeText(t); toast('Đã copy – dán vào Zalo gửi nhân viên'); } catch { toast(t); }
@@ -50,6 +77,7 @@ function PlanMembers() {
         <div key={m.id} className="tm-row">
           <span><b>{m.name}</b><small className="mono">{m.username}</small>
             <KindPick value={kindOf(m)} size={12} onChange={(k) => setKindOf(m, k)} />
+            {locations.length > 1 && <LocPick value={assignedLocations(m)} locations={locations} onChange={(l) => setLocsOf(m, l)} />}
           </span>
           <button className="icon-btn sm danger" onClick={() => remove(m)} aria-label={`Xoá ${m.name}`}><Trash2 size={16} /></button>
         </div>
@@ -178,7 +206,7 @@ export function AccountCard() {
         <b>{s.workspace?.name}</b>
       </div>
       {s.role !== 'demo' && s.workspace && <PlanPill plan={s.plan} />}
-      {!s.plan.expired && s.user?.role === 'admin' && <PlanMembers />}
+      {!s.plan.expired && (s.user?.role === 'admin' || (s.role === 'owner' && s.workspace)) && <PlanMembers />}
       <SyncStatus />
       <p className="tiny muted">Tự đồng bộ mỗi 15 phút, khi mở app, khi chuyển app xuống nền và ngay sau khi bạn sửa.</p>
       <div className="row gap8 wrap">
