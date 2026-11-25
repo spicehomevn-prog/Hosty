@@ -1542,12 +1542,3 @@ input.switch:checked::after { transform: translateX(18px); }
 .clean-card.drop-before::before, .clean-card.drop-after::after { content: ''; position: absolute; left: 8px; right: 8px; height: 4px; border-radius: 2px; background: var(--violet-ink); z-index: 2; }
 .clean-card.drop-before::before { top: -7px; }
 .clean-card.drop-after::after { bottom: -7px; }
-/* Màn Dọn phòng: thẻ bật thông báo */
-.cl-push { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 14px; padding: 14px 16px; border-radius: 20px; text-align: left; background: #FFF3C4; border: 2px solid #F3BE3E; color: #4A3500; }
-.cl-push-ico { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: #F3BE3E; color: #3A2A00; }
-.cl-push-txt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.cl-push-txt b { font-size: 20px; }
-.cl-push-txt small { font-size: 15px; color: #6B5200; }
-.cl-push-go { flex: none; min-height: 48px; padding: 0 22px; border-radius: 14px; display: grid; place-items: center; background: var(--nav); color: #fff; font-weight: 800; font-size: 18px; }
-.cl-push.on { padding: 10px 14px; border-radius: 14px; background: #E4F7EE; border-color: #B9DCCD; color: #1C6B52; font-weight: 700; font-size: 16px; }
-.cl-push.on span { flex: 1; }

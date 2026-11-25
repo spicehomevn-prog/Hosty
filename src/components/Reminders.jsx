@@ -66,6 +66,22 @@ function failHelp(step) {
   return '';
 }
 
+/** iPhone / iPad: chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính */
+function IosInstallSteps() {
+  return (
+    <div className="rm-note rm-steps">
+      <b>Cài Hostexa ra Màn hình chính (làm 1 lần)</b>
+      <ol>
+        <li>Mở Hostexa bằng <b>Safari</b> (như đang mở).</li>
+        <li>Bấm nút <b>Chia sẻ</b> (ô vuông có mũi tên ↑ ở thanh dưới). Điện thoại mới: bấm <b>≡</b> hoặc <b>•••</b> cạnh thanh địa chỉ, rồi chọn <b>Chia sẻ</b>.</li>
+        <li>Kéo xuống, chọn <b>Thêm vào MH chính</b> → bấm <b>Thêm</b>.</li>
+        <li>Thoát Safari, mở <b>biểu tượng Hostexa</b> vừa xuất hiện ở Màn hình chính. Đăng nhập lại (biểu tượng có phiên đăng nhập riêng).</li>
+        <li>Vào <b>Cơ sở → Thông báo</b>, bấm <b>Bật thông báo</b> và chọn <b>Cho phép</b>.</li>
+      </ol>
+    </div>
+  );
+}
+
 const Spin = ({ on }) => (on ? <Loader2 size={14} className="spin" /> : null);
 
 const PREFS = [
@@ -99,6 +115,7 @@ function RunStatus({ run }) {
 export function RemindersPanel({ n }) {
   const s = useSession();
   const { info, err, busy, pushOn } = n;
+  const [help, setHelp] = useState(true); // máy chưa bật được: mở sẵn hướng dẫn
   const owner = s.role === 'owner';
   const cleaner = s.role === 'member' && s.user?.kind !== 'staff';
 
@@ -107,9 +124,9 @@ export function RemindersPanel({ n }) {
   }
   if (!info && !err) return <p className="tiny muted"><Loader2 size={14} className="spin" /> Đang tải…</p>;
 
-  let pushNote = null;
+  let pushNote = null; let iosInstall = false;
   if (isInApp()) pushNote = 'Trang đang mở bên trong Zalo / Facebook nên không nhận được thông báo. Bấm ⋮ (hoặc …) → "Mở bằng trình duyệt" / "Mở bằng Chrome", rồi bật thông báo ở đó.';
-  else if (!pushSupported() && isIOS() && !isStandalone()) pushNote = 'iPhone chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính: bấm nút Chia sẻ trong Safari > "Thêm vào MH chính", rồi mở từ biểu tượng đó.';
+  else if (!pushSupported() && isIOS() && !isStandalone()) { pushNote = 'iPhone chỉ nhận thông báo khi mở Hostexa từ biểu tượng ngoài Màn hình chính. Bạn đang mở trong Safari.'; iosInstall = true; }
   else if (!pushSupported()) pushNote = isIOS() ? 'Cần iOS 16.4 trở lên để nhận thông báo.' : 'Trình duyệt này không hỗ trợ thông báo. Dùng Chrome hoặc Safari bản mới.';
 
   return (
@@ -119,7 +136,13 @@ export function RemindersPanel({ n }) {
           <span className="rm-ico p"><Bell size={18} /></span>
           <div><b>Thông báo trên máy này</b><small>Hostexa tự gửi thông báo tới điện thoại / máy tính này. Bật riêng trên từng máy.</small></div>
         </div>
-        {pushNote ? <p className="rm-note">{pushNote}</p> : pushOn ? (
+        {pushNote ? (
+          <>
+            <p className="rm-note">{pushNote}</p>
+            <button className="btn primary block" onClick={() => setHelp(!help)} aria-expanded={help}>Bật thông báo</button>
+            {iosInstall && help && <IosInstallSteps />}
+          </>
+        ) : pushOn ? (
           <>
             <p className="rm-state ok"><CheckCircle2 size={15} /><span>Đang bật trên máy này</span></p>
             <div className="row gap8 wrap">
