@@ -3,7 +3,7 @@ import { Trash2 } from '../lib/icons.jsx';
 import { TaskReminderBox } from './Reminders.jsx';
 import { useStore, uid } from '../lib/store.jsx';
 import { todayKey, dm } from '../lib/dates.js';
-import { REPEATS, REMINDS, repeatLabel, remindName, remindFromMD, remindToMD, isPresetRemind } from '../lib/tasks.js';
+import { REPEATS, REMINDS, UNITS, repeatLabel, remindName, remindFromMD, remindToMD, isPresetRemind, everyOf, unitOf } from '../lib/tasks.js';
 import { roomIndex } from '../lib/derive.js';
 import { Sheet, Field } from './ui.jsx';
 import { useMembers } from '../lib/members.js';
@@ -40,6 +40,7 @@ export function TaskSheet({ task, onClose }) {
     if (!f.title.trim()) return;
     const clean = { ...f, id: f.id || uid(), title: f.title.trim() };
     if (clean.repeat === 'none') { delete clean.until; delete clean.doneDates; }
+    if (clean.repeat === 'custom') { clean.every = everyOf(clean); clean.unit = unitOf(clean); } else { delete clean.every; delete clean.unit; }
     dispatch({ type: 'SAVE_TASK', task: clean });
     onClose();
   };
@@ -66,8 +67,25 @@ export function TaskSheet({ task, onClose }) {
               {r.id === 'none' ? r.label : repeatLabel({ ...f, repeat: r.id }) || r.label}
             </button>
           ))}
+          <button type="button" className={`mini-chip ${f.repeat === 'custom' ? 'on' : ''}`} style={{ '--pc': '#6B4FD8' }}
+            onClick={() => setF({ ...f, repeat: 'custom', every: f.every || 2, unit: unitOf(f) })}>
+            {f.repeat === 'custom' ? repeatLabel(f) : 'Tuỳ chỉnh…'}
+          </button>
         </div>
       </Field>
+      {f.repeat === 'custom' && (
+        <div className="remind-custom repeat-custom">
+          <span>Lặp lại mỗi</span>
+          <input type="number" inputMode="numeric" min="1" max="99" className="input sm" aria-label="Số lần"
+            value={f.every ?? ''} placeholder="1"
+            onChange={(e) => setF({ ...f, every: e.target.value === '' ? '' : Math.max(1, Math.min(99, Math.floor(Number(e.target.value) || 1))) })} />
+          <div className="seg">
+            {Object.entries(UNITS).map(([u, label]) => (
+              <button key={u} type="button" className={unitOf(f) === u ? 'on' : ''} onClick={() => setF({ ...f, unit: u })}>{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       {f.repeat && f.repeat !== 'none' && (
         <Field label="Lặp đến ngày (để trống = không kết thúc)"><input type="date" className="input" min={f.date} value={f.until || ''} onChange={set('until')} /></Field>
       )}

@@ -1,6 +1,7 @@
 // Task lặp lại & lời nhắc (hàm thuần)
-// task: { date, time?, repeat?: 'none'|'daily'|'weekdays'|'weekly'|'monthly', until?, remind?: phút, done, doneDates? }
-import { addDays, fromKey, toKey, endOfMonth, WD_SHORT } from './dates.js';
+// task: { date, time?, repeat?: 'none'|'daily'|'weekdays'|'weekly'|'monthly'|'custom', every?, unit?, until?, remind?: phút, done, doneDates? }
+// repeat 'custom': mỗi `every` (1–99) `unit` ('day' | 'week' | 'month') tính từ ngày bắt đầu
+import { addDays, fromKey, toKey, endOfMonth, diffDays, WD_SHORT } from './dates.js';
 
 export const REPEATS = [
   { id: 'none', label: 'Không' },
@@ -14,6 +15,9 @@ export const REMINDS = [
   { v: 30, label: '30 phút' }, { v: 60, label: '1 giờ' }, { v: 120, label: '2 giờ' }, { v: 1440, label: '1 ngày' },
 ];
 
+export const UNITS = { day: 'ngày', week: 'tuần', month: 'tháng' };
+export const everyOf = (t) => Math.max(1, Math.min(99, Math.floor(Number(t.every) || 1)));
+export const unitOf = (t) => (UNITS[t.unit] ? t.unit : 'week');
 export const isRepeating = (t) => !!t.repeat && t.repeat !== 'none' && !!t.date;
 const wd = (k) => fromKey(k).getDay(); // 0 = CN
 
@@ -22,6 +26,11 @@ export function repeatLabel(t) {
   if (!isRepeating(t)) return '';
   if (t.repeat === 'weekly') return `Hằng tuần (${WD_SHORT[(wd(t.date) + 6) % 7]})`;
   if (t.repeat === 'monthly') return `Hằng tháng (ngày ${Number(t.date.slice(8))})`;
+  if (t.repeat === 'custom') {
+    const n = everyOf(t); const u = unitOf(t);
+    const tail = u === 'week' ? ` (${WD_SHORT[(wd(t.date) + 6) % 7]})` : u === 'month' ? ` (ngày ${Number(t.date.slice(8))})` : '';
+    return `Mỗi ${n} ${UNITS[u]}${tail}`;
+  }
   return REPEATS.find((r) => r.id === t.repeat)?.label || '';
 }
 /** Nhắc tuỳ chỉnh "… tháng, … ngày" (lưu bằng phút như các mốc khác; 1 tháng = 30 ngày) */
@@ -42,6 +51,13 @@ export function remindName(m) {
 }
 export const remindLabel = (m) => (m == null ? '' : m === 0 ? 'đúng giờ' : `trước ${remindName(m)}`);
 
+/** Cùng "ngày trong tháng" với ngày bắt đầu; tháng không có ngày đó (VD 31) -> ngày cuối tháng */
+function sameMonthDay(start, day) {
+  const want = Number(start.slice(8));
+  const last = Number(endOfMonth(day).slice(8));
+  return Number(day.slice(8)) === Math.min(want, last);
+}
+
 /** Task có lịch vào ngày `day` không */
 export function occursOn(t, day) {
   if (!t.date) return false;
@@ -51,11 +67,14 @@ export function occursOn(t, day) {
     case 'daily': return true;
     case 'weekdays': { const w = wd(day); return w >= 1 && w <= 5; }
     case 'weekly': return wd(day) === wd(t.date);
-    case 'monthly': {
-      // tháng không có ngày đó (VD 31) -> ngày cuối tháng
-      const want = Number(t.date.slice(8));
-      const last = Number(endOfMonth(day).slice(8));
-      return Number(day.slice(8)) === Math.min(want, last);
+    case 'monthly': return sameMonthDay(t.date, day);
+    case 'custom': {
+      const n = everyOf(t);
+      const u = unitOf(t);
+      if (u === 'day') return diffDays(t.date, day) % n === 0;
+      if (u === 'week') { const d = diffDays(t.date, day); return d % 7 === 0 && (d / 7) % n === 0; }
+      const months = (Number(day.slice(0, 4)) - Number(t.date.slice(0, 4))) * 12 + Number(day.slice(5, 7)) - Number(t.date.slice(5, 7));
+      return months % n === 0 && sameMonthDay(t.date, day);
     }
     default: return false;
   }
@@ -110,8 +129,18 @@ export function rrule(t) {
       const d = Number(t.date.slice(8));
       return d > 28 ? `FREQ=MONTHLY;BYMONTHDAY=${d},-1;BYSETPOS=1${until}` : `FREQ=MONTHLY;BYMONTHDAY=${d}${until}`;
     }
+    case 'custom': return customRrule(t.date, everyOf(t), unitOf(t), until);
     default: return '';
   }
+}
+
+/** RRULE cho lặp tuỳ chỉnh (dùng chung với api/ical-out.js) */
+export function customRrule(start, n, unit, until = '') {
+  const iv = n > 1 ? `;INTERVAL=${n}` : '';
+  if (unit === 'day') return `FREQ=DAILY${iv}${until}`;
+  if (unit === 'week') return `FREQ=WEEKLY${iv};BYDAY=${RRULE_DAY[new Date(`${start}T00:00:00Z`).getUTCDay()]}${until}`;
+  const d = Number(start.slice(8));
+  return d > 28 ? `FREQ=MONTHLY${iv};BYMONTHDAY=${d},-1;BYSETPOS=1${until}` : `FREQ=MONTHLY${iv};BYMONTHDAY=${d}${until}`;
 }
 
 /** Dữ liệu gọn gửi lên /cal/task.ics (chỉ phần cần cho sự kiện) */
@@ -120,6 +149,7 @@ export function reminderPayload(t, roomName = '') {
   return {
     t: cut(t.title, 120), d: cut(t.desc, 400), r: cut(roomName, 60), s: t.date, h: t.time || '',
     p: t.repeat && t.repeat !== 'none' ? t.repeat : '', u: t.until || '', m: t.remind ?? null,
+    ...(t.repeat === 'custom' ? { i: everyOf(t), n: unitOf(t) } : {}),
   };
 }
 const b64url = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

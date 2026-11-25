@@ -1532,3 +1532,5 @@ input.switch:checked::after { transform: translateX(18px); }
 .svc-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .svc-suggest .mini-chip, .extra-suggest .mini-chip { display: inline-flex; align-items: center; gap: 4px; }
 .extra-suggest .mini-chip em { font-style: normal; color: var(--muted); font-size: 11.5px; }
+.repeat-custom { margin: -4px 0 14px; }
+.repeat-custom .seg button { padding: 0 14px; }

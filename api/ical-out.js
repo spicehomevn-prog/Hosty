@@ -3,6 +3,7 @@
 // Gồm: đặt phòng trực tiếp + đặt phòng / ngày khoá từ các sàn khác của cùng phòng,
 // trừ lịch của chính sàn nhận link (x), và trừ sự kiện của sàn khác trùng hệt một ĐẶT PHÒNG THẬT của sàn x (bản chép ngược).
 // Lưu ý: ngày sàn x chặn theo chính link này ("Airbnb (Not available)") KHÔNG được coi là của sàn x, nếu không sẽ tự mở chặn.
+import { customRrule } from '../src/lib/tasks.js';
 import { createHash } from 'node:crypto';
 import { getJSON } from './_store.js';
 import { verifyFeed, wsFile } from './_auth.js';
@@ -37,6 +38,7 @@ function taskRrule(p) {
   const until = /^\d{4}-\d{2}-\d{2}$/.test(p.u || '') ? `;UNTIL=${ymd(p.u)}T235959Z` : '';
   const wdDay = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][new Date(`${p.s}T00:00:00Z`).getUTCDay()];
   const day = Number(p.s.slice(8));
+  if (p.p === 'custom') return customRrule(p.s, Math.max(1, Math.min(99, Math.floor(Number(p.i) || 1))), ['day', 'week', 'month'].includes(p.n) ? p.n : 'week', until);
   return ({
     daily: `FREQ=DAILY${until}`,
     weekdays: `FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR${until}`,
