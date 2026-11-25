@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { isTrial, trialExpired, trialDaysLeft } from './plan.js';
+import { isTrial, planId, PLANS, planExpired, planDaysLeft, planEnds } from './plan.js';
 
 const KEY = 'hosty:session';
 const DATA_PREFIX = 'hosty:data:';
@@ -84,8 +84,16 @@ export function SessionProvider({ children }) {
 
   const value = useMemo(() => {
     const workspace = session?.workspaces?.find((w) => w.id === session.ws) || null;
-    // gói của cơ sở đang mở: dùng thử -> khoá tính năng Pro; hết hạn -> chỉ xem (vai trò 'viewer')
-    const plan = { trial: isTrial(workspace), expired: trialExpired(workspace), daysLeft: trialDaysLeft(workspace) };
+    // gói của cơ sở đang mở: dùng thử -> khoá Tài chính / Thông báo; hết hạn (mọi gói) -> chỉ xem (vai trò 'viewer')
+    // xem thử: đủ tính năng như VIP
+    const pid = session?.demo ? 'vip' : planId(workspace);
+    const P = PLANS[pid];
+    const plan = {
+      id: pid, name: P.name, trial: isTrial(workspace), vip: pid === 'vip',
+      expired: !session?.demo && planExpired(workspace), daysLeft: session?.demo ? null : planDaysLeft(workspace),
+      ends: session?.demo ? null : planEnds(workspace), limits: P,
+      has: (f) => P.features.includes(f),
+    };
     const baseRole = session?.demo ? 'demo' : session?.user?.role || null;
     const role = plan.expired && baseRole !== 'owner' ? 'viewer' : baseRole;
     return {
@@ -93,7 +101,7 @@ export function SessionProvider({ children }) {
       role,
       plan,
       /** tính năng Pro bị khoá ở cơ sở đang mở (finance | push | rates | rooms | locations | members) */
-      locked: () => plan.trial,
+      locked: (f) => (f ? !plan.has(f) : plan.trial),
       user: session?.user || null,
       token: session?.token || null,
       workspace,

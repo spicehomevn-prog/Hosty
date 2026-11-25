@@ -4,7 +4,7 @@
 import { scrypt as _scrypt, randomBytes, createHmac, createHash, timingSafeEqual, randomInt } from 'node:crypto';
 import { promisify } from 'node:util';
 import { getJSON, updateJSON } from './_store.js';
-import { normPhone } from '../src/lib/plan.js';
+import { normPhone, hasFeature, planExpired, planOf, PRO_FEATURES } from '../src/lib/plan.js';
 import { HttpError } from './_http.js';
 
 const scrypt = promisify(_scrypt);
@@ -98,11 +98,17 @@ export async function getWorkspace(ws) {
     || (await loadWorkspaces({ fresh: true })).workspaces.find((w) => w.id === ws) || null;
 }
 export const wsExists = async (ws) => !!(await getWorkspace(ws));
-/** Chặn tính năng Pro với cơ sở dùng thử */
-export async function requirePro(ws, feature = 'Tính năng này') {
+/** Chặn tính năng không có trong gói của cơ sở (hoặc gói đã hết hạn) */
+export async function requireFeature(ws, feature) {
   const w = await getWorkspace(ws);
   if (!w) throw new HttpError(404, 'Cơ sở không còn tồn tại');
-  if (w.plan === 'trial') throw new HttpError(403, `${feature} chỉ có ở gói Pro – nâng cấp tài khoản Pro để kích hoạt`, { pro: true });
+  const label = PRO_FEATURES[feature] || 'Tính năng này';
+  if (!hasFeature(w, feature)) {
+    throw new HttpError(403, feature === 'ota'
+      ? `${label} chỉ có ở tài khoản VIP`
+      : `${label} không có ở gói ${planOf(w).name} – nâng cấp gói trả phí để kích hoạt`, { pro: true });
+  }
+  if (planExpired(w)) throw new HttpError(403, `Gói ${planOf(w).name} đã hết hạn – gia hạn để tiếp tục`, { expired: true });
   return w;
 }
 
@@ -199,7 +205,9 @@ export function canAccess(user, wsId) {
 /** Danh sách cơ sở mà user được thấy */
 export async function workspacesFor(user) {
   const { workspaces } = await loadWorkspaces();
-  return user.role === 'owner' ? workspaces : workspaces.filter((w) => w.id === user.ws);
+  if (user.role === 'owner') return workspaces;
+  // người trong cơ sở: không gửi lịch sử thanh toán / thông tin người đăng ký
+  return workspaces.filter((w) => w.id === user.ws).map(({ payments, contact, ...w }) => w); // eslint-disable-line no-unused-vars
 }
 
 export { checkPassword };

@@ -16,6 +16,7 @@ import { balanceDue } from '../src/lib/fin.js';
 import { fmtShort } from '../src/lib/money.js';
 import { eventsOf } from './_feeds.js';
 import { loadWorkspaces } from './_auth.js';
+import { hasFeature, planExpired } from '../src/lib/plan.js';
 
 const INDEX = 'notify/index.json';
 const pFile = (uid) => `notify/push/${uid}.json`;
@@ -196,7 +197,8 @@ export function cronCtx() {
     users: () => once('users', validUsers),
     workspaces: () => once('wss', () => loadWorkspaces().then((r) => r.workspaces)),
     /** cơ sở gói dùng thử (không có thông báo đẩy) */
-    trial: () => once('trial', () => loadWorkspaces().then((r) => new Set(r.workspaces.filter((w) => w.plan === 'trial').map((w) => w.id)))),
+    // cơ sở không được gửi thông báo: gói không có thông báo đẩy (dùng thử) hoặc gói đã hết hạn
+    trial: () => once('trial', () => loadWorkspaces().then((r) => new Set(r.workspaces.filter((w) => !hasFeature(w, 'push') || planExpired(w)).map((w) => w.id)))),
     sent: () => once('sent', () => getJSON(SENT, { etag: false }).then((r) => r?.data || {})),
     ws: (id) => once(`ws:${id}`, () => getJSON(wsFile(id), { etag: false, cache: true }).then((r) => r?.data?.data || null)),
     fin: (id) => once(`fin:${id}`, () => getJSON(`fin/${id}.json`, { etag: false, cache: true }).then((r) => r?.data?.data || {})),

@@ -184,6 +184,7 @@ export function HistorySheet({ month, onClose }) {
 /* ---------- Cài đặt tài chính: phí sàn, thuế ---------- */
 export function FinanceSettings({ onClose, onOpenRates, focus }) {
   const { fin, dispatch } = useFinance();
+  const { plan } = useSession();
   // mở từ Bảng giá ("Cập nhật tự động từ sàn"): cuộn tới mục Giá các sàn theo ngày (Apify)
   useEffect(() => {
     if (focus !== 'ota') return undefined;
@@ -230,7 +231,8 @@ export function FinanceSettings({ onClose, onOpenRates, focus }) {
       <p className="tiny muted">Đặt giá một đêm cho từng phòng theo ngày. Đặt phòng từ sàn sẽ tự tính giá = tổng giá các đêm. Đặt phòng có giá trong file báo cáo hoặc nhập tay thì giữ nguyên.</p>
       <button className="btn ghost block" onClick={onOpenRates}><Pricing size={16} /> Mở bảng giá</button>
 
-      <OtaRates />
+      {/* giá tự động từ sàn (Apify): chỉ tài khoản VIP */}
+      {plan.has('ota') && <OtaRates />}
     </Sheet>
   );
 }

@@ -1383,3 +1383,25 @@ input.switch:checked::after { transform: translateX(18px); }
 .ota-head.flash { background: var(--violet-soft, #F3EEFF); box-shadow: 0 0 0 6px var(--violet-soft, #F3EEFF); }
 .listing-add { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
 .listing-add .mini-chip { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Gói dịch vụ: thẻ chọn gói (hộp nâng cấp), nhãn gói, quản lý gói (chủ hệ thống) */
+.plan-cards { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
+.plan-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 12px 14px; border-radius: var(--r-sm, 14px); border: 1.5px solid var(--line); background: #fff; font: inherit; color: inherit; cursor: pointer; }
+.plan-card.on { border-color: #7C5CE6; background: var(--violet-soft, #F3EEFF); box-shadow: 0 0 0 2px #7C5CE633; }
+.plan-card .pc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.plan-card .pc-top { display: flex; align-items: center; gap: 8px; }
+.plan-card .pc-top b { font-size: 16px; }
+.plan-card .pc-cur { font-style: normal; font-size: 11px; font-weight: 700; color: #16875F; background: #E4F7EE; padding: 1px 7px; border-radius: 999px; }
+.plan-card .pc-main small { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.plan-card .pc-price { flex: none; text-align: right; font-family: var(--font-head, inherit); font-size: 19px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-card .pc-price small { display: block; font-size: 11px; color: var(--muted); font-family: inherit; }
+.plan-months { margin-bottom: 8px; }
+.plan-total { margin: 0 0 12px; font-size: 15px; }
+.plan-total b { font-size: 18px; }
+.plan-total small { color: var(--muted); }
+.trial-pill.paid { background: #E4F7EE; color: #16875F; }
+.trial-pill.soon { background: #FFF1DC; color: #8A5200; }
+.trial-pill:disabled { cursor: default; }
+.plan-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.plan-pick .input { width: auto; height: 32px; }
+.plan-pay { flex-basis: 100%; }

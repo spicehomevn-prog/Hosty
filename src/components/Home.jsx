@@ -164,7 +164,7 @@ function LockedFinanceTiles() {
         <span className="hero-ico"><Revenue size={18} /></span>
         <span className="hero-label">Doanh thu tháng này</span>
         <b className="hero-num">•••</b>
-        <span className="hero-sub">Tính năng Pro</span>
+        <span className="hero-sub">Gói trả phí</span>
         <span className="hero-deco" aria-hidden="true" />
       </button>
       <button className="hero pink locked" onClick={() => openUpgrade('finance')}>
@@ -172,7 +172,7 @@ function LockedFinanceTiles() {
         <span className="hero-ico"><Payments size={18} /></span>
         <span className="hero-label">Còn phải thu</span>
         <b className="hero-num">•••</b>
-        <span className="hero-sub">Tính năng Pro</span>
+        <span className="hero-sub">Gói trả phí</span>
         <span className="hero-deco" aria-hidden="true" />
       </button>
     </div>

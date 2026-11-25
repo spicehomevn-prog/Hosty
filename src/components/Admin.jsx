@@ -4,7 +4,8 @@ import { useSession } from '../lib/session.jsx';
 import { ROLE_LABEL } from '../lib/perm.js';
 import { Sheet, toast } from './ui.jsx';
 import { CredentialsSheet } from './Credentials.jsx';
-import { isTrial, trialExpired, trialDaysLeft, TRIAL } from '../lib/plan.js';
+import { TRIAL, PLANS, PAID, COMBOS, comboPrice, planId, planExpired, planDaysLeft, planEnds } from '../lib/plan.js';
+import { fmtVND } from '../lib/money.js';
 
 const TONES = ['violet', 'yellow', 'pink', 'blue'];
 
@@ -44,19 +45,52 @@ function AccountRow({ a, ws, act }) {
 }
 
 /** Quản lý cơ sở & tài khoản — chỉ chủ hệ thống */
-/** Gói của cơ sở: Pro / Dùng thử (còn X ngày / hết hạn) + người đăng ký + nút đổi gói */
+/** Gói của cơ sở: chọn gói, hạn dùng, gia hạn 1 / 3 / 6 tháng (ghi lịch sử thanh toán), người đăng ký */
 function PlanRow({ w, act, busy }) {
-  const trial = isTrial(w);
-  const exp = trialExpired(w);
+  const id = planId(w);
+  const P = PLANS[id];
+  const exp = planExpired(w);
+  const ends = planEnds(w);
+  const left = planDaysLeft(w);
+  const paid = PAID.includes(id);
+  const legacy = !w.plan || w.plan === 'pro';
+  const state = exp ? 'bad' : id === 'trial' ? 'trial' : 'pro';
+  const setPlan = (plan) => {
+    if (plan === id && !legacy) return;
+    const txt = plan === 'trial' ? `Chuyển "${w.name}" về dùng thử (${TRIAL.days} ngày, khoá Tài chính, Thông báo đẩy, tối đa ${TRIAL.maxRooms} phòng)?`
+      : plan === 'vip' ? `Đặt "${w.name}" là VIP (đủ tính năng, không giới hạn, có giá tự động từ sàn)?`
+        : `Đổi "${w.name}" sang gói ${PLANS[plan].name}?${!w.paidUntil ? ' Hạn dùng đầu tiên: 1 tháng.' : ''}`;
+    if (confirm(txt)) act('set-plan', { id: w.id, plan });
+  };
   return (
-    <div className={`plan-row ${trial ? (exp ? 'bad' : 'trial') : 'pro'}`}>
-      <span className="plan-tag">{trial ? (exp ? 'Dùng thử · hết hạn' : `Dùng thử · còn ${trialDaysLeft(w)} ngày`) : 'Pro'}</span>
-      {w.contact && <span className="plan-contact">{w.contact.name} · <a href={`tel:${w.contact.phone}`}>{w.contact.phone}</a>{w.signupAt ? ` · đăng ký ${new Date(w.signupAt).toLocaleDateString('vi-VN')}` : ''}</span>}
-      <span className="row gap8 wrap">
-        {trial && <button className="btn tiny primary" disabled={busy} onClick={() => act('set-plan', { id: w.id, plan: 'pro' })}>Nâng cấp Pro</button>}
-        {trial && <button className="btn tiny" disabled={busy} onClick={() => act('extend-trial', { id: w.id, days: TRIAL.days })}>Gia hạn {TRIAL.days} ngày</button>}
-        {!trial && <button className="btn tiny" disabled={busy} onClick={() => { if (confirm(`Chuyển "${w.name}" về gói dùng thử (${TRIAL.days} ngày, khoá Tài chính, Thông báo đẩy, giới hạn ${TRIAL.maxRooms} phòng)?`)) act('set-plan', { id: w.id, plan: 'trial' }); }}>Về dùng thử</button>}
+    <div className={`plan-row ${state}`}>
+      <span className="plan-tag">
+        {P.name}{legacy ? ' (mặc định)' : ''}
+        {exp ? ' · hết hạn' : left != null ? ` · còn ${left} ngày` : ''}
+        {ends ? ` · tới ${new Date(ends).toLocaleDateString('vi-VN')}` : (paid || id === 'vip' ? ' · không hạn' : '')}
       </span>
+      {w.contact && <span className="plan-contact">{w.contact.name} · <a href={`tel:${w.contact.phone}`}>{w.contact.phone}</a>{w.signupAt ? ` · đăng ký ${new Date(w.signupAt).toLocaleDateString('vi-VN')}` : ''}</span>}
+      <label className="plan-pick">
+        <span>Gói</span>
+        <select className="input sm" value={legacy ? '' : id} disabled={busy} onChange={(e) => e.target.value && setPlan(e.target.value)}>
+          {legacy && <option value="">Cao cấp (mặc định, chưa chọn)</option>}
+          {['trial', ...PAID, 'vip'].map((k) => <option key={k} value={k}>{PLANS[k].name}{PLANS[k].price ? ` – ${fmtVND(PLANS[k].price)}/tháng` : ''}</option>)}
+        </select>
+      </label>
+      <span className="row gap8 wrap">
+        {id === 'trial' && <button className="btn tiny" disabled={busy} onClick={() => act('extend-trial', { id: w.id, days: TRIAL.days })}>Gia hạn dùng thử {TRIAL.days} ngày</button>}
+        {paid && !legacy && COMBOS.map((c) => (
+          <button key={c.months} className="btn tiny" disabled={busy}
+            onClick={() => { if (confirm(`Gia hạn "${w.name}" gói ${P.name} thêm ${c.months} tháng – đã nhận ${fmtVND(comboPrice(id, c.months))}?`)) act('extend-paid', { id: w.id, months: c.months }); }}>
+            +{c.months} tháng · {fmtVND(comboPrice(id, c.months))}
+          </button>
+        ))}
+      </span>
+      {w.payments?.length > 0 && (
+        <span className="plan-pay tiny muted">
+          Đã thu: {w.payments.slice(0, 3).map((p) => `${new Date(p.at).toLocaleDateString('vi-VN')} ${PLANS[p.plan]?.name || p.plan} ${p.months}th ${fmtVND(p.amount)}`).join(' · ')}
+        </span>
+      )}
     </div>
   );
 }

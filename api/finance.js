@@ -7,7 +7,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { route, send, readBody, query, HttpError, MAX_BYTES } from './_http.js';
 import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
-import { requireUser, canAccess, loadWorkspaces, envClean, requirePro, wsFile } from './_auth.js';
+import { requireUser, canAccess, loadWorkspaces, envClean, requireFeature, wsFile } from './_auth.js';
+import { isVip } from '../src/lib/plan.js';
 import {
   resolveAirbnb, runAirbnbCalendars, resolveBooking, runBookingCalendars, agodaId, runAgodaNights, parseAgodaNight, usdVnd,
   OtaError, AIRBNB_COST, BOOKING_COST, AGODA_COST, OTA_MONTHS,
@@ -23,7 +24,7 @@ async function requireFinance(req, ws) {
   const user = await requireUser(req);
   if (user.role !== 'owner' && user.role !== 'admin') throw new HttpError(403, 'Chỉ chủ hệ thống và admin cơ sở xem được tài chính');
   if (!ws || !canAccess(user, ws)) throw new HttpError(403, 'Không có quyền với cơ sở này');
-  await requirePro(ws, 'Tài chính'); // gói dùng thử không có Tài chính / cập nhật giá phòng
+  await requireFeature(ws, 'finance'); // gói dùng thử không có Tài chính; gói hết hạn bị chặn
   return user;
 }
 
@@ -240,7 +241,7 @@ export default route(async (req, res) => {
     const { workspaces } = await loadWorkspaces();
     const done = [];
     for (const w of workspaces) {
-      if (w.plan === 'trial') continue;
+      if (!isVip(w)) continue; // giá tự động từ sàn (Apify) chỉ có ở tài khoản VIP
       const cur = await getJSON(finFile(w.id), { etag: false, cache: true });
       if (!hasLinks(cur?.data?.data?.otaListings)) continue;
       try { await updateOta(w.id, 'Tự cập nhật hằng tháng'); done.push(w.id); } catch (e) { console.error('ota', w.id, e.message); }
@@ -253,6 +254,7 @@ export default route(async (req, res) => {
     const ws = q.get('ws');
     const user = await requireFinance(req, ws);
     if (q.get('action') !== 'ota') throw new HttpError(400, 'Thao tác không hợp lệ');
+    await requireFeature(ws, 'ota'); // chỉ VIP
     // nút bấm tay: tối đa 2 lần / tháng / cơ sở (chủ hệ thống không giới hạn); lượt không lấy được giá nào được trả lại
     const ticket = user.role === 'owner' ? 0 : await takeManualRun(ws, user.name || user.username);
     let doc;

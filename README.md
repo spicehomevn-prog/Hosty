@@ -60,11 +60,23 @@ Máy chủ tự đọc lịch iCal của các sàn (tối đa 1 lần/giờ) đ�
 
 Ngoài ra trong form task vẫn có **Thêm tay vào lịch** (.ics cho iPhone, link Google Calendar) – thêm một lần, không tự cập nhật.
 
-## Gói dùng thử & Pro
-- Màn đăng nhập có nút **Đăng ký tài khoản dùng thử miễn phí**: khách nhập tên cơ sở, họ tên, SĐT, mật khẩu → hệ thống tự tạo cơ sở gói **dùng thử 14 ngày** + tài khoản admin (đăng nhập bằng SĐT). Chống spam: tối đa 3 lần đăng ký / IP / ngày, tối đa 200 cơ sở dùng thử.
-- Gói dùng thử: **không có** Tài chính, Thông báo đẩy, Cập nhật giá phòng; tối đa **5 phòng, 1 địa điểm, 1 nhân viên dọn phòng** (admin tự thêm ở Cơ sở → Tài khoản). Giao diện vẫn hiện đủ, có biểu tượng khoá → bấm sẽ hiện hộp *Nâng cấp tài khoản Pro*. Máy chủ cũng chặn các API tương ứng.
-- Hết 14 ngày: dữ liệu **chỉ xem** cho tới khi nâng cấp.
-- Chủ hệ thống nâng cấp trong **Quản lý tài khoản** (Nâng cấp Pro / Gia hạn 14 ngày / Về dùng thử), xem tên + SĐT người đăng ký. Cơ sở cũ (tạo trước khi có tính năng này) là **Pro**.
+## Gói dịch vụ
+| Gói | Phòng | Địa điểm | Nhân viên | 1 tháng | 3 tháng (−5%) | 6 tháng (−8%) |
+|---|---|---|---|---|---|---|
+| Dùng thử 14 ngày | 5 | 1 | 1 | miễn phí | | |
+| Cơ bản | 5 | 1 | 2 | 65.000 ₫ | 185.000 ₫ | 359.000 ₫ |
+| Nâng cao | 15 | không giới hạn | 5 | 129.000 ₫ | 368.000 ₫ | 712.000 ₫ |
+| Cao cấp | 30 | không giới hạn | 10 | 199.000 ₫ | 567.000 ₫ | 1.098.000 ₫ |
+| VIP | không giới hạn | không giới hạn | không giới hạn | chủ hệ thống gán | | |
+
+- Giá chưa gồm VAT, combo làm tròn tới nghìn. Bảng giá và giới hạn nằm ở `src/lib/plan.js` (dùng chung app + máy chủ).
+- Dùng thử: **không có** Tài chính, Thông báo đẩy, Bảng giá. Gói trả phí có đủ. **Giá tự động từ sàn (Apify) chỉ có ở VIP** (cơ sở riêng của chủ, ví dụ Spicehome).
+- Màn đăng nhập có nút **Đăng ký tài khoản dùng thử miễn phí**: khách nhập tên cơ sở, họ tên, SĐT, mật khẩu → hệ thống tự tạo cơ sở dùng thử + tài khoản admin (đăng nhập bằng SĐT). Chống spam: tối đa 3 lần đăng ký / IP / ngày, tối đa 200 cơ sở dùng thử.
+- Hết hạn (dùng thử hoặc gói trả phí): dữ liệu **chỉ xem** cho tới khi gia hạn. Máy chủ chặn ghi, tài chính, thông báo.
+- Giới hạn phòng / địa điểm chỉ chặn khi **thêm** vượt giới hạn: cơ sở cũ có sẵn nhiều phòng vẫn sửa được. Admin cơ sở tự thêm nhân viên trong giới hạn gói (Cơ sở → Tài khoản).
+- Khách bấm khoá / nhãn gói → hộp **Gói Hostexa**: chọn gói + 1/3/6 tháng → nút Zalo copy sẵn lời nhắn có gói và số tiền. Thu tiền thủ công.
+- Chủ hệ thống: **Quản lý tài khoản** → chọn gói cho từng cơ sở, bấm **+1 / +3 / +6 tháng** khi nhận tiền (cộng từ hạn hiện tại, ghi lịch sử thanh toán). Lần đầu chọn gói trả phí: hạn 1 tháng.
+- Cơ sở cũ chưa có gói (hoặc gói `pro` cũ) = **Cao cấp, không hạn** cho tới khi chủ hệ thống chọn gói. Nhớ chọn **VIP** cho Spicehome.
 - Số Zalo nhận yêu cầu nâng cấp: `UPGRADE_ZALO` trong `site.config.js` (hoặc biến `VITE_UPGRADE_ZALO` lúc build).
 - Chế độ xem thử với dữ liệu mẫu vẫn còn qua đường dẫn `/?demo` (để làm video, ảnh hướng dẫn).
 

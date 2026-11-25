@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Settings2, Upload, Plus, AlertTriangle, Revenue, Payments, Reports, Pencil, History, Users, Trash2, Pricing } from '../lib/icons.jsx';
 import { useStore, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
+import { useSession } from '../lib/session.jsx';
 import { getBookings, roomIndex } from '../lib/derive.js';
 import { ledger, monthSummary, platformOrder, SOURCE_SHORT } from '../lib/fin.js';
 import { fmtVND, fmtShort } from '../lib/money.js';
@@ -16,6 +17,7 @@ const shiftMonth = (m, n) => addMonths(`${m}-01`, n).slice(0, 7);
 const mLabel = (m) => `T${Number(m.slice(5))}`;
 
 export default function Finance({ api }) {
+  const sess = useSession();
   const { state } = useStore();
   const finance = useFinance();
   const { fin, dispatch } = finance;
@@ -216,7 +218,7 @@ export default function Finance({ api }) {
       {sheet?.type === 'expense' && <ExpenseSheet expense={sheet.data} month={month} onClose={() => setSheet(null)} />}
       {sheet?.type === 'history' && <HistorySheet month={sheet.data} onClose={() => setSheet(null)} />}
       {sheet?.type === 'settings' && <FinanceSettings onClose={() => setSheet(null)} onOpenRates={() => open('rates')} focus={sheet.data} />}
-      {sheet?.type === 'rates' && <RateCalendar onClose={() => setSheet(null)} initialRoom={sheet.data} onOpenOta={() => open('settings', 'ota')} />}
+      {sheet?.type === 'rates' && <RateCalendar onClose={() => setSheet(null)} initialRoom={sheet.data} onOpenOta={sess.plan.has('ota') ? () => open('settings', 'ota') : null} />}
       {sheet?.type === 'import' && <ImportReport month={month} onClose={() => setSheet(null)} />}
     </div>
   );

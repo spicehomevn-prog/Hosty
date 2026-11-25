@@ -11,7 +11,7 @@ import {
   login, requireUser, workspacesFor, canAccess, loadAccounts, loadWorkspaces, hashPassword, checkPassword, ACCOUNTS, envClean,
 } from './_auth.js';
 import { createAccount, createWorkspace } from './_accounts.js';
-import { TRIAL, isTrial, trialExpired, normPhone } from '../src/lib/plan.js';
+import { TRIAL, isTrial, planExpired, planOf, normPhone } from '../src/lib/plan.js';
 
 const SIGNUPS = 'signups.json';
 const MAX_PER_IP_DAY = 3;
@@ -49,18 +49,18 @@ async function signup(req, b) {
   return { token: r.token, user: r.user, workspaces: await workspacesFor(r.user) };
 }
 
-/** Admin cơ sở dùng thử tự quản lý nhân viên dọn phòng (tối đa TRIAL.maxMembers) */
-async function trialAdmin(req, b) {
+/** Admin cơ sở tự quản lý nhân viên dọn phòng (tối đa theo gói: dùng thử 1, Cơ bản 2, Nâng cao 5, Cao cấp 10, VIP không giới hạn) */
+async function planAdmin(req, b) {
   const user = await requireUser(req);
   if (user.role !== 'admin' || !canAccess(user, b.ws)) throw new HttpError(403, 'Chỉ admin cơ sở được thực hiện');
   const ws = (await loadWorkspaces({ fresh: true })).workspaces.find((w) => w.id === b.ws);
   if (!ws) throw new HttpError(404, 'Không tìm thấy cơ sở');
-  if (!isTrial(ws)) throw new HttpError(403, 'Cơ sở gói Pro: liên hệ chủ hệ thống để thêm tài khoản');
-  if (trialExpired(ws)) throw new HttpError(403, 'Hết hạn dùng thử – nâng cấp Pro để tiếp tục');
+  const plan = planOf(ws);
+  if (planExpired(ws)) throw new HttpError(403, `Gói ${plan.name} đã hết hạn – gia hạn để tiếp tục`);
   const { accounts } = await loadAccounts({ fresh: true });
   const members = accounts.filter((a) => a.ws === ws.id && a.role === 'member');
   if (b.action === 'add-member') {
-    if (members.length >= TRIAL.maxMembers) throw new HttpError(400, `Gói dùng thử tối đa ${TRIAL.maxMembers} nhân viên – nâng cấp Pro để thêm`);
+    if (members.length >= plan.maxMembers) throw new HttpError(400, `Gói ${plan.name} tối đa ${plan.maxMembers} nhân viên – nâng cấp gói để thêm`, { pro: true });
     return createAccount({ ws: ws.id, role: 'member', name: String(b.name || '').trim().slice(0, 60) || 'Nhân viên dọn phòng' });
   }
   if (!members.some((a) => a.id === b.id)) throw new HttpError(404, 'Không tìm thấy nhân viên');
@@ -86,7 +86,7 @@ export default route(async (req, res) => {
   if (req.method === 'POST') {
     const body = await readBody(req);
     if (body.action === 'signup') return send(res, 200, await signup(req, body));
-    if (body.action === 'add-member' || body.action === 'remove-member') return send(res, 200, await trialAdmin(req, body));
+    if (body.action === 'add-member' || body.action === 'remove-member') return send(res, 200, await planAdmin(req, body));
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
       return send(res, 200, { token, user, workspaces: await workspacesFor(user) });

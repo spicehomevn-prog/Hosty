@@ -7,13 +7,13 @@ import { timeAgo } from '../lib/dates.js';
 import { Sheet, Field, toast } from './ui.jsx';
 import { AdminSheet } from './Admin.jsx';
 import { openUpgrade } from './Upgrade.jsx';
-import { TRIAL } from '../lib/plan.js';
 import { useMembers } from '../lib/members.js';
 import { Lock, Copy, Trash2, Plus } from '../lib/icons.jsx';
 
-/** Admin cơ sở dùng thử: tự thêm / xoá tối đa TRIAL.maxMembers nhân viên dọn phòng */
-function TrialMembers() {
+/** Admin cơ sở tự thêm / xoá nhân viên dọn phòng, tối đa theo gói (dùng thử 1, Cơ bản 2, Nâng cao 5, Cao cấp 10, VIP không giới hạn) */
+function PlanMembers() {
   const s = useSession();
+  const max = s.plan.limits.maxMembers;
   const members = useMembers().filter((m) => m.role === 'member');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,7 +22,7 @@ function TrialMembers() {
   const [list, setList] = useState(null); // danh sách sau khi thêm / xoá (khỏi chờ tải lại)
   const shown = list || members;
   const add = async () => {
-    if (shown.length >= TRIAL.maxMembers) { openUpgrade('members'); return; }
+    if (shown.length >= max) { openUpgrade('members'); return; }
     setBusy(true); setErr('');
     try {
       const r = await s.call('/api/auth', { method: 'POST', body: { action: 'add-member', ws: s.workspace.id, name: name.trim() } });
@@ -40,7 +40,7 @@ function TrialMembers() {
   };
   return (
     <div className="trial-members">
-      <div className="row-between"><b>Nhân viên dọn phòng</b><span className="tiny muted">{shown.length}/{TRIAL.maxMembers}</span></div>
+      <div className="row-between"><b>Nhân viên dọn phòng</b><span className="tiny muted">{Number.isFinite(max) ? `${shown.length}/${max}` : shown.length}</span></div>
       {shown.map((m) => (
         <div key={m.id} className="tm-row">
           <span><b>{m.name}</b><small className="mono">{m.username}</small></span>
@@ -53,16 +53,34 @@ function TrialMembers() {
           <button className="btn tiny" onClick={copy}><Copy size={14} /> Copy gửi Zalo</button>
         </div>
       )}
-      {shown.length < TRIAL.maxMembers ? (
+      {shown.length < max ? (
         <div className="row gap8">
           <input className="input sm" placeholder="Tên nhân viên" value={name} onChange={(e) => setName(e.target.value)} />
           <button className="btn tiny primary" onClick={add} disabled={busy}>{busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} Thêm</button>
         </div>
       ) : (
-        <button className="btn tiny" onClick={() => openUpgrade('members')}><Lock size={14} /> Thêm nhân viên (Pro)</button>
+        <button className="btn tiny" onClick={() => openUpgrade('members')}><Lock size={14} /> Thêm nhân viên (nâng cấp gói)</button>
       )}
       {err && <p className="form-error">{err}</p>}
     </div>
+  );
+}
+
+/** Nhãn gói của cơ sở: tên gói, hạn dùng; bấm để gia hạn / nâng cấp */
+function PlanPill({ plan }) {
+  const soon = plan.daysLeft != null && plan.daysLeft <= 5;
+  const end = plan.ends ? new Date(plan.ends).toLocaleDateString('vi-VN') : '';
+  let text;
+  if (plan.expired) text = plan.trial ? 'Hết hạn dùng thử – chỉ xem' : `Gói ${plan.name} đã hết hạn ${end} – chỉ xem`;
+  else if (plan.trial) text = `Dùng thử · còn ${plan.daysLeft} ngày`;
+  else if (plan.vip) text = 'Tài khoản VIP · đủ tính năng';
+  else text = `Gói ${plan.name}${end ? ` · dùng tới ${end}` : ''}${soon ? ` (còn ${plan.daysLeft} ngày)` : ''}`;
+  const cta = plan.vip ? '' : plan.trial ? 'Chọn gói' : plan.expired || soon ? 'Gia hạn' : 'Đổi gói';
+  return (
+    <button className={`trial-pill ${plan.expired ? 'bad' : ''} ${!plan.trial && !plan.expired ? 'paid' : ''} ${soon && !plan.expired ? 'soon' : ''}`}
+      onClick={() => !plan.vip && openUpgrade(null)} disabled={plan.vip}>
+      {plan.trial || plan.expired ? <Lock size={14} /> : <CheckCircle2 size={14} />} {text}{cta && <> · <b>{cta}</b></>}
+    </button>
   );
 }
 
@@ -151,12 +169,8 @@ export function AccountCard() {
         <span>Cơ sở đang mở</span>
         <b>{s.workspace?.name}</b>
       </div>
-      {s.plan.trial && (
-        <button className={`trial-pill ${s.plan.expired ? 'bad' : ''}`} onClick={() => openUpgrade(null)}>
-          <Lock size={14} /> {s.plan.expired ? 'Hết hạn dùng thử – chỉ xem' : `Dùng thử · còn ${s.plan.daysLeft} ngày`} · <b>Nâng cấp Pro</b>
-        </button>
-      )}
-      {s.plan.trial && !s.plan.expired && s.user?.role === 'admin' && <TrialMembers />}
+      {s.role !== 'demo' && s.workspace && <PlanPill plan={s.plan} />}
+      {!s.plan.expired && s.user?.role === 'admin' && <PlanMembers />}
       <SyncStatus />
       <p className="tiny muted">Tự đồng bộ mỗi 15 phút, khi mở app, khi chuyển app xuống nền và ngay sau khi bạn sửa.</p>
       <div className="row gap8 wrap">

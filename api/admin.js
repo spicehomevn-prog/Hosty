@@ -8,7 +8,17 @@ import {
   ACCOUNTS, WORKSPACES, wsFile,
 } from './_auth.js';
 import { createAccount, createWorkspace, RESERVED } from './_accounts.js';
-import { TRIAL } from '../src/lib/plan.js';
+import { TRIAL, PLANS, PAID, COMBOS, comboPrice } from '../src/lib/plan.js';
+
+/** Cộng n tháng (theo lịch, giờ VN) vào mốc ms */
+const addMonthsMs = (t, n) => {
+  const d = new Date(t + 7 * 3600e3);
+  const day = d.getUTCDate();
+  d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
+  return d.getTime() - 7 * 3600e3;
+};
 
 export default route(async (req, res) => {
   const user = await requireUser(req);
@@ -48,16 +58,35 @@ export default route(async (req, res) => {
       await delJSON(`fin/${b.id}.json`);
       return send(res, 200, { ok: true });
     }
-    // gói của cơ sở: { id, plan: 'pro' | 'trial' }  ·  gia hạn dùng thử: { id, days }
+    // gói của cơ sở: { id, plan: trial | basic | advanced | premium | vip }
     case 'set-plan': {
-      if (!['pro', 'trial'].includes(b.plan)) throw new HttpError(400, 'Gói không hợp lệ');
+      if (!PLANS[b.plan]) throw new HttpError(400, 'Gói không hợp lệ');
       let ws;
       await updateJSON(WORKSPACES, (d) => {
         ws = d.workspaces.find((w) => w.id === b.id);
         if (!ws) throw new HttpError(404, 'Không tìm thấy cơ sở');
         ws.plan = b.plan;
+        ws.planAt = Date.now();
         if (b.plan === 'trial' && !ws.trialEnds) ws.trialEnds = Date.now() + TRIAL.days * 864e5;
-        if (b.plan === 'pro') ws.proAt = Date.now();
+        // gói trả phí lần đầu: 1 tháng
+        if (PAID.includes(b.plan) && !ws.paidUntil) ws.paidUntil = addMonthsMs(Date.now(), 1);
+        return d;
+      }, { workspaces: [] });
+      return send(res, 200, { workspace: ws });
+    }
+    // gia hạn gói trả phí: { id, months: 1 | 3 | 6 } – cộng từ hạn hiện tại (hoặc từ hôm nay nếu đã hết hạn), ghi lịch sử thanh toán
+    case 'extend-paid': {
+      const months = Number(b.months);
+      if (!COMBOS.some((c) => c.months === months)) throw new HttpError(400, 'Kỳ hạn không hợp lệ');
+      let ws;
+      await updateJSON(WORKSPACES, (d) => {
+        ws = d.workspaces.find((w) => w.id === b.id);
+        if (!ws) throw new HttpError(404, 'Không tìm thấy cơ sở');
+        const plan = PAID.includes(ws.plan) ? ws.plan : PAID.includes(b.plan) ? b.plan : null;
+        if (!plan) throw new HttpError(400, 'Chọn gói Cơ bản / Nâng cao / Cao cấp trước khi gia hạn');
+        ws.plan = plan;
+        ws.paidUntil = addMonthsMs(Math.max(Date.now(), ws.paidUntil || 0), months);
+        ws.payments = [{ at: Date.now(), plan, months, amount: comboPrice(plan, months) }, ...(ws.payments || [])].slice(0, 24);
         return d;
       }, { workspaces: [] });
       return send(res, 200, { workspace: ws });

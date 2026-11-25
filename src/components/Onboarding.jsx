@@ -4,7 +4,6 @@ import { useStore, uid, PLATFORMS, LOCATION_EMOJI, platformColor, loadLegacy } f
 import { Stepper, Field } from './ui.jsx';
 import { openUpgrade } from './Upgrade.jsx';
 import { useSession } from '../lib/session.jsx';
-import { TRIAL } from '../lib/plan.js';
 import { LogoMark } from './Logo.jsx';
 
 const STEPS = ['welcome', 'name', 'count', 'locations', 'calendars', 'finish']; // bước 0 (màn chào) đã chuyển sang trang Đăng nhập
@@ -14,7 +13,7 @@ const newLocation = (i) => ({ id: uid(), name: '', address: '', emoji: LOCATION_
 function TrialLimit({ text, feature }) {
   return (
     <button type="button" className="trial-limit" onClick={() => openUpgrade(feature)}>
-      <Lock size={14} /> {text} · <b>Nâng cấp Pro để thêm</b>
+      <Lock size={14} /> {text} · <b>Nâng cấp gói để thêm</b>
     </button>
   );
 }
@@ -35,11 +34,12 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
 
   const key = STEPS[step];
 
-  // gói dùng thử: tối đa 1 địa điểm, 5 phòng -> vượt thì mở hộp nâng cấp, không thêm
+  // giới hạn phòng / địa điểm theo gói -> vượt thì mở hộp nâng cấp, không thêm
   const { plan } = useSession();
+  const lim = plan.limits;
   const roomTotal = locations.reduce((n, l) => n + l.rooms.length, 0);
   const setCount = (n) => {
-    if (plan.trial && n > TRIAL.maxLocations) { openUpgrade('locations'); return; }
+    if (n > lim.maxLocations && n > state.locations.length) { openUpgrade('locations'); return; }
     setLocations((ls) => {
       const next = ls.slice(0, n);
       while (next.length < n) next.push(newLocation(next.length));
@@ -48,7 +48,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
   };
   const updLoc = (id, patch) => setLocations((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   const setRoomCount = (loc, n) => {
-    if (plan.trial && n > loc.rooms.length && roomTotal - loc.rooms.length + n > TRIAL.maxRooms) { openUpgrade('rooms'); return; }
+    if (n > loc.rooms.length && roomTotal - loc.rooms.length + n > lim.maxRooms) { openUpgrade('rooms'); return; }
     const rooms = loc.rooms.slice(0, n);
     while (rooms.length < n) rooms.push({ id: uid(), name: `Phòng ${rooms.length + 1}` });
     updLoc(loc.id, { rooms });
@@ -144,7 +144,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
           <h2>Bạn có bao nhiêu địa điểm?</h2>
           <p className="muted">Mỗi địa điểm là một toà nhà / chi nhánh có địa chỉ riêng.</p>
           <div className="big-stepper"><Stepper value={locations.length} onChange={setCount} min={1} max={20} /></div>
-          {plan.trial && <TrialLimit text={`Gói dùng thử: tối đa ${TRIAL.maxLocations} địa điểm`} feature="locations" />}
+          {Number.isFinite(lim.maxLocations) && <TrialLimit text={`Gói ${plan.name}: tối đa ${lim.maxLocations} địa điểm`} feature="locations" />}
           <div className="loc-preview">
             {locations.map((l, i) => <span key={l.id} className="loc-pill"><MapPin size={14} />{l.name || `Địa điểm ${i + 1}`}</span>)}
           </div>
@@ -156,7 +156,7 @@ export default function Onboarding({ editing, onDone, onCancel, initialName = ''
           <span className="eyebrow">Câu hỏi 3</span>
           <h2>Địa chỉ & phòng của từng địa điểm</h2>
           <p className="muted">Nhập địa chỉ, số phòng và đặt tên cho từng phòng.</p>
-          {plan.trial && <TrialLimit text={`Gói dùng thử: ${roomTotal}/${TRIAL.maxRooms} phòng`} feature="rooms" />}
+          {Number.isFinite(lim.maxRooms) && <TrialLimit text={`Gói ${plan.name}: ${roomTotal}/${lim.maxRooms} phòng`} feature="rooms" />}
           {locations.map((loc, i) => (
             <div key={loc.id} className={`setup-card tone-${['violet', 'yellow', 'pink', 'blue'][i % 4]}`}>
               <div className="setup-card-head">

@@ -167,7 +167,7 @@ function Workspace() {
     <div className="app">
       {s.plan.expired && (
         <button className="expired-bar" onClick={() => openUpgrade(null)}>
-          Hết hạn dùng thử – dữ liệu chỉ xem. <b>Nâng cấp Pro</b>
+          {s.plan.trial ? 'Hết hạn dùng thử' : `Gói ${s.plan.name} đã hết hạn`} – dữ liệu chỉ xem. <b>{s.plan.trial ? 'Chọn gói' : 'Gia hạn'}</b>
         </button>
       )}
       <main key={tab} className={`page page-${tab}`}>
