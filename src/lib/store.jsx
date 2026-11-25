@@ -26,7 +26,7 @@ export const emptyState = () => ({
   notes: {},
   tasks: [],
   cleanDone: {},
-  cleanAdj: {}, // { [mã thẻ]: { hide: true } | { date: 'YYYY-MM-DD' } } – admin xoá / dời ngày thẻ dọn phòng
+  cleanAdj: {}, // { [mã thẻ]: { hide: true } | { date: 'YYYY-MM-DD' } | { ord: số } } – admin xoá / dời ngày / sắp thứ tự thẻ dọn phòng
   cleanExtra: [], // [{ id, roomId, date, time, note }] – thẻ dọn phòng admin thêm tay
   cleanNotes: {}, // { [mã thẻ]: 'ghi chú riêng của thẻ dọn phòng' }
   settings: { font: 'Be Vietnam Pro', calView: 'month' },
@@ -89,8 +89,17 @@ function reducer(state, a) {
       return { ...state, cleanDone };
     }
     case 'CLEAN_ADJ': {
+      // xoá / dời ngày không làm mất thứ tự thẻ (ord) admin đã kéo thả
       const cleanAdj = { ...(state.cleanAdj || {}) };
-      if (a.patch) cleanAdj[a.id] = a.patch; else delete cleanAdj[a.id];
+      const ord = cleanAdj[a.id]?.ord;
+      const next = a.patch ? { ...a.patch, ...(ord != null ? { ord } : {}) } : (ord != null ? { ord } : null);
+      if (next) cleanAdj[a.id] = next; else delete cleanAdj[a.id];
+      return { ...state, cleanAdj };
+    }
+    case 'CLEAN_ORDER': {
+      // a.orders: { [mã thẻ]: số thứ tự } – admin kéo thả thẻ dọn phòng trong ngày
+      const cleanAdj = { ...(state.cleanAdj || {}) };
+      for (const [id, n] of Object.entries(a.orders || {})) cleanAdj[id] = { ...(cleanAdj[id] || {}), ord: n };
       return { ...state, cleanAdj };
     }
     case 'CLEAN_NOTE': {

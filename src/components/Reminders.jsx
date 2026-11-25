@@ -100,6 +100,7 @@ export function RemindersPanel({ n }) {
   const s = useSession();
   const { info, err, busy, pushOn } = n;
   const owner = s.role === 'owner';
+  const cleaner = s.role === 'member' && s.user?.kind !== 'staff';
 
   if (n.demo) {
     return <p className="tiny muted">Chế độ xem thử không gửi nhắc hẹn. Đăng nhập tài khoản thật để bật thông báo.</p>;
@@ -139,7 +140,7 @@ export function RemindersPanel({ n }) {
         {pushOn && info?.push?.prefs && (
           <div className="rm-prefs">
             <small className="rm-prefs-h">Nhận những thông báo:</small>
-            {PREFS.map((p) => (
+            {PREFS.map((p0) => (cleaner && p0.k === 'daily' ? { ...p0, hint: 'Số phòng trả / nhận phòng trong ngày' } : p0)).map((p) => (
               <label key={p.k} className="rm-pref">
                 <span><b>{p.label}</b><small>{p.hint}</small></span>
                 <input type="checkbox" className="switch" checked={info.push.prefs[p.k] !== false} onChange={(e) => n.setPref(p.k, e.target.checked)} />

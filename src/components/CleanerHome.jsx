@@ -9,7 +9,10 @@ import { LogoMark } from './Logo.jsx';
 import { InboxButton } from './Inbox.jsx';
 import Places from './Places.jsx';
 import { byLocation } from './CleaningPanel.jsx';
-import { MapPin } from '../lib/icons.jsx';
+import { RemindersPanel } from './Reminders.jsx';
+import { useNotify } from '../lib/notify.js';
+import { Sheet } from './ui.jsx';
+import { MapPin, Bell, CheckCircle2, ChevronRight } from '../lib/icons.jsx';
 
 /**
  * Màn hình riêng cho tài khoản Dọn phòng: to, rõ, ít chữ, một thao tác cho mỗi việc.
@@ -28,6 +31,8 @@ const buzz = () => { try { navigator.vibrate?.(30); } catch { /* noop */ } };
 export default function CleanerApp() {
   const [view, setView] = useState(() => (new URLSearchParams(location.search).get('tab') === 'tasks' ? 'tasks' : 'clean'));
   const [off, setOff] = useState(0);
+  const notify = useNotify();
+  const [pushOpen, setPushOpen] = useState(false);
   useEffect(() => { if (location.search) history.replaceState(null, '', location.pathname); }, []);
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return undefined;
@@ -58,10 +63,14 @@ export default function CleanerApp() {
         ) : (
           <>
             <CleanerTop api={api} onAccount={() => setView('account')} />
+            <PushCard n={notify} onOpen={() => setPushOpen(true)} />
             {view === 'clean' ? <CleanList off={off} setOff={setOff} /> : <TaskList />}
           </>
         )}
       </main>
+      <Sheet open={pushOpen} onClose={() => setPushOpen(false)} title="Thông báo trên điện thoại">
+        <RemindersPanel n={notify} />
+      </Sheet>
       {view !== 'account' && (
         <nav className="cl-nav" aria-label="Điều hướng">
           <button className={view === 'clean' ? 'on' : ''} onClick={() => setView('clean')} aria-current={view === 'clean' ? 'page' : undefined}>
@@ -73,6 +82,25 @@ export default function CleanerApp() {
         </nav>
       )}
     </div>
+  );
+}
+
+/** Thẻ bật thông báo đẩy ở đầu màn Dọn phòng: chưa bật -> nút to; đã bật -> dòng xác nhận nhỏ */
+function PushCard({ n, onOpen }) {
+  if (n.demo || (!n.info && !n.err)) return null; // gói không có thông báo đẩy / đang tải
+  if (n.pushOn) {
+    return (
+      <button type="button" className="cl-push on" onClick={onOpen}>
+        <CheckCircle2 size={20} /><span>Đã bật thông báo trên máy này</span><ChevronRight size={18} />
+      </button>
+    );
+  }
+  return (
+    <button type="button" className="cl-push" onClick={onOpen}>
+      <span className="cl-push-ico"><Bell size={26} /></span>
+      <span className="cl-push-txt"><b>Bật thông báo</b><small>Báo phòng cần dọn, khách trả / nhận phòng</small></span>
+      <span className="cl-push-go">Bật</span>
+    </button>
   );
 }
 

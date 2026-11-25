@@ -94,7 +94,7 @@ export function getCleanings(state, bookings, from, to, locationId) {
     map[id] = {
       id, date, origDate: b.end, moved: !!a?.date && a.date !== b.end, roomId: b.roomId, room: idx[b.roomId].room, location: loc,
       outTime: b.checkOut, outPlatform: b.platform, outBooking: b,
-      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(id), note: state.cleanNotes?.[id] || '',
+      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(id), note: state.cleanNotes?.[id] || '', ord: a?.ord ?? null,
     };
   }
   for (const x of state.cleanExtra || []) {
@@ -106,12 +106,14 @@ export function getCleanings(state, bookings, from, to, locationId) {
     map[x.id] = {
       id: x.id, date: x.date, roomId: x.roomId, room: idx[x.roomId].room, location: loc, custom: true, note: x.note || '',
       outTime: x.time || '', outPlatform: 'Thêm tay', outBooking: null,
-      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(x.id),
+      next, sameDay: !!sameDay, inTime: sameDay ? next.checkIn : null, ...doneOf(x.id), ord: adj[x.id]?.ord ?? null,
     };
   }
   const t = (c) => c.outTime || '99:99';
+  const o = (c) => (c.ord == null ? Infinity : c.ord); // thứ tự admin kéo thả (thẻ chưa sắp xếp xếp sau)
   return Object.values(map).sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1)
+      : o(a) !== o(b) ? (o(a) < o(b) ? -1 : 1)
       : a.sameDay !== b.sameDay ? (a.sameDay ? -1 : 1)
         : t(a).localeCompare(t(b)),
   );

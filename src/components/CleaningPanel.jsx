@@ -31,9 +31,15 @@ function LocGroups({ cards, multi, render }) {
   ));
 }
 
+const GripIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    {[7, 12, 17].map((y) => [9, 15].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.7" />))}
+  </svg>
+);
+
 const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
-export function CleaningCard({ c, compact, showDate, onEdit }) {
+export function CleaningCard({ c, compact, showDate, onEdit, sort }) {
   const { state, dispatch, user } = useStore();
   const [anim, setAnim] = useState(false);
   const timer = useRef(null);
@@ -53,7 +59,8 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
   };
   const on = c.done || anim;
   return (
-    <div className={`clean-card tone-${st.tone} ${c.done ? 'done' : ''} ${anim ? 'celebrate' : ''}`}>
+    <div className={`clean-card tone-${st.tone} ${c.done ? 'done' : ''} ${anim ? 'celebrate' : ''} ${sort?.dragging === c.id ? 'dragging' : ''} ${sort?.over === c.id ? `drop-${sort.pos}` : ''}`}
+      data-cid={c.id} data-date={c.date} data-loc={c.location?.id || ''} data-done={c.done ? '1' : ''}>
       <button className={`check ${on ? 'on' : ''} ${anim ? 'anim' : ''}`} onClick={toggle} aria-label={c.done ? 'Bỏ đánh dấu đã dọn' : 'Đánh dấu đã dọn'}>
         {anim
           ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path className="check-draw" d="M5 12.5 L10 17.5 L19 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -92,6 +99,10 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
         )}
       </div>
       <div className="clean-actions">
+        {sort && !c.done && (
+          <button type="button" className="icon-btn sm ghost-btn drag-handle" aria-label={`Kéo để đổi thứ tự thẻ ${c.room.name} (hoặc dùng phím mũi tên lên / xuống)`}
+            onPointerDown={sort.start(c)} onKeyDown={sort.key(c)}><GripIcon /></button>
+        )}
         <button className="icon-btn sm ghost-btn" onClick={copyOne} aria-label={`Copy thẻ dọn ${c.room.name}`}><Copy size={16} /></button>
         {onEdit && <button className="icon-btn sm ghost-btn" onClick={() => onEdit(c)} aria-label={`Sửa thẻ dọn ${c.room.name}`}><Pencil size={15} /></button>}
       </div>
@@ -105,10 +116,59 @@ export function CleaningCard({ c, compact, showDate, onEdit }) {
  * Admin: sửa / dời ngày / xoá thẻ, thêm thẻ (addDate = ngày mặc định của thẻ mới).
  */
 export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, compact }) {
-  const { role, state } = useStore();
+  const { role, state, dispatch } = useStore();
   const canEdit = can(role, 'booking');
   const multiLoc = state.locations.length > 1;
   const [sheet, setSheet] = useState(null);
+  const [drag, setDrag] = useState(null); // { id, over, pos }
+  const cardsRef = useRef(cards); cardsRef.current = cards;
+  const offDrag = useRef(null);
+  useEffect(() => () => offDrag.current?.(), []);
+  // Admin kéo thả (hoặc phím mũi tên) để đổi thứ tự thẻ trong cùng ngày + cùng địa điểm. Thứ tự lưu ở cleanAdj[id].ord.
+  const commitOrder = (id, overId, pos) => {
+    const list = cardsRef.current;
+    const me = list.find((x) => x.id === id);
+    if (!me || id === overId) return;
+    const ids = list.filter((x) => x.date === me.date).map((x) => x.id).filter((x) => x !== id);
+    const at = ids.indexOf(overId);
+    if (at < 0) return;
+    ids.splice(at + (pos === 'after' ? 1 : 0), 0, id);
+    dispatch({ type: 'CLEAN_ORDER', orders: Object.fromEntries(ids.map((x, i) => [x, i])) });
+  };
+  const sameGroup = (a, b) => a.date === b.date && (a.location?.id || '') === (b.location?.id || '') && !b.done;
+  const sort = !canEdit ? null : {
+    dragging: drag?.id, over: drag?.over, pos: drag?.pos,
+    start: (c) => (e) => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      const st = { id: c.id, over: null, pos: 'before' };
+      setDrag({ ...st });
+      const move = (ev) => {
+        if (ev.clientY < 90) window.scrollBy(0, -14); else if (ev.clientY > window.innerHeight - 130) window.scrollBy(0, 14);
+        const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('[data-cid]');
+        const t = el && el.dataset.cid !== c.id ? cardsRef.current.find((x) => x.id === el.dataset.cid) : null;
+        if (t && sameGroup(c, t)) {
+          const r = el.getBoundingClientRect();
+          st.over = t.id; st.pos = ev.clientY < r.top + r.height / 2 ? 'before' : 'after';
+        } else st.over = null;
+        setDrag({ ...st });
+      };
+      const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); offDrag.current = null; };
+      const up = () => { stop(); if (st.over) commitOrder(c.id, st.over, st.pos); setDrag(null); };
+      const cancel = () => { stop(); setDrag(null); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
+      offDrag.current = stop;
+    },
+    key: (c) => (e) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      const sib = cardsRef.current.filter((x) => !x.done && sameGroup(c, x));
+      const i = sib.findIndex((x) => x.id === c.id);
+      const t = sib[i + (e.key === 'ArrowUp' ? -1 : 1)];
+      if (!t) return;
+      e.preventDefault();
+      commitOrder(c.id, t.id, e.key === 'ArrowUp' ? 'before' : 'after');
+    },
+  };
   const [openDone, setOpenDone] = useState(false);
   const todo = cards.filter((c) => !c.done);
   const done = cards.filter((c) => c.done);
@@ -127,10 +187,10 @@ export function CleaningList({ cards, grouped, selectDay, addDate, emptyText, co
               <span>{wdLong(date)}, {dm(date)}</span>
               <em>{list.length} phòng</em>
             </button>
-            <LocGroups cards={list} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />} />
+            <LocGroups cards={list} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} sort={sort} />} />
           </div>
         ))
-        : <LocGroups cards={todo} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} />} />}
+        : <LocGroups cards={todo} multi={multiLoc} render={(c) => <CleaningCard key={c.id} c={c} compact={compact} onEdit={edit} sort={sort} />} />}
       {done.length > 0 && (
         <div className={`done-group ${openDone ? 'open' : ''}`}>
           <button className="done-head" onClick={() => setOpenDone(!openDone)} aria-expanded={openDone}>
