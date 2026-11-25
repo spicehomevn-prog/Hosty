@@ -10,9 +10,18 @@ import { repriceAfter, setDays, setPlatformDays, mergeDays, mergePlatformDays, s
 import { fmtShort, fmtVND } from '../lib/money.js';
 import { todayKey, addDays, addMonths, startOfWeek, endOfMonth, rangeKeys, monthTitle, WD_SHORT, fromKey, timeAgo } from '../lib/dates.js';
 import { Sheet, MoneyInput, toast } from './ui.jsx';
+import { WeekRates } from './WeekRates.jsx';
 
-/** Bảng giá: chọn các ngày trên lịch rồi áp chung một giá một đêm cho phòng */
+/** Bảng giá: mặc định là bảng điền nhanh theo mẫu tuần; có thể chuyển sang lịch chọn ngày (giá lẻ, ngày lễ) */
 export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
+  const [view, setView] = useState('week');
+  return view === 'week'
+    ? <WeekRates onClose={onClose} initialRoom={initialRoom} onOpenOta={onOpenOta} onDays={() => setView('days')} />
+    : <RateCalendarDays onClose={onClose} initialRoom={initialRoom} onOpenOta={onOpenOta} onWeek={() => setView('week')} />;
+}
+
+/** Lịch chọn ngày: chọn các ngày rồi áp chung một giá một đêm cho phòng */
+function RateCalendarDays({ onClose, initialRoom, onOpenOta, onWeek }) {
   const { state } = useStore();
   const { fin, dispatch } = useFinance();
   const today = todayKey();
@@ -132,6 +141,7 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
           </div>
         </div>
       )}>
+      <button type="button" className="link week-back" onClick={onWeek}>← Bảng điền nhanh theo tuần</button>
       <RatesExcel month={month} />
       {onOpenOta && (
         <button type="button" className="rate-auto" onClick={onOpenOta}>
@@ -239,7 +249,7 @@ export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
   );
 }
 
-const DIRECT = 'Trực tiếp';
+export const DIRECT = 'Trực tiếp';
 const OTA_TAG = { Airbnb: 'A', 'Booking.com': 'B', Agoda: 'AG' };
 /** Các sàn đặt giá riêng được (cố định, giống form Excel) */
 function platformsOf() {
@@ -250,7 +260,7 @@ function platformsOf() {
  * Form Excel bảng giá của tháng: tải mẫu -> điền -> tải lên.
  * Trực tiếp: mỗi phòng 1 dòng (directRates). Các sàn: mỗi phòng 1 dòng "Mọi sàn" (rateTable) + 1 dòng / sàn (platformRates).
  */
-function RatesExcel({ month }) {
+export function RatesExcel({ month }) {
   const { state } = useStore();
   const { fin, dispatch } = useFinance();
   const { workspace } = useSession();
