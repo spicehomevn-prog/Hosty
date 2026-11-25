@@ -4,11 +4,14 @@ import { TRIAL, normPhone } from '../lib/plan.js';
 import { SupportLink } from './Support.jsx';
 import { useSession } from '../lib/session.jsx';
 import { Logo } from './Logo.jsx';
+import { LegalLinks } from './Legal.jsx';
+import { POLICY_VERSION } from '../lib/legal.js';
 
 /** Đăng ký dùng thử miễn phí: tạo cơ sở + tài khoản admin (đăng nhập bằng SĐT) */
 function Signup({ onBack }) {
   const { signup } = useSession();
   const [f, setF] = useState({ wsName: '', name: '', phone: '', password: '', again: '' });
+  const [agree, setAgree] = useState(false); // đồng ý Điều khoản + Chính sách bảo mật: không tích sẵn
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -28,8 +31,9 @@ function Signup({ onBack }) {
     if (!normPhone(f.phone)) return setErr('Số điện thoại chưa đúng (10 số, vd 0912 345 678)');
     if (f.password.length < 6) return setErr('Mật khẩu cần ít nhất 6 ký tự');
     if (f.password !== f.again) return setErr('Nhập lại mật khẩu chưa khớp');
+    if (!agree) return setErr('Vui lòng tích đồng ý Điều khoản sử dụng và Chính sách bảo mật');
     setBusy(true); setErr('');
-    try { await signup({ wsName: f.wsName.trim(), name: f.name.trim(), phone: f.phone, password: f.password }); } catch (e2) { setErr(e2.message); setBusy(false); }
+    try { await signup({ wsName: f.wsName.trim(), name: f.name.trim(), phone: f.phone, password: f.password, consent: true, policyVersion: POLICY_VERSION }); } catch (e2) { setErr(e2.message); setBusy(false); }
   };
   return (
     <form className="login-form signup-form" ref={formRef} onSubmit={submit}>
@@ -58,8 +62,12 @@ function Signup({ onBack }) {
         <span className="field-label">Nhập lại mật khẩu</span>
         <span className="input-ico"><Lock size={16} /><input className="input" type={show ? 'text' : 'password'} autoComplete="new-password" value={f.again} onChange={set('again')} /></span>
       </label>
+      <label className="consent-row">
+        <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+        <span>Tôi đã đọc và đồng ý với <a href="/dieu-khoan" target="_blank" rel="noopener">Điều khoản sử dụng</a> và <a href="/chinh-sach-bao-mat" target="_blank" rel="noopener">Chính sách bảo mật</a> của Hostexa.</span>
+      </label>
       {err && <p className="form-error">{err}</p>}
-      <button className="btn primary lg block" type="submit" disabled={busy}>
+      <button className="btn primary lg block" type="submit" disabled={busy || !agree}>
         {busy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />} Tạo tài khoản dùng thử
       </button>
       <p className="tiny muted center">Miễn phí {TRIAL.days} ngày · tối đa {TRIAL.maxRooms} phòng, {TRIAL.maxLocations} địa điểm · không cần thẻ thanh toán</p>
@@ -128,6 +136,7 @@ export default function Login() {
       </button>
       {demoLink && <button className="link-btn center-btn" onClick={startDemo}>Xem thử với dữ liệu mẫu</button>}
       <SupportLink />
+      <LegalLinks newTab />
       </>}
     </div>
   );

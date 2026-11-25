@@ -83,6 +83,12 @@ Ngoài ra trong form task vẫn có **Thêm tay vào lịch** (.ics cho iPhone, 
 - Số Zalo nhận yêu cầu nâng cấp: `UPGRADE_ZALO` trong `site.config.js` (hoặc biến `VITE_UPGRADE_ZALO` lúc build).
 - Chế độ xem thử với dữ liệu mẫu vẫn còn qua đường dẫn `/?demo` (để làm video, ảnh hướng dẫn).
 
+## Pháp lý & dữ liệu cá nhân
+
+- Trang công khai [`/chinh-sach-bao-mat`](https://hostexa.vercel.app/chinh-sach-bao-mat) và [`/dieu-khoan`](https://hostexa.vercel.app/dieu-khoan); soạn theo Luật 91/2025/QH15 và NĐ 356/2025/NĐ-CP. Điền thông tin đơn vị vận hành (tên, MST, địa chỉ, email) ở `src/lib/legal.js` để hiện ở cuối hai trang.
+- Đăng ký bắt buộc tích ô đồng ý; máy chủ lưu thời điểm và phiên bản đồng ý. Sửa nội dung hai trang thì đổi `POLICY_VERSION`.
+- Cơ sở → Tài khoản → **Xoá tài khoản**: nhập mật khẩu để xác nhận. Admin duy nhất của cơ sở xoá thì toàn bộ cơ sở và dữ liệu bị xoá vĩnh viễn; nhân viên chỉ xoá tài khoản của mình.
+
 ## Quy trình sử dụng
 1. Chủ hệ thống đăng nhập → **Tạo cơ sở mới** → Hostexa tự tạo tài khoản `<cơ sở>-admin` và hiện mật khẩu → bấm **Copy để gửi** qua Zalo.
 2. Admin cơ sở đăng nhập → trả lời 4 câu hỏi thiết lập phòng & lịch iCal.

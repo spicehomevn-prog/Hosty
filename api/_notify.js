@@ -7,7 +7,7 @@
 //   notify/sent.json         { [khoá lần nhắc]: thời điểm gửi }   – chống gửi trùng
 import { roomScope, isCleanerUser } from './_scope.js';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
+import { getJSON, putJSON, updateJSON, delJSON, ConflictError } from './_store.js';
 import { envClean, loadAccounts, wsFile } from './_auth.js';
 import { HttpError } from './_http.js';
 import { taskInstances, remindName } from '../src/lib/tasks.js';
@@ -98,6 +98,11 @@ export async function pushSubscribe(uid, ws, sub, ua) {
   }, null);
   await setIndex('push', uid, rec.subs.map((s) => s.ws));
   return rec.subs.length;
+}
+/** Xoá toàn bộ thiết bị nhận thông báo + tuỳ chọn của một tài khoản (khi xoá tài khoản) */
+export async function purgeUserPush(uid) {
+  await delJSON(pFile(uid));
+  await setIndex('push', uid, []);
 }
 export async function pushUnsubscribe(uid, endpoint) {
   const rec = await updateJSON(pFile(uid), (d) => ({ ...(d || {}), subs: (d?.subs || []).filter((s) => s.endpoint !== endpoint) }), null);

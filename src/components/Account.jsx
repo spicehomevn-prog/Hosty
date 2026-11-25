@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertTriangle, LogOut, KeyRound, ArrowLeftRight, Users, Loader2, CheckCircle2 } from '../lib/icons.jsx';
 import { useSession } from '../lib/session.jsx';
 import { useStore } from '../lib/store.jsx';
@@ -168,12 +168,66 @@ function ChangePassword({ onClose }) {
   );
 }
 
+/** Xoá tài khoản: hộp xác nhận nêu rõ sẽ mất gì, nhập mật khẩu để xác nhận. Admin duy nhất của cơ sở -> xoá cả cơ sở + dữ liệu. */
+function DeleteAccount({ onClose }) {
+  const { call, logout, user } = useSession();
+  const [info, setInfo] = useState(null);
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    call('/api/auth', { method: 'POST', body: { action: 'delete-account', dry: true } }).then(setInfo).catch((e) => setErr(e.message));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const wsName = useSession().workspace?.name;
+  const whole = info?.scope === 'workspace';
+  const go = async () => {
+    if (!pw) return setErr('Nhập mật khẩu để xác nhận');
+    setBusy(true); setErr('');
+    try {
+      await call('/api/auth', { method: 'POST', body: { action: 'delete-account', password: pw } });
+      logout();
+      toast('Đã xoá tài khoản');
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={busy ? () => {} : onClose} title="Xoá tài khoản"
+      footer={<button className="btn danger-solid block" onClick={go} disabled={busy || !info}>{busy && <Loader2 size={16} className="spin" />} {whole ? 'Xoá tài khoản và toàn bộ dữ liệu' : 'Xoá tài khoản của tôi'}</button>}>
+      <div className="delete-warn">
+        <AlertTriangle size={22} />
+        <div>
+          <b>{whole ? 'Toàn bộ cơ sở sẽ bị xoá vĩnh viễn' : 'Tài khoản của bạn sẽ bị xoá vĩnh viễn'}</b>
+          <p className="tiny">Không thể khôi phục sau khi xoá.</p>
+        </div>
+      </div>
+      {!info && !err && <p className="muted tiny"><Loader2 size={14} className="spin" /> Đang kiểm tra…</p>}
+      {whole && (
+        <ul className="delete-list">
+          <li>Cơ sở <b>{wsName}</b>: địa điểm, phòng, lịch đặt phòng, thẻ dọn phòng, task</li>
+          <li>Toàn bộ dữ liệu tài chính, bảng giá, chi phí</li>
+          <li>{info.accounts > 1 ? `${info.accounts} tài khoản của cơ sở (gồm ${info.members} nhân viên / dọn phòng)` : 'Tài khoản của bạn'}, các thiết bị nhận thông báo</li>
+          <li>Gói dịch vụ còn lại không được hoàn lại</li>
+        </ul>
+      )}
+      {info && !whole && (
+        <ul className="delete-list">
+          <li>Tài khoản <b>{user?.username}</b> và các thiết bị nhận thông báo của bạn</li>
+          <li>Dữ liệu của cơ sở vẫn được giữ cho những người còn lại</li>
+        </ul>
+      )}
+      <Field label="Nhập mật khẩu để xác nhận"><input className="input" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} /></Field>
+      {whole && <p className="tiny muted">Nếu cần giữ bản sao, hãy bấm "Xuất dữ liệu" ở màn Cơ sở trước khi xoá.</p>}
+      {err && <p className="form-error">{err}</p>}
+    </Sheet>
+  );
+}
+
 /** Thẻ tài khoản ở trang Cơ sở */
 export function AccountCard() {
   const s = useSession();
   const { cloud } = useStore();
   const [pw, setPw] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [del, setDel] = useState(false);
 
   if (s.role === 'demo') {
     return (
@@ -216,6 +270,8 @@ export function AccountCard() {
         {s.role === 'owner' && <button className="btn tiny" onClick={() => setAdmin(true)}><Users size={14} /> Quản lý tài khoản</button>}
         <button className="btn tiny danger" onClick={logout}><LogOut size={14} /> Đăng xuất</button>
       </div>
+      {s.role !== 'owner' && <button type="button" className="link-btn delete-link" onClick={() => setDel(true)}><Trash2 size={13} /> Xoá tài khoản</button>}
+      {del && <DeleteAccount onClose={() => setDel(false)} />}
       {pw && <ChangePassword onClose={() => setPw(false)} />}
       {admin && <AdminSheet onClose={() => { setAdmin(false); s.refresh(); }} />}
     </div>

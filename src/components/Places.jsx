@@ -9,6 +9,7 @@ import { SupportCard } from './Support.jsx';
 import { RemindersCard } from './Reminders.jsx';
 import { ExportLinksSheet } from './ExportLinks.jsx';
 import { can } from '../lib/perm.js';
+import { LegalLinks } from './Legal.jsx';
 
 const TONES = ['blue', 'violet', 'yellow', 'pink'];
 
@@ -127,6 +128,7 @@ export default function Places({ api }) {
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
         </div>
       </>}
+      <LegalLinks />
       <footer className="brand-foot"><Logo size={28} /><span>Lịch đặt phòng & dọn phòng cho khách sạn, homestay</span></footer>
     </div>
   );

@@ -2,7 +2,8 @@
 // POST /api/auth {action:'change-password', oldPassword, newPassword} -> { token }
 // GET  /api/auth                                               -> { user, workspaces }
 // GET  /api/auth?members=1&ws=ID                               -> { members: [{id, name, username, role}] }
-// POST /api/auth {action:'signup', wsName, name, phone, password}  -> { token, user, workspaces }   (đăng ký dùng thử, không cần đăng nhập)
+// POST /api/auth {action:'signup', wsName, name, phone, password, consent:true, policyVersion}  -> { token, user, workspaces }   (đăng ký dùng thử, không cần đăng nhập)
+// POST /api/auth {action:'delete-account', password, dry?}  -> xoá tài khoản của chính mình; admin duy nhất của cơ sở thì xoá cả cơ sở + dữ liệu
 // POST /api/auth {action:'add-member', ws, name} / {action:'remove-member', ws, id}  (admin cơ sở dùng thử, tối đa 1 member)
 import { createHash } from 'node:crypto';
 import { route, send, readBody, query, HttpError } from './_http.js';
@@ -13,6 +14,8 @@ import {
 import { createAccount, createWorkspace } from './_accounts.js';
 import { cleanLocations } from './_scope.js';
 import { TRIAL, isTrial, planExpired, planOf, normPhone } from '../src/lib/plan.js';
+import { POLICY_VERSION } from '../src/lib/legal.js';
+import { deleteAccount } from './_delete.js';
 
 const SIGNUPS = 'signups.json';
 const MAX_PER_IP_DAY = 3;
@@ -31,6 +34,9 @@ async function signup(req, b) {
   if (!name) throw new HttpError(400, 'Vui lòng nhập họ tên');
   if (!phone) throw new HttpError(400, 'Số điện thoại không hợp lệ');
   if (password.length < 6) throw new HttpError(400, 'Mật khẩu cần ít nhất 6 ký tự');
+  // đồng ý Điều khoản + Chính sách bảo mật: bắt buộc, không tích sẵn (Luật 91/2025 Điều 9, NĐ 356/2025 Điều 6)
+  if (b.consent !== true) throw new HttpError(400, 'Vui lòng đọc và đồng ý Điều khoản sử dụng và Chính sách bảo mật để tạo tài khoản');
+  if (b.policyVersion !== POLICY_VERSION) throw new HttpError(409, 'Điều khoản vừa được cập nhật. Vui lòng tải lại trang rồi đăng ký lại.');
   const { accounts } = await loadAccounts({ fresh: true });
   if (accounts.some((a) => a.username === phone)) throw new HttpError(409, 'Số điện thoại này đã có tài khoản – hãy đăng nhập');
   const { workspaces } = await loadWorkspaces({ fresh: true });
@@ -45,7 +51,7 @@ async function signup(req, b) {
     return { list };
   }, { list: [] });
   const ws = await createWorkspace({ name: wsName, extra: { plan: 'trial', trialEnds: now + TRIAL.days * 864e5, contact: { name, phone }, signupAt: now } });
-  await createAccount({ ws: ws.id, role: 'admin', name, username: phone, password });
+  await createAccount({ ws: ws.id, role: 'admin', name, username: phone, password, extra: { consent: { at: now, version: POLICY_VERSION, terms: true, privacy: true } } });
   const r = await login(phone, password);
   return { token: r.token, user: r.user, workspaces: await workspacesFor(r.user, { fresh: true }) };
 }
@@ -106,6 +112,18 @@ export default route(async (req, res) => {
     if (body.action === 'login') {
       const { token, user } = await login(body.username, body.password);
       return send(res, 200, { token, user, workspaces: await workspacesFor(user, { fresh: true }) });
+    }
+    if (body.action === 'delete-account') {
+      const user = await requireUser(req);
+      if (user.role === 'owner') throw new HttpError(400, 'Tài khoản chủ hệ thống khai báo trong biến môi trường, không xoá ở đây');
+      // xác nhận bằng mật khẩu (dùng lại login: có khoá khi sai nhiều lần)
+      if (!body.dry) {
+        try { await login(user.username, String(body.password || '')); } catch (e) {
+          if (e.status === 401) throw new HttpError(400, 'Mật khẩu không đúng'); // không dùng 401: app sẽ tự đăng xuất
+          throw e;
+        }
+      }
+      return send(res, 200, await deleteAccount(user, { dry: !!body.dry }));
     }
     if (body.action === 'change-password') {
       const user = await requireUser(req);

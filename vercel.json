@@ -6,7 +6,9 @@
     {
       "source": "/cal/:token",
       "destination": "/api/ical-out?k=:token"
-    }
+    },
+    { "source": "/chinh-sach-bao-mat", "destination": "/index.html" },
+    { "source": "/dieu-khoan", "destination": "/index.html" }
   ],
   "functions": {
     "api/finance.js": {
