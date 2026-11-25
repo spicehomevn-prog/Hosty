@@ -145,12 +145,11 @@ export function cleaningText(state, cards, { title, notes = {} } = {}) {
     for (const [locName, list] of Object.entries(byLoc)) {
       if (state.locations.length > 1) lines.push(`📍 ${locName}`);
       for (const c of list) {
-        const st = c.sameDay
-          ? `⚠️ GẤP – khách mới nhận ${c.inTime}`
-          : c.next ? `khách tiếp theo ${dm(c.next.start)}` : 'chưa có khách tiếp theo';
+        // gọn: chỉ nhắc khách tiếp theo khi họ nhận phòng ngay trong ngày (gấp)
+        const urgent = c.sameDay ? ` ⚠️ Gấp, khách nhận ${c.inTime}` : '';
         lines.push(c.custom
-          ? `${c.done ? '✅' : '▫️'} ${c.room.name}: dọn${c.outTime ? ` lúc ${c.outTime}` : ''} → ${st}`
-          : `${c.done ? '✅' : '▫️'} ${c.room.name}: khách trả ${c.outTime} → ${st}`);
+          ? `${c.done ? '✅' : '▫️'} ${c.room.name}: dọn${c.outTime ? ` lúc ${c.outTime}` : ''}${urgent}`
+          : `${c.done ? '✅' : '▫️'} ${c.room.name}: trả ${c.outTime}${urgent}`);
         if (c.note) lines.push(`   📝 ${c.note}`);
       }
     }
