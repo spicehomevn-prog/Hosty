@@ -7,12 +7,16 @@ import { Field, MoneyInput, Stepper } from './ui.jsx';
 
 export const DEPOSIT_METHODS = ['Chuyển khoản', 'Tiền mặt', 'Ví điện tử'];
 
-/** Dịch vụ cộng thêm: danh sách { id, name, price, qty } */
-export function ExtrasEditor({ value = [], onChange }) {
+/**
+ * Dịch vụ cộng thêm: danh sách { id, name, price, qty }.
+ * services: bảng giá dịch vụ (Bảng giá → Giá dịch vụ cộng thêm, chỉ cho đặt phòng trực tiếp) -> chip điền sẵn đơn giá.
+ */
+export function ExtrasEditor({ value = [], onChange, services }) {
   const set = (id, patch) => onChange(value.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const [focusId, setFocusId] = useState(null);
   const add = (x) => { const id = uid(); setFocusId(id); onChange([...value, { id, name: '', price: null, qty: 1, ...x }]); };
   const used = new Set(value.map((x) => x.name));
+  const list = services?.length ? services : EXTRA_SUGGEST;
   return (
     <div className="extras">
       {value.map((x) => (
@@ -29,8 +33,10 @@ export function ExtrasEditor({ value = [], onChange }) {
         </div>
       ))}
       <div className="chip-row extra-suggest">
-        {EXTRA_SUGGEST.filter((s) => !used.has(s.name)).map((s) => (
-          <button key={s.name} type="button" className="mini-chip" onClick={() => add({ name: s.name })}><Plus size={12} /> {s.name}</button>
+        {list.filter((s) => !used.has(s.name)).map((s) => (
+          <button key={s.name} type="button" className="mini-chip" onClick={() => add({ name: s.name, ...(s.price > 0 ? { price: s.price } : {}) })}>
+            <Plus size={12} /> {s.name}{s.price > 0 && <em>{fmtVND(s.price)}</em>}
+          </button>
         ))}
         <button type="button" className="mini-chip" onClick={() => add({})}><Plus size={12} /> Dịch vụ khác</button>
       </div>
@@ -39,14 +45,14 @@ export function ExtrasEditor({ value = [], onChange }) {
 }
 
 /** Dịch vụ cộng thêm + đặt cọc + khung tổng phải thu cho đặt phòng trực tiếp */
-export function PaymentFields({ room, extras, setExtras, deposit, setDeposit, method, setMethod }) {
+export function PaymentFields({ room, extras, setExtras, deposit, setDeposit, method, setMethod, services }) {
   const ext = extras.reduce((a, x) => a + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
   const total = (room || 0) + ext;
   const due = Math.max(0, total - (deposit || 0));
   const over = (deposit || 0) > total && total > 0;
   return (
     <>
-      <Field label="Dịch vụ cộng thêm"><ExtrasEditor value={extras} onChange={setExtras} /></Field>
+      <Field label="Dịch vụ cộng thêm"><ExtrasEditor value={extras} onChange={setExtras} services={services} /></Field>
       <Field label="Đặt cọc trước">
         <MoneyInput value={deposit} onChange={setDeposit} placeholder="Số tiền khách đã cọc" invalid={over} />
         {deposit > 0 && (

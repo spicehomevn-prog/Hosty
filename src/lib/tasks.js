@@ -24,7 +24,23 @@ export function repeatLabel(t) {
   if (t.repeat === 'monthly') return `Hằng tháng (ngày ${Number(t.date.slice(8))})`;
   return REPEATS.find((r) => r.id === t.repeat)?.label || '';
 }
-export const remindLabel = (m) => (m == null ? '' : m === 0 ? 'đúng giờ' : `trước ${REMINDS.find((r) => r.v === m)?.label || `${m} phút`}`);
+/** Nhắc tuỳ chỉnh "… tháng, … ngày" (lưu bằng phút như các mốc khác; 1 tháng = 30 ngày) */
+export const DAY_MIN = 1440;
+export const MONTH_DAYS = 30;
+export const remindFromMD = (months, days) => ((Number(months) || 0) * MONTH_DAYS + (Number(days) || 0)) * DAY_MIN;
+export const remindToMD = (m) => { const d = Math.round((Number(m) || 0) / DAY_MIN); return { months: Math.floor(d / MONTH_DAYS), days: d % MONTH_DAYS }; };
+export const isPresetRemind = (m) => REMINDS.some((r) => r.v === (m ?? null));
+/** Tên mốc nhắc: "15 phút", "1 ngày", "2 tháng 5 ngày" */
+export function remindName(m) {
+  const p = REMINDS.find((r) => r.v === m);
+  if (p) return p.label;
+  if (m % DAY_MIN === 0) {
+    const { months, days } = remindToMD(m);
+    return [months ? `${months} tháng` : '', days ? `${days} ngày` : ''].filter(Boolean).join(' ') || '0 ngày';
+  }
+  return m >= 60 && m % 60 === 0 ? `${m / 60} giờ` : `${m} phút`;
+}
+export const remindLabel = (m) => (m == null ? '' : m === 0 ? 'đúng giờ' : `trước ${remindName(m)}`);
 
 /** Task có lịch vào ngày `day` không */
 export function occursOn(t, day) {

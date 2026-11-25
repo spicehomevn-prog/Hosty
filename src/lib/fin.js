@@ -3,7 +3,7 @@ import { addDays, diffDays, todayKey } from './dates.js';
 import { PLATFORMS } from './platforms.js';
 import { coveredByDirect } from './derive.js';
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual', 'services'];
 export const DEFAULT_FEES = { Airbnb: 15, 'Booking.com': 15, Agoda: 18, Traveloka: 15, Expedia: 18, 'Trực tiếp': 0 };
 export const EXPENSE_GROUPS = ['Điện nước', 'Internet', 'Vật tư', 'Sửa chữa', 'Thuê nhà', 'Khác'];
 export const WEEK_NIGHTS = 7;
@@ -11,7 +11,7 @@ export const MONTH_NIGHTS = 28;
 
 export const emptyFin = () => ({
   settings: { taxOn: true, taxRate: 7, fees: { ...DEFAULT_FEES } },
-  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {}, platformRates: {}, otaManual: null,
+  rateTable: {}, dayDiscount: {}, stayDiscount: {}, otaListings: {}, otaRates: {}, otaRun: null, prices: {}, expenses: [], history: {}, roomMap: {}, directRates: {}, platformRates: {}, otaManual: null, services: [],
 });
 export const pickFin = (f) => {
   const e = emptyFin();

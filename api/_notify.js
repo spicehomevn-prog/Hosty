@@ -10,7 +10,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { getJSON, putJSON, updateJSON, ConflictError } from './_store.js';
 import { envClean, loadAccounts, wsFile } from './_auth.js';
 import { HttpError } from './_http.js';
-import { taskInstances, REMINDS } from '../src/lib/tasks.js';
+import { taskInstances, remindName } from '../src/lib/tasks.js';
 import { addDays } from '../src/lib/dates.js';
 import { getBookings } from '../src/lib/derive.js';
 import { balanceDue } from '../src/lib/fin.js';
@@ -183,7 +183,7 @@ export async function saveRun(entry, daily = {}) {
 }
 export async function loadRun() { return (await getJSON(LASTRUN, { etag: false }))?.data || null; }
 
-const remindText = (m) => (m === 0 ? 'Đến giờ' : `Còn ${REMINDS.find((r) => r.v === m)?.label || `${m} phút`}`);
+const remindText = (m) => (m === 0 ? 'Đến giờ' : `Còn ${remindName(m)}`);
 /** Thời điểm nhắc (ms, UTC) của 1 lần task: giờ làm (cả ngày = 08:00) giờ VN trừ số phút nhắc trước */
 export const fireAt = (occ, time, remind) => Date.parse(`${occ}T${time || '08:00'}:00+07:00`) - Number(remind) * 60000;
 const WINDOW = 20 * 60000; // cron chạy trễ tối đa 20 phút vẫn gửi
@@ -223,7 +223,10 @@ export async function pushDue(now = Date.now(), ctx = cronCtx()) {
     const data = await ctx.ws(ws);
     if (!data) continue;
     const rooms = roomNames(data);
-    const items = taskInstances((data.tasks || []).filter((t) => t.remind != null), addDays(today, -1), addDays(today, 2));
+    // nhắc trước nhiều ngày / tháng: xét các lần sắp tới đủ xa (theo mốc nhắc lớn nhất)
+    const withRemind = (data.tasks || []).filter((t) => t.remind != null);
+    const ahead = Math.ceil(Math.max(0, ...withRemind.map((t) => Number(t.remind) || 0)) / 1440);
+    const items = taskInstances(withRemind, addDays(today, -1), addDays(today, 2 + Math.min(ahead, 400)));
     for (const it of items) {
       if (it.done) continue;
       const at = fireAt(it.occ, it.time, it.remind);

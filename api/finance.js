@@ -34,7 +34,7 @@ async function staffPrices(req, ws) {
   return { version: fin?.data?.version || 0, data, readOnly: true };
 }
 
-export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual'];
+export const FIN_KEYS = ['settings', 'rateTable', 'dayDiscount', 'stayDiscount', 'otaListings', 'otaRates', 'otaRun', 'prices', 'expenses', 'history', 'roomMap', 'directRates', 'platformRates', 'otaManual', 'services'];
 export const finFile = (ws) => `fin/${ws}.json`;
 const pick = (d) => Object.fromEntries(FIN_KEYS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
 

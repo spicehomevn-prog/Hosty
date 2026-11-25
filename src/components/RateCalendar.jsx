@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ServicePrices } from './ServicePrices.jsx';
 import { useSession } from '../lib/session.jsx';
 import { readRows } from '../lib/report.js';
 import { downloadRateTemplate, parseRateSheet, FORM_PLATFORMS } from '../lib/directPrices.js';
@@ -14,9 +15,10 @@ import { WeekRates } from './WeekRates.jsx';
 
 /** Bảng giá: mặc định là bảng điền nhanh theo mẫu tuần; có thể chuyển sang lịch chọn ngày (giá lẻ, ngày lễ) */
 export function RateCalendar({ onClose, initialRoom, onOpenOta }) {
-  const [view, setView] = useState('week');
+  const [view, setView] = useState(initialRoom === 'services' ? 'services' : 'week');
+  if (view === 'services') return <ServicePrices onClose={onClose} onBack={() => setView('week')} />;
   return view === 'week'
-    ? <WeekRates onClose={onClose} initialRoom={initialRoom} onOpenOta={onOpenOta} onDays={() => setView('days')} />
+    ? <WeekRates onClose={onClose} initialRoom={initialRoom} onOpenOta={onOpenOta} onDays={() => setView('days')} onServices={() => setView('services')} />
     : <RateCalendarDays onClose={onClose} initialRoom={initialRoom} onOpenOta={onOpenOta} onWeek={() => setView('week')} />;
 }
 

@@ -24,6 +24,8 @@ function reducer(s, a) {
     case 'SETTINGS': return { ...s, settings: { ...s.settings, ...a.patch, fees: { ...s.settings.fees, ...(a.patch.fees || {}) } } };
     case 'SET_RATES': return { ...s, rateTable: setDays(s.rateTable, a.roomIds, a.days, a.price), prices: withPrices(s.prices, a.reprice) };
     // bảng giá riêng kênh Trực tiếp (không ảnh hưởng giá các sàn)
+    // bảng giá dịch vụ cộng thêm (chỉ dùng cho đặt phòng trực tiếp): [{ id, name, price }]
+    case 'SET_SERVICES': return { ...s, services: a.services };
     case 'SET_DIRECT_RATES': return { ...s, directRates: setDays(s.directRates, a.roomIds, a.days, a.price) };
     case 'MERGE_DIRECT_RATES': return { ...s, directRates: mergeDays(s.directRates, a.table) };
     // bảng giá riêng từng sàn (ưu tiên hơn bảng giá chung khi tính giá đặt phòng của sàn đó)

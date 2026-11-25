@@ -3,7 +3,7 @@ import { Trash2 } from '../lib/icons.jsx';
 import { TaskReminderBox } from './Reminders.jsx';
 import { useStore, uid } from '../lib/store.jsx';
 import { todayKey, dm } from '../lib/dates.js';
-import { REPEATS, REMINDS, repeatLabel } from '../lib/tasks.js';
+import { REPEATS, REMINDS, repeatLabel, remindName, remindFromMD, remindToMD, isPresetRemind } from '../lib/tasks.js';
 import { roomIndex } from '../lib/derive.js';
 import { Sheet, Field } from './ui.jsx';
 import { useMembers } from '../lib/members.js';
@@ -24,6 +24,14 @@ export function TaskSheet({ task, onClose }) {
   // task gắn phòng: chỉ giao được cho người phụ trách địa điểm của phòng đó (hoặc người đang được giao sẵn)
   const locId = roomIndex(state)[f.roomId]?.location.id;
   const members = allMembers.filter((m) => !locId || !m.locations?.length || m.locations.includes(locId) || m.id === f.assignee);
+  // nhắc tuỳ chỉnh: … tháng, … ngày trước
+  const [custom, setCustom] = useState(() => !isPresetRemind(f.remind));
+  const md = remindToMD(f.remind);
+  const setMD = (k) => (e) => {
+    const v = Math.max(0, Math.min(k === 'months' ? 12 : 365, Math.floor(Number(e.target.value) || 0)));
+    const next = { ...md, [k]: v };
+    setRemind(remindFromMD(next.months, next.days) || null);
+  };
   const setRemind = (v) => {
     if (v != null && !f.time) { setF({ ...f, remind: v, time: '08:00' }); setAutoTime(true); } else setF({ ...f, remind: v });
   };
@@ -66,16 +74,25 @@ export function TaskSheet({ task, onClose }) {
       <Field label="Nhắc trước">
         <div className="chip-row">
           {REMINDS.map((r) => (
-            <button key={String(r.v)} type="button" className={`mini-chip ${(f.remind ?? null) === r.v ? 'on' : ''}`} style={{ '--pc': '#6B4FD8' }} onClick={() => setRemind(r.v)}>{r.label}</button>
+            <button key={String(r.v)} type="button" className={`mini-chip ${!custom && (f.remind ?? null) === r.v ? 'on' : ''}`} style={{ '--pc': '#6B4FD8' }} onClick={() => { setCustom(false); setRemind(r.v); }}>{r.label}</button>
           ))}
+          <button type="button" className={`mini-chip ${custom ? 'on' : ''}`} style={{ '--pc': '#6B4FD8' }}
+            onClick={() => { setCustom(true); if (isPresetRemind(f.remind) && (f.remind ?? 0) < 1440) setRemind(remindFromMD(0, 3)); }}>Tuỳ chỉnh…</button>
         </div>
+        {custom && (
+          <div className="remind-custom">
+            <span>Nhắc trước</span>
+            <label><input type="number" inputMode="numeric" min="0" max="12" className="input sm" value={md.months || ''} placeholder="0" onChange={setMD('months')} aria-label="Số tháng" /> tháng</label>
+            <label><input type="number" inputMode="numeric" min="0" max="365" className="input sm" value={md.days || ''} placeholder="0" onChange={setMD('days')} aria-label="Số ngày" /> ngày</label>
+          </div>
+        )}
       </Field>
       {(f.remind != null || f.time) && f.title.trim() && (
         <TaskReminderBox f={f} roomName={roomName} summary={(
           <>
             {f.time ? `${dm(f.date)} lúc ${f.time}` : `${dm(f.date)} (cả ngày)`}
             {f.repeat && f.repeat !== 'none' ? ` · ${repeatLabel(f)}` : ''}
-            {f.remind != null ? ` · nhắc ${f.remind === 0 ? 'đúng giờ' : `trước ${REMINDS.find((r) => r.v === f.remind)?.label}`}` : ' · chưa chọn nhắc trước'}
+            {f.remind != null ? ` · nhắc ${f.remind === 0 ? 'đúng giờ' : `trước ${remindName(f.remind)}`}` : ' · chưa chọn nhắc trước'}
           </>
         )} />
       )}

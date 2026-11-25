@@ -199,7 +199,8 @@ function ManualForm({ data, onClose }) {
         </Field>
         <Field label="Giảm giá (không bắt buộc)"><DiscountInput value={discount} onChange={setDiscount} /></Field>
         {priceOk && price !== pay && <p className="tiny muted pay-note">Đã giảm {fmtVND(price - pay)} · tiền phòng còn {fmtVND(pay)}</p>}
-        <PaymentFields room={priceOk ? pay : 0} extras={extras} setExtras={setExtras} deposit={deposit} setDeposit={setDeposit} method={method} setMethod={setMethod} />
+        <PaymentFields room={priceOk ? pay : 0} extras={extras} setExtras={setExtras} deposit={deposit} setDeposit={setDeposit} method={method} setMethod={setMethod}
+          services={f.platform === 'Trực tiếp' ? finance.fin.services : null} />
         </>
       )}
       <div className="grid2">

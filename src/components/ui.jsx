@@ -43,9 +43,13 @@ export function Stepper({ value, onChange, min = 1, max = 50 }) {
   );
 }
 
+// <label> bọc cả khối có nút (chip, xoá dòng…): bấm nút xong thì nút bị gỡ khỏi trang, Safari lại coi như bấm vào
+// label và "bấm hộ" nút đầu tiên trong khung (vd. chip "+ dịch vụ" -> dòng vừa xoá hiện lại). Chặn việc bấm hộ đó.
+const stopLabelRelay = (e) => { if (e.target instanceof Element && e.target.closest('button[type="button"]')) e.preventDefault(); };
+
 export function Field({ label, children, hint }) {
   return (
-    <label className="field">
+    <label className="field" onClick={stopLabelRelay}>
       <span className="field-label">{label}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, RefreshCw, ChevronRight } from '../lib/icons.jsx';
+import { Copy, RefreshCw, ChevronRight, Plus } from '../lib/icons.jsx';
 import { useStore, platformColor } from '../lib/store.jsx';
 import { useFinance } from '../lib/finance.jsx';
 import { getBookings } from '../lib/derive.js';
@@ -18,7 +18,7 @@ const show = (n) => (n ? Number(n).toLocaleString('vi-VN') : '');
  * Bảng điền nhanh theo mẫu tuần: mỗi sàn 1 dòng × 4 ô (T2–T5, T6, T7, CN) -> áp cho khoảng ngày đã chọn.
  * Ô trống = giữ nguyên giá đang có. Giá lẻ / ngày lễ sửa ở lịch chọn ngày (onDays).
  */
-export function WeekRates({ onClose, initialRoom, onOpenOta, onDays }) {
+export function WeekRates({ onClose, initialRoom, onOpenOta, onDays, onServices }) {
   const { state } = useStore();
   const { fin, dispatch } = useFinance();
   const today = todayKey();
@@ -161,6 +161,16 @@ export function WeekRates({ onClose, initialRoom, onOpenOta, onDays }) {
         <span className="rate-auto-txt"><b>Sửa giá từng ngày, ngày lễ</b><small>Chọn ngày trên lịch, giảm giá theo ngày và theo số đêm</small></span>
         <ChevronRight size={18} />
       </button>
+      {onServices && (
+        <button type="button" className="rate-auto" onClick={onServices}>
+          <span className="rate-auto-ico svc"><Plus size={17} /></span>
+          <span className="rate-auto-txt">
+            <b>Giá dịch vụ cộng thêm</b>
+            <small>{fin.services?.length ? `${fin.services.length} dịch vụ · ${fin.services.slice(0, 3).map((x) => x.name).join(', ')}${fin.services.length > 3 ? '…' : ''}` : 'Ăn sáng, đưa đón, thuê xe… · chỉ cho đặt phòng trực tiếp'}</small>
+          </span>
+          <ChevronRight size={18} />
+        </button>
+      )}
       {onOpenOta && (
         <button type="button" className="rate-auto" onClick={onOpenOta}>
           <span className="rate-auto-ico"><RefreshCw size={17} /></span>
