@@ -10,3 +10,6 @@ export const siteUrl = (env = process.env) => {
 
 /** Số Zalo nhận yêu cầu nâng cấp gói Pro (để trống = chỉ hiện thông báo). Có thể ghi đè bằng env VITE_UPGRADE_ZALO lúc build. */
 export const UPGRADE_ZALO = '0904955479';
+
+/** Số Zalo hỗ trợ khách (hướng dẫn, báo lỗi, đặt lại mật khẩu). Có thể ghi đè bằng env VITE_SUPPORT_ZALO lúc build. */
+export const SUPPORT_ZALO = '0904955479';

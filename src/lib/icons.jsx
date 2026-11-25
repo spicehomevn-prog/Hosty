@@ -111,6 +111,7 @@ export const CalendarPlus = make('calendarPlus');
 export const CalendarRange = make('calendarRange');
 export const BedDouble = make('bookings');
 export const NotebookPen = make('inbox');
+export const MessageCircle = make('inbox'); // bong bóng chat
 export const Users = make('guests');
 export const UserRound = make('user');
 export const User = make('user');

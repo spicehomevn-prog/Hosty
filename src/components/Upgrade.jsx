@@ -91,7 +91,7 @@ export function UpgradeHost() {
           </div>
         ))}
       </div>
-      <p className="tiny muted">Giá chưa gồm VAT. {ZALO ? 'Bấm "Liên hệ Zalo": lời nhắn đã được copy sẵn, chỉ cần dán và gửi. Sau khi chuyển khoản, gói được kích hoạt trong ngày.' : ''}</p>
+      <p className="tiny muted">Cần tư vấn chọn gói? Nhắn Zalo hỗ trợ. Giá chưa gồm VAT. {ZALO ? 'Bấm "Liên hệ Zalo": lời nhắn đã được copy sẵn, chỉ cần dán và gửi. Sau khi chuyển khoản, gói được kích hoạt trong ngày.' : ''}</p>
     </Sheet>
   );
 }

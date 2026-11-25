@@ -5,6 +5,7 @@ import { timeAgo } from '../lib/dates.js';
 import { toast } from './ui.jsx';
 import { Logo } from './Logo.jsx';
 import { AccountCard } from './Account.jsx';
+import { SupportCard } from './Support.jsx';
 import { RemindersCard } from './Reminders.jsx';
 import { ExportLinksSheet } from './ExportLinks.jsx';
 import { can } from '../lib/perm.js';
@@ -47,6 +48,7 @@ export default function Places({ api }) {
 
       <h2 className="section-title"><UserRound size={18} /> Tài khoản</h2>
       <AccountCard />
+      <SupportCard />
 
       <h2 className="section-title"><Bell size={18} /> Thông báo</h2>
       <RemindersCard />

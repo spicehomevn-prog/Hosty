@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Sparkles, CheckCircle2, LogIn, Eye, EyeOff, Loader2, User, Lock, Building2, Bell } from '../lib/icons.jsx';
 import { TRIAL, normPhone } from '../lib/plan.js';
+import { SupportLink } from './Support.jsx';
 import { useSession } from '../lib/session.jsx';
 import { Logo } from './Logo.jsx';
 
@@ -126,6 +127,7 @@ export default function Login() {
         <Sparkles size={18} /> Đăng ký tài khoản dùng thử miễn phí
       </button>
       {demoLink && <button className="link-btn center-btn" onClick={startDemo}>Xem thử với dữ liệu mẫu</button>}
+      <SupportLink />
       </>}
     </div>
   );

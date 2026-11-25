@@ -1405,3 +1405,12 @@ input.switch:checked::after { transform: translateX(18px); }
 .plan-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
 .plan-pick .input { width: auto; height: 32px; }
 .plan-pay { flex-basis: 100%; }
+
+/* Liên hệ hỗ trợ Zalo */
+.support-card { display: flex; align-items: center; gap: 12px; width: 100%; margin: 12px 0 4px; padding: 12px 14px; border-radius: var(--r-sm, 14px); border: 1.5px solid var(--line); background: #fff; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.support-card:hover { border-color: #9DC3FF; }
+.support-ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #3E9BFF, #0068FF); }
+.support-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.support-txt b { font-size: 14.5px; }
+.support-txt small { font-size: 12.5px; color: var(--muted); }
+.support-link { display: block; margin: 14px auto 0; padding: 6px 10px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: #0068FF; cursor: pointer; text-align: center; }
