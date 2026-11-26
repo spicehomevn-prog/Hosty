@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useReducer, useRef, 
 import { api } from './session.jsx';
 import { useStore } from './store.jsx';
 import { merge3, deepEqual } from './merge.js';
-import { emptyFin, pickFin, toFreeze, setDays, setPlatformDays, mergeDays, mergePlatformDays } from './fin.js';
+import { emptyFin, pickFin, toFreeze, markGone, setDays, setPlatformDays, mergeDays, mergePlatformDays } from './fin.js';
 import { getBookings } from './derive.js';
 import { addDays, todayKey, addMonths } from './dates.js';
 
@@ -177,9 +177,11 @@ function FinanceInner({ cloud, children }) {
   // Chốt giá: đặt phòng từ sàn đủ giá theo bảng giá mà chưa có trong sổ
   useEffect(() => {
     if (!status.loaded) return;
-    const entries = toFreeze(getBookings(state), finRef.current);
+    const bookings = getBookings(state);
+    // đặt phòng sàn mới / đổi ngày -> chốt, tính lại giá; biến khỏi lịch khi còn ở tương lai -> đánh dấu đã huỷ
+    const entries = { ...markGone(state, bookings, finRef.current), ...toFreeze(bookings, finRef.current) };
     if (Object.keys(entries).length) dispatch({ type: 'PRICES', entries });
-  }, [state.events, state.overrides, fin.rateTable, fin.otaRates, fin.platformRates, status.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.events, state.overrides, state.syncInfo, fin.rateTable, fin.otaRates, fin.platformRates, status.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lấy giá các sàn (Airbnb, Booking.com, Agoda) qua Apify ngay – máy chủ chạy actor bằng APIFY_TOKEN, ghi vào file tài chính; tối đa 2 lần / tháng
   const runOta = useCallback(async () => {

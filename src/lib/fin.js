@@ -212,12 +212,60 @@ export function toFreeze(bookings, fin) {
     out[key] = null;
   }
   for (const b of bookings) {
-    if (b.source !== 'ical' || b.blocked || prices[b.id] || taken.has(b.id)) continue;
-    const est = rateEstimate(b, fin);
-    if (est) out[b.id] = freezeEntry(b, est);
+    if (b.source !== 'ical' || b.blocked || taken.has(b.id)) continue;
+    const e = prices[b.id];
+    if (!e) {
+      const est = rateEstimate(b, fin);
+      if (est) out[b.id] = freezeEntry(b, est);
+      continue;
+    }
+    const moved = redate(b, e, fin);
+    if (moved) out[b.id] = moved;
   }
   return out;
 }
+
+/**
+ * Sàn đổi ngày đặt phòng (cùng mã, vd. rút ngắn 3 -> 1 đêm): mục giá đã chốt vẫn giữ ngày/tiền cũ -> tính lại.
+ * Giá theo bảng giá / Apify: tính lại theo ngày mới. Giá thật (file sàn, nhập tay): chia theo số đêm mới.
+ * Ghi `changed.from` (ngày + tiền gốc lần đầu) để hiện cho chủ cơ sở xem. Không đổi gì -> null.
+ */
+export function redate(b, e, fin) {
+  if (e?.amount == null || !e.start || !e.end || (e.start === b.start && e.end === b.end)) return null;
+  const from = e.changed?.from || { start: e.start, end: e.end, amount: e.amount };
+  const changed = { from, at: Date.now() };
+  if (e.source === 'rate' || e.source === 'ota') {
+    const est = rateEstimate(b, fin);
+    if (est) return { ...freezeEntry(b, est), changed };
+  }
+  const oldN = Math.max(1, diffDays(e.start, e.end)); const newN = Math.max(1, diffDays(b.start, b.end));
+  const k = newN / oldN;
+  const scale = (v) => (v == null || v === '' ? v : Math.round(Number(v) * k));
+  const { goneAt, ...rest } = e; // eslint-disable-line no-unused-vars
+  return {
+    ...rest, start: b.start, end: b.end, changed,
+    ...(newN !== oldN ? { amount: scale(e.amount), ...(e.base != null ? { base: scale(e.base) } : {}), ...(e.fee != null && e.fee !== '' ? { fee: scale(e.fee) } : {}) } : {}),
+  };
+}
+
+/**
+ * Đặt phòng sàn đã chốt giá mà biến khỏi lịch iCal khi ngày ở còn ở tương lai (lịch vẫn đồng bộ được) -> đánh dấu `goneAt`,
+ * để sau khi qua ngày ở cũng không bị tính lại thành doanh thu. Xuất hiện lại trên lịch -> bỏ dấu.
+ */
+export function markGone(state, bookings, fin, today = todayKey()) {
+  const out = {};
+  const ids = new Set(bookings.map((b) => b.id));
+  const calOk = (calId) => state.syncInfo?.[calId]?.ok;
+  for (const [id, e] of Object.entries(fin.prices || {})) {
+    if (!e || e.amount == null) continue;
+    const calId = icalCal(id);
+    if (!calId) continue;
+    if (ids.has(id)) { if (e.goneAt) { const { goneAt, ...rest } = e; out[id] = rest; } continue; } // eslint-disable-line no-unused-vars
+    if (!e.goneAt && e.end && e.end > today && calOk(calId) && state.lastSync) out[id] = { ...e, goneAt: Date.now() };
+  }
+  return out;
+}
+const icalCal = (id) => (id.includes(':') && !id.startsWith('rep:') ? id.split(':')[0] : null);
 
 /**
  * Nhập file báo cáo của một sàn -> { entries (cho PRICES), summary }.
@@ -295,10 +343,21 @@ export function ledger(state, bookings, fin, today = todayKey()) {
   const cancelled = [];
   const calOk = (calId) => state.syncInfo?.[calId]?.ok;
   for (const [id, e] of Object.entries(fin.prices || {})) {
-    if (ids.has(id) || e.amount == null || !e.start || !e.end) continue;
-    const calId = id.includes(':') && !id.startsWith('rep:') ? id.split(':')[0] : null;
-    const manualGone = !calId && !id.startsWith('rep:'); // đặt phòng trực tiếp đã xoá
-    if (manualGone) continue;
+    if (ids.has(id) || e.amount == null || (!e.cancelled && (!e.start || !e.end))) continue;
+    const calId = icalCal(id);
+    const manualGone = !calId && !id.startsWith('rep:'); // đặt phòng trực tiếp đã xoá / huỷ
+    if (manualGone) {
+      // huỷ có giữ lại tiền (cọc / phí huỷ) -> doanh thu tháng huỷ, không tính đêm
+      const c = e.cancelled;
+      if (c?.keep > 0) {
+        items.push({
+          id, roomId: e.roomId || '', platform: e.platform || 'Trực tiếp', start: e.start || c.date, end: e.end || c.date, summary: e.guest || '',
+          source: 'manual', ledgerOnly: true, cancelFee: true, cancelDate: c.date, color: null,
+          price: { amount: c.keep, fee: 0, net: c.keep, source: 'manual', entry: e, missing: false, total: c.keep, due: 0 },
+        });
+      }
+      continue;
+    }
     // bản sao lịch khoá của đặt phòng trực tiếp (sàn trả ngược về) đã lỡ chốt giá -> không tính
     if (calId && (e.source === 'rate' || e.source === 'ota') && coveredByDirect(e.start, e.end, (state.manual || []).filter((m) => m.roomId === e.roomId))) continue;
     const b = {
@@ -307,7 +366,7 @@ export function ledger(state, bookings, fin, today = todayKey()) {
     };
     const fee = feeOf(fin, b.platform, e.amount, e.fee);
     const price = { amount: e.amount, fee, net: e.amount - fee, source: e.source, entry: e, missing: false };
-    if (calId && e.end > today && calOk(calId) && state.lastSync) cancelled.push({ ...b, price });
+    if (calId && (e.goneAt || (e.end > today && calOk(calId) && state.lastSync))) cancelled.push({ ...b, price });
     else items.push({ ...b, price });
   }
   return { items, cancelled };
@@ -335,11 +394,20 @@ export function expensesIn(fin, m) {
 /** Tổng hợp tháng m */
 export function monthSummary(items, fin, m) {
   const revenue = {}; const fees = {};
-  let discountTotal = 0; let servicesTotal = 0;
+  let discountTotal = 0; let servicesTotal = 0; let cancelTotal = 0;
   const dueList = [];
   let nights = 0; let pricedNights = 0; let missing = 0;
   const rows = [];
   for (const b of items) {
+    if (b.cancelFee) {
+      if (monthOf(b.cancelDate || '') !== m) continue;
+      const keep = b.price.amount;
+      cancelTotal += keep;
+      revenue[b.platform] = (revenue[b.platform] || 0) + keep;
+      fees[b.platform] = fees[b.platform] || 0;
+      rows.push({ b, n: 0, share: 1, amount: keep, fee: 0 });
+      continue;
+    }
     const n = nightsIn(b, m);
     if (!n) continue;
     const total = Math.max(1, diffDays(b.start, b.end));
@@ -383,8 +451,8 @@ export function monthSummary(items, fin, m) {
   rows.sort((a, b) => (a.b.start < b.b.start ? -1 : a.b.start > b.b.start ? 1 : 0));
   return {
     month: m, revenue: rev, fees: fee, revenueTotal, feeTotal, tax, salary, other, otherByGroup, cost,
-    profit: revenueTotal - cost, nights, adr: !fromHistory && pricedNights ? Math.round((revenueTotal - servicesTotal) / pricedNights) : null,
-    missing, rows, expenses: exp, fromHistory, history: hist || null, discountTotal: fromHistory ? 0 : discountTotal, servicesTotal: fromHistory ? 0 : servicesTotal, dueList,
+    profit: revenueTotal - cost, nights, adr: !fromHistory && pricedNights ? Math.round((revenueTotal - servicesTotal - cancelTotal) / pricedNights) : null,
+    missing, rows, expenses: exp, fromHistory, history: hist || null, discountTotal: fromHistory ? 0 : discountTotal, servicesTotal: fromHistory ? 0 : servicesTotal, cancelTotal: fromHistory ? 0 : cancelTotal, dueList,
   };
 }
 
@@ -402,7 +470,7 @@ export const platformOrder = (names) => {
 export function collectStats(items, m) {
   let total = 0; let collected = 0; let due = 0; let count = 0; let dueCount = 0;
   for (const b of items) {
-    if (b.source !== 'manual' || b.price?.amount == null) continue;
+    if (b.source !== 'manual' || b.cancelFee || b.price?.amount == null) continue;
     const p = b.price;
     const inMonth = b.start.slice(0, 7) <= m && b.end > `${m}-01`;
     if (!inMonth && !(p.due > 0 && b.start.slice(0, 7) < m)) continue;

@@ -26,6 +26,7 @@ function BookingDetail({ b, onClose }) {
   const finLocked = !pl.has('finance') && can(rl, 'finance');
   const [edit, setEdit] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const canEdit = can(role, 'booking');
   const info = roomIndex(state)[b.roomId];
   if (edit) return <ManualForm data={state.manual.find((m) => m.id === b.id) || b} onClose={onClose} />;
@@ -34,7 +35,8 @@ function BookingDetail({ b, onClose }) {
     <Sheet open onClose={onClose} title="Chi tiết đặt phòng"
       footer={!canEdit ? null : b.source === 'manual' ? (
         <>
-          <button className="icon-btn danger" onClick={() => { dispatch({ type: 'DELETE_MANUAL', id: b.id }); finance?.dispatch({ type: 'PRICE', id: b.id, entry: null }); toast('Đã xoá đặt phòng'); onClose(); }} aria-label="Xoá"><Trash2 size={18} /></button>
+          <button className="icon-btn danger" title="Xoá (nhập nhầm)" onClick={() => { if (!confirm('Xoá đặt phòng này (nhập nhầm)? Nếu khách huỷ, hãy dùng "Huỷ đặt phòng" để giữ lại tiền cọc / phí huỷ.')) return; dispatch({ type: 'DELETE_MANUAL', id: b.id }); finance?.dispatch({ type: 'PRICE', id: b.id, entry: null }); toast('Đã xoá đặt phòng'); onClose(); }} aria-label="Xoá đặt phòng (nhập nhầm)"><Trash2 size={18} /></button>
+          <button className="btn ghost danger" onClick={() => setCancelOpen(true)}><Ban size={16} /> Huỷ</button>
           <button className="btn primary block" onClick={() => setEdit(true)}>Sửa đặt phòng</button>
         </>
       ) : (
@@ -55,6 +57,7 @@ function BookingDetail({ b, onClose }) {
       {finance && !b.blocked && <PriceBlock b={b} finance={finance} onEdit={() => (b.source === 'manual' ? setEdit(true) : setPriceOpen(true))} />}
       {!finance && !b.blocked && finLocked && <LockedRow feature="finance" title="Giá & thanh toán" sub="Giá phòng, phí sàn, đặt cọc, còn phải thu" />}
       {priceOpen && <PriceSheet b={b} onClose={() => setPriceOpen(false)} />}
+      {cancelOpen && <CancelSheet b={b} finance={finance} onClose={() => setCancelOpen(false)} onDone={onClose} />}
       {(b.summary || b.description) && (
         <div className="bk-desc">
           {b.summary && <b>{b.summary}</b>}
@@ -91,12 +94,55 @@ function PriceBlock({ b, finance, onEdit }) {
         <div><span>Phí sàn{p.entry?.fee == null ? ` (${feePct(finance.fin, b.platform)}%)` : ''}</span><b>{p.fee ? `−${fmtVND(p.fee)}` : fmtVND(0)}</b></div>
         <div className="net"><span>Thực nhận{p.extras > 0 ? ' (gồm DV)' : ''}</span><b>{fmtVND(p.net)}</b></div>
       </div>
+      {p.entry?.changed?.from && (
+        <p className="redate-note">Sàn đã đổi ngày ({diffDays(p.entry.changed.from.start, p.entry.changed.from.end)} → {diffDays(b.start, b.end)} đêm, trước đây {dmShort(p.entry.changed.from.start)} → {dmShort(p.entry.changed.from.end)}). Giá đã tính lại từ {fmtVND(p.entry.changed.from.amount)}.</p>
+      )}
       {b.source === 'manual' && p.entry && <PayBlock p={p} b={b} finance={finance} />}
       <div className="bk-price-foot">
         <small>{SOURCE_LABEL[p.source]}{p.estimated ? ' · ước tính' : ''}{ro ? ' · chỉ xem' : ''}</small>
         {!ro && <button className="link" onClick={onEdit}><Pencil size={14} /> Sửa giá</button>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Huỷ đặt phòng trực tiếp: phòng được trả lại lịch (xoá khỏi lịch, thẻ dọn, link xuất lên sàn);
+ * số tiền giữ lại (cọc / phí huỷ) tính vào doanh thu tháng huỷ. Giữ lại 0 -> như xoá.
+ */
+export function CancelSheet({ b, finance, onClose, onDone }) {
+  const { dispatch } = useStore();
+  const e = finance?.fin.prices?.[b.id] || null;
+  const edit = !!e?.cancelled; // sửa số tiền giữ lại của đặt phòng đã huỷ (từ Tài chính)
+  const [keep, setKeep] = useState(() => (edit ? e.cancelled.keep : Number(e?.deposit) || 0));
+  const [note, setNote] = useState(() => e?.cancelled?.note || '');
+  const total = e ? (Number(e.amount) || 0) : 0;
+  const go = () => {
+    if (!edit) dispatch({ type: 'DELETE_MANUAL', id: b.id });
+    if (finance && !finance.readOnly) {
+      finance.dispatch({
+        type: 'PRICE', id: b.id,
+        entry: keep > 0 && e ? { ...e, roomId: e.roomId || b.roomId, platform: e.platform || b.platform, guest: e.guest || b.summary || '', start: e.start || b.start, end: e.end || b.end, cancelled: { at: e.cancelled?.at || Date.now(), date: e.cancelled?.date || todayKey(), keep: Math.round(keep), ...(note.trim() ? { note: note.trim() } : {}) } } : null,
+      });
+    }
+    toast(edit ? 'Đã lưu' : keep > 0 ? `Đã huỷ · giữ lại ${fmtVND(keep)}` : 'Đã huỷ đặt phòng');
+    onClose(); onDone?.();
+  };
+  return (
+    <Sheet open onClose={onClose} title={edit ? 'Đặt phòng đã huỷ' : 'Huỷ đặt phòng'}
+      footer={<button className={`btn block ${edit ? 'primary' : 'danger-solid'}`} onClick={go} disabled={keep > total && total > 0}>{edit ? 'Lưu' : 'Xác nhận huỷ'}</button>}>
+      {!edit && <p className="tiny muted">Phòng sẽ được trả lại lịch (bỏ chặn trên các sàn, bỏ thẻ dọn phòng).</p>}
+      {finance && e ? (
+        <>
+          <Field label="Số tiền giữ lại (cọc / phí huỷ)" hint={`Tính vào doanh thu ${edit ? 'tháng huỷ' : 'tháng này'} · để 0 nếu hoàn hết cho khách`}>
+            <MoneyInput value={keep} onChange={(v) => setKeep(v || 0)} placeholder="0" invalid={keep > total && total > 0} />
+            {keep > total && total > 0 && <span className="field-error">Lớn hơn tiền phòng ({fmtVND(total)})</span>}
+          </Field>
+          <Field label="Ghi chú (không bắt buộc)"><input className="input" value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="VD: khách huỷ trước 3 ngày, giữ cọc" /></Field>
+          {edit && <button type="button" className="link danger" onClick={() => { finance.dispatch({ type: 'PRICE', id: b.id, entry: null }); toast('Đã xoá khỏi sổ'); onClose(); }}><Trash2 size={14} /> Xoá khỏi sổ (không tính tiền)</button>}
+        </>
+      ) : <p>Huỷ đặt phòng của <b>{b.summary || 'khách'}</b> ({dmShort(b.start)} → {dmShort(b.end)})?</p>}
+    </Sheet>
   );
 }
 
@@ -146,6 +192,13 @@ function ManualForm({ data, onClose }) {
   const est = needPrice && f.platform === 'Trực tiếp' ? directEstimate(finance.fin, f.roomId, f.start, f.end) : null;
   useEffect(() => { if (auto) setPrice(est); }, [auto, est]);
   const typePrice = (v) => { setAuto(false); setPrice(v); };
+  // sửa ngày đặt phòng đã có giá -> gợi ý giá theo ngày mới (bảng giá Trực tiếp, không có thì chia theo số đêm); không tự đổi
+  const oldN = data?.start && data?.end ? diffDays(data.start, data.end) : 0;
+  const newN = f.end > f.start ? diffDays(f.start, f.end) : 0;
+  const redated = !!oldEntry && !!oldN && newN > 0 && (f.start !== data.start || f.end !== data.end);
+  const oldBase = oldEntry ? Number(oldEntry.base ?? oldEntry.amount) || 0 : 0;
+  const suggest = !redated ? null
+    : (f.platform === 'Trực tiếp' && directEstimate(finance?.fin, f.roomId, f.start, f.end)) || (oldBase ? Math.round((oldBase * newN) / oldN) : null);
   const priceOk = !needPrice || (price != null && price > 0);
   const valid = f.roomId && f.start && f.end && f.end > f.start && priceOk;
   const save = () => {
@@ -210,6 +263,12 @@ function ManualForm({ data, onClose }) {
         <Field label="Giờ trả"><input type="time" className="input" value={f.checkOut} onChange={set('checkOut')} /></Field>
       </div>
       {f.end <= f.start && <p className="form-error">Ngày trả phải sau ngày nhận.</p>}
+      {needPrice && suggest != null && suggest !== price && (
+        <div className="redate-hint">
+          <span>Ngày đã đổi ({oldN} → {newN} đêm). Giá phòng theo ngày mới: <b>{fmtVND(suggest)}</b></span>
+          <button type="button" className="btn tiny" onClick={() => typePrice(suggest)}>Dùng giá này</button>
+        </div>
+      )}
       <Field label="Ghi chú"><textarea className="input" rows={2} value={f.note} onChange={set('note')} placeholder="Yêu cầu đặc biệt, tiền cọc…" /></Field>
     </Sheet>
   );

@@ -1574,3 +1574,10 @@ input.switch:checked::after { transform: translateX(18px); }
 .delete-list { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; }
 .btn.danger-solid { background: #C83355; color: #fff; border-color: #C83355; }
 .btn.danger-solid:disabled { opacity: .6; }
+
+/* --- Đổi ngày / huỷ đặt phòng --- */
+.redate-hint { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--yellow-soft); color: var(--ink); border-radius: var(--r-sm); padding: 10px 12px; font-size: 14px; margin: 4px 0 12px; }
+.redate-hint .btn.tiny { background: #fff; }
+.redate-note { margin: 8px 0 0; font-size: 13px; color: var(--yellow-ink); background: var(--yellow-soft); border-radius: 10px; padding: 8px 10px; }
+.fin-cancel { color: var(--pink-ink); font-weight: 600; }
+.link.danger { color: #C83355; display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; }

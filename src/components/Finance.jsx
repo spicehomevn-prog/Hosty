@@ -9,6 +9,7 @@ import { fmtVND, fmtShort } from '../lib/money.js';
 import { todayKey, addMonths, monthTitle, dm } from '../lib/dates.js';
 import { PriceSheet, ExpenseSheet, HistorySheet, FinanceSettings } from './FinanceSheets.jsx';
 import { ImportReport } from './ImportReport.jsx';
+import { CancelSheet } from './BookingSheet.jsx';
 import { RateCalendar } from './RateCalendar.jsx';
 
 const REV = '#7C5CE6';
@@ -46,7 +47,8 @@ export default function Finance({ api }) {
   const cancelledHere = cancelled.filter((b) => b.start.slice(0, 7) <= month && b.end.slice(0, 7) >= month);
 
   const openRow = (b) => {
-    if (b.source === 'manual' && !b.ledgerOnly) api.openBooking(b);
+    if (b.cancelFee) open('cancel', b);
+    else if (b.source === 'manual' && !b.ledgerOnly) api.openBooking(b);
     else open('price', b);
   };
 
@@ -153,7 +155,9 @@ export default function Finance({ api }) {
             <span className="fin-bar" style={{ background: platformColor(b.platform) }} />
             <span className="arr-main">
               <b>{idx[b.roomId]?.room.name || 'Không gắn phòng'}</b>
-              <small>{b.platform} · {dm(b.start)} → {dm(b.end)}{n !== Math.round((new Date(b.end) - new Date(b.start)) / 864e5) ? ` · ${n} đêm trong tháng` : ''}</small>
+              {b.cancelFee
+                ? <small><span className="fin-cancel">Đã huỷ {dm(b.cancelDate)}</span>{b.start !== b.end ? ` · ${dm(b.start)} → ${dm(b.end)}` : ''} · giữ lại cọc / phí huỷ</small>
+                : <small>{b.platform} · {dm(b.start)} → {dm(b.end)}{n !== Math.round((new Date(b.end) - new Date(b.start)) / 864e5) ? ` · ${n} đêm trong tháng` : ''}</small>}
             </span>
             {amount == null
               ? <em className="ftag warn">Chưa có giá</em>
@@ -214,6 +218,7 @@ export default function Finance({ api }) {
         </div>
       </div>
 
+      {sheet?.type === 'cancel' && <CancelSheet b={sheet.data} finance={finance} onClose={() => setSheet(null)} />}
       {sheet?.type === 'price' && <PriceSheet b={sheet.data} onClose={() => setSheet(null)} />}
       {sheet?.type === 'expense' && <ExpenseSheet expense={sheet.data} month={month} onClose={() => setSheet(null)} />}
       {sheet?.type === 'history' && <HistorySheet month={sheet.data} onClose={() => setSheet(null)} />}
